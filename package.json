@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "validate": "node validation/backend-validation.mjs"
+    "start": "node src/server.mjs",
+    "test": "node test/backend.test.mjs",
+    "validate": "node validation/backend-validation.mjs && node test/backend.test.mjs"
   }
 }
