@@ -1,0 +1,28 @@
+name: Backend Validation
+
+on:
+  push:
+    branches:
+      - main
+      - fix/ai-native-2.0-backend-validation
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate business flow
+        run: npm run validate
+      - name: Runtime health smoke test
+        run: |
+          node src/server.mjs > /tmp/backend.log 2>&1 &
+          PID=$!
+          trap 'kill $PID' EXIT
+          sleep 1
+          curl --fail http://127.0.0.1:3000/health
