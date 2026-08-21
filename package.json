@@ -1,0 +1,9 @@
+{
+  "name": "department-registration-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate": "node validation/backend-validation.mjs"
+  }
+}
