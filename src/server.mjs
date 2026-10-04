@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { URL } from 'node:url';
+import { handleRuntimeRoute } from './runtime-api.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
@@ -17,6 +18,7 @@ const route = async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {});
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { status: 'ok', service: 'department-registration-backend' });
+  if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
   if (req.method === 'GET' && url.pathname === '/api/cities') return json(res, 200, { data: data.cities });
   if (req.method === 'GET' && url.pathname === '/api/hospitals') { const cityId = url.searchParams.get('cityId'); return json(res, 200, { data: data.hospitals.filter(x => !cityId || x.cityId === cityId) }); }
   if (req.method === 'GET' && url.pathname === '/api/campuses') { const hospitalId = url.searchParams.get('hospitalId'); return json(res, 200, { data: data.campuses.filter(x => !hospitalId || x.hospitalId === hospitalId) }); }
@@ -36,5 +38,13 @@ const route = async (req, res) => {
   }
   return json(res, 404, { error: 'NOT_FOUND' });
 };
-export const server = http.createServer((req, res) => route(req, res).catch(error => json(res, 400, { error: error.message })));
+export const server = http.createServer((req, res) => route(req, res).catch(error => json(
+  res,
+  error.statusCode || 400,
+  {
+    error: error.code || 'BAD_REQUEST',
+    message: error.message,
+    ...(error.details ? { details: error.details } : {}),
+  }
+)));
 if (process.argv[1] && process.argv[1].endsWith('server.mjs')) server.listen(port, '0.0.0.0', () => console.log(`department-registration-backend listening on ${port}`));
