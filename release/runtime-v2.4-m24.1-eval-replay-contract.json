@@ -1,0 +1,177 @@
+{
+  "milestone": "M24.1",
+  "release": "AI Native Runtime V2.4",
+  "title": "Eval Dataset + Replay Contract",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "base": {
+    "releaseBranch": "release/ai-native-runtime-v2.3-production",
+    "productionBaselineSha": "34578464f5d19e87978ccb81719fb23a4b79d6f1"
+  },
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.1-eval-replay-contract",
+    "stagingRuntimeSha": "ec7d914a0143cc0b5180cc22a1bac9eb3a99cf01"
+  },
+  "scope": {
+    "executionIntroduced": false,
+    "purpose": "versioned, immutable, hash-verifiable synthetic eval fixtures and replay manifests for later regression execution",
+    "access": "platform administrator only",
+    "replayContractVersion": "eval-replay-v1"
+  },
+  "capabilities": [
+    "Eval Suite registry",
+    "Versioned Eval Suite drafts",
+    "Synthetic Eval Cases",
+    "Structured-output assertion contract",
+    "Evidence / provenance assertion contract",
+    "Router decision assertion contract",
+    "Execution budget assertion contract",
+    "Frozen fixture SHA-256",
+    "Case content integrity re-hash",
+    "Replay manifest bound to candidate Runtime SHA",
+    "Optional baseline Runtime SHA",
+    "Workflow / Router / RAG version binding",
+    "Replay manifest SHA-256",
+    "Replay idempotency conflict detection",
+    "Private source body rejection",
+    "Secret / credential field rejection",
+    "Frozen suite immutability"
+  ],
+  "fixtureSafety": {
+    "sourceBodiesPersisted": false,
+    "allowedSourceReferenceShape": [
+      "sourceFileId",
+      "sourceVersion",
+      "lineStart",
+      "lineEnd",
+      "contentSha256",
+      "contextRole",
+      "sourceProvider"
+    ],
+    "forbiddenExamples": [
+      "sourceBody",
+      "sourceText",
+      "retrievedText",
+      "documentBody",
+      "rawSource",
+      "snippet"
+    ],
+    "secretGuard": true,
+    "fixtureKind": "SYNTHETIC"
+  },
+  "assertions": {
+    "groups": [
+      "structuredOutput",
+      "evidence",
+      "router",
+      "execution"
+    ],
+    "structuredOutput": [
+      "requiredKeys",
+      "exact",
+      "jsonSchemaSha256"
+    ],
+    "evidence": [
+      "required",
+      "minCount",
+      "allowedSourceFileIds",
+      "requireContentHash"
+    ],
+    "router": [
+      "matched",
+      "policyResult",
+      "routeRuleKey",
+      "selectedProviderKey",
+      "selectedModelKey",
+      "providerHealthStatus"
+    ],
+    "execution": [
+      "status",
+      "maxDurationMs",
+      "maxEstimatedCost",
+      "costCurrency"
+    ]
+  },
+  "schema": {
+    "migration": "017_eval_replay_contract.sql",
+    "totalMigrationFiles": 18,
+    "tables": [
+      "eval_suites",
+      "eval_suite_versions",
+      "eval_cases",
+      "eval_replay_manifests"
+    ],
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=17 total=18"
+  },
+  "api": {
+    "createSuite": "POST /api/runtime/eval-suites",
+    "listSuites": "GET /api/runtime/eval-suites",
+    "createVersion": "POST /api/runtime/eval-suites/:suiteId/versions",
+    "addCase": "POST /api/runtime/eval-suite-versions/:versionId/cases",
+    "freezeVersion": "POST /api/runtime/eval-suite-versions/:versionId/freeze",
+    "versionDetail": "GET /api/runtime/eval-suite-versions/:versionId",
+    "createReplayManifest": "POST /api/runtime/eval-replay-manifests",
+    "replayManifestDetail": "GET /api/runtime/eval-replay-manifests/:manifestId",
+    "authorization": "platform administrator"
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.1 Eval Replay Contract Gate",
+    "initialRunId": 37215146385,
+    "initialRunStatus": "SUCCESS",
+    "finalCandidateRunId": 37215218552,
+    "finalCandidateRunStatus": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "v23BillingLedgerRegression": "PASS",
+    "v23BillingOperationsRegression": "PASS",
+    "v23CollectionsRegression": "PASS",
+    "v23RevenueAnalyticsRegression": "PASS",
+    "v23FinancialAdjustmentsRegression": "PASS",
+    "v23FinanceCloseRegression": "PASS",
+    "v23CommercialFinanceRcE2E": "PASS",
+    "m241EvalReplayContract": "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "b05d6673-ef88-4f9c-b0ef-2ed1172d493c",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "http": {
+      "evalSuitesUnauthenticated": 401,
+      "replayManifestsUnauthenticated": 401,
+      "observedRequestsLastHour": 8,
+      "http2xx": 1,
+      "http4xx": 7,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 29
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestones": [
+    "M24.2 Eval Runner + Assertion Engine",
+    "M24.3 Regression Comparator + Release Gate",
+    "M24.4 Production-safe Replay / Shadow Eval",
+    "M24.5 Reliability Analytics",
+    "M24.6 Reliability RC Freeze"
+  ],
+  "conclusion": "M24.1 Eval Dataset + Replay Contract is STAGING PASS / FROZEN. Synthetic eval fixtures are versioned, immutable after freeze, content-hash verified, safe from private source-body and secret persistence, and replay manifests are deterministically bound to exact candidate Runtime SHAs. No model execution is introduced yet. Production remains on the frozen V2.3 baseline."
+}
