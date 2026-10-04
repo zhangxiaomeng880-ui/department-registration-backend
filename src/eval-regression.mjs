@@ -132,6 +132,9 @@ export const compareEvalRuns=async({baselineEvalRunId,candidateEvalRunId,idempot
   if(!['PASS','FAIL'].includes(baseline.status)||!['PASS','FAIL'].includes(candidate.status)) throw errorOf(
     'Only completed PASS/FAIL Eval Runs can be compared','EVAL_COMPARISON_RUN_NOT_COMPLETE',409
   );
+  if(!/^[a-f0-9]{64}$/i.test(String(baseline.resultSha256||''))||!/^[a-f0-9]{64}$/i.test(String(candidate.resultSha256||''))){
+    throw errorOf('Eval Runs must have valid result SHA-256 evidence','EVAL_COMPARISON_RUN_INTEGRITY_MISSING',409);
+  }
   const baselineFixture=baseline.summary?.fixtureSha256||null;
   const candidateFixture=candidate.summary?.fixtureSha256||null;
   if(!baselineFixture||baselineFixture!==candidateFixture) throw errorOf(
@@ -247,13 +250,13 @@ const validatePolicy=policy=>{
   const integerFields=['maxCaseRegressions','maxAssertionRegressions','maxEvidenceRegressions','maxRouterDrifts'];
   for(const key of integerFields){
     const n=Number(policy[key]);
-    if(!Number.isInteger(n)||n<0) throw errorOf(`${key} must be a non-negative integer`,'INVALID_EVAL_RELEASE_GATE_POLICY',{field:key});
+    if(!Number.isInteger(n)||n<0) throw errorOf(`${key} must be a non-negative integer`,'INVALID_EVAL_RELEASE_GATE_POLICY',400,{field:key});
   }
   for(const key of ['maxCostIncreasePct','maxLatencyIncreasePct']){
     const n=Number(policy[key]);
-    if(!Number.isFinite(n)||n<0) throw errorOf(`${key} must be a non-negative number`,'INVALID_EVAL_RELEASE_GATE_POLICY',{field:key});
+    if(!Number.isFinite(n)||n<0) throw errorOf(`${key} must be a non-negative number`,'INVALID_EVAL_RELEASE_GATE_POLICY',400,{field:key});
   }
-  if(typeof policy.requireCandidatePass!=='boolean') throw errorOf('requireCandidatePass must be boolean','INVALID_EVAL_RELEASE_GATE_POLICY',{field:'requireCandidatePass'});
+  if(typeof policy.requireCandidatePass!=='boolean') throw errorOf('requireCandidatePass must be boolean','INVALID_EVAL_RELEASE_GATE_POLICY',400,{field:'requireCandidatePass'});
   return {
     requireCandidatePass:policy.requireCandidatePass,
     maxCaseRegressions:Number(policy.maxCaseRegressions),
