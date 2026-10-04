@@ -1,0 +1,79 @@
+name: Runtime Orchestrator Validation
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-persistence
+  workflow_dispatch:
+
+jobs:
+  runtime-orchestrator:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: runtime_ci_password
+          MYSQL_ROOT_PASSWORD: runtime_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pruntime_ci_root_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+
+      - name: Apply Runtime migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+        run: bash scripts/validate-runtime-persistence.sh
+
+      - name: Validate Context Bridge and Runtime Orchestrator
+        env:
+          PORT: 3100
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3100
+          OPENAI_API_KEY: x
+          OPENAI_MODEL: test-model
+          OPENAI_BASE_URL: http://127.0.0.1:4010/v1
+        run: |
+          node test/mock-openai-responses-server.mjs > /tmp/mock-openai-orchestrator.log 2>&1 &
+          MOCK_PID=$!
+          node src/server.mjs > /tmp/runtime-orchestrator.log 2>&1 &
+          RUNTIME_PID=$!
+          trap 'kill $MOCK_PID $RUNTIME_PID 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          npm run validate:context-bridge
+          npm run validate:runtime-orchestrator
