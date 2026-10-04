@@ -73,7 +73,6 @@ INSERT IGNORE INTO rbac_role_permissions (role_key,permission_key) VALUES
   ('TENANT_ADMIN','commercial:read'),
   ('TENANT_ADMIN','commercial:write'),
   ('TENANT_ADMIN','membership:read'),
-  ('TENANT_ADMIN','membership:write'),
   ('TENANT_ADMIN','credential:read'),
   ('TENANT_ADMIN','credential:write'),
 

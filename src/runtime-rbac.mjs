@@ -236,6 +236,33 @@ export const resolveRunScope=async runId=>{
   if(!rows.length) throw errorOf('Run not found','RUN_NOT_FOUND',404);
   return {tenantId:rows[0].tenant_id,workspaceId:rows[0].workspace_id};
 };
+export const resolveTaskScope=async taskId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT r.tenant_id,r.workspace_id FROM tasks t JOIN runs r ON r.id=t.run_id WHERE t.id=?`,
+    [taskId]
+  );
+  if(!rows.length) throw errorOf('Task not found','TASK_NOT_FOUND',404);
+  return {tenantId:rows[0].tenant_id,workspaceId:rows[0].workspace_id};
+};
+export const resolveReservationScope=async reservationId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    'SELECT id,tenant_id,workspace_id,run_id FROM usage_reservations WHERE id=?',
+    [reservationId]
+  );
+  if(!rows.length) throw errorOf('Usage reservation not found','RESERVATION_NOT_FOUND',404);
+  return {tenantId:rows[0].tenant_id,workspaceId:rows[0].workspace_id,runId:rows[0].run_id};
+};
+export const resolveCredentialScope=async credentialId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    'SELECT id,identity_id,tenant_id,workspace_id FROM api_credentials WHERE id=?',
+    [credentialId]
+  );
+  if(!rows.length) throw errorOf('Credential not found','CREDENTIAL_NOT_FOUND',404);
+  return {identityId:rows[0].identity_id,tenantId:rows[0].tenant_id,workspaceId:rows[0].workspace_id};
+};
 
 export const requirePlatformAdmin=principal=>{
   if(!principal?.platformAdmin) throw errorOf('Platform administrator credential required','PLATFORM_ADMIN_REQUIRED',403);

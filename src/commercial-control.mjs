@@ -231,11 +231,19 @@ export const upsertRateLimitPolicy=async input=>{
   return normalizeRatePolicy(rows[0]);
 };
 
-export const listRateLimitPolicies=async({operationKey=null}={})=>{
+export const listRateLimitPolicies=async({operationKey=null,tenantId=null,workspaceId=null,planKey=null}={})=>{
   const db=getRuntimePool();
-  const [rows]=operationKey
-    ? await db.execute('SELECT * FROM rate_limit_policies WHERE operation_key=? ORDER BY scope_type,policy_key',[operationKey])
-    : await db.execute('SELECT * FROM rate_limit_policies ORDER BY operation_key,scope_type,policy_key');
+  const clauses=[],values=[];
+  if(operationKey){clauses.push('operation_key=?');values.push(operationKey);}
+  if(tenantId||workspaceId||planKey){
+    const scopes=[];
+    if(planKey){scopes.push("(scope_type='PLAN' AND plan_key=?)");values.push(planKey);}
+    if(tenantId){scopes.push("(scope_type='TENANT' AND tenant_id=?)");values.push(tenantId);}
+    if(workspaceId){scopes.push("(scope_type='WORKSPACE' AND workspace_id=?)");values.push(workspaceId);}
+    clauses.push(`(${scopes.join(' OR ')})`);
+  }
+  const where=clauses.length?`WHERE ${clauses.join(' AND ')}`:'';
+  const [rows]=await db.execute(`SELECT * FROM rate_limit_policies ${where} ORDER BY operation_key,scope_type,policy_key`,values);
   return rows.map(normalizeRatePolicy);
 };
 

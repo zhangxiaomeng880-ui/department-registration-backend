@@ -38,7 +38,7 @@ import { createTenant, listTenants, createWorkspace, listWorkspaces } from './te
 import {
   createIdentity,upsertTenantMembership,upsertWorkspaceMembership,createApiCredential,
   revokeApiCredential,listRbacRoles,assertAccess,resolveWorkspaceScope,resolveProjectScope,
-  resolveRunScope,requirePlatformAdmin
+  resolveRunScope,resolveTaskScope,resolveReservationScope,resolveCredentialScope,requirePlatformAdmin
 } from './runtime-rbac.mjs';
 import { upsertQuotaPolicy, listQuotaPolicies, getUsageMeter, evaluateRunQuota } from './quota-meter.mjs';
 import {
@@ -92,7 +92,10 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/api-credentials') {
     const body=await readBody(req);
-    if(!principal?.platformAdmin) await assertAccess({principal,permission:'credential:write',tenantId:body.tenantId,workspaceId:body.workspaceId||null,method:req.method,path:url.pathname});
+    if(!principal?.platformAdmin){
+      await assertAccess({principal,permission:'credential:write',tenantId:body.tenantId,workspaceId:body.workspaceId||null,method:req.method,path:url.pathname});
+      if(body.identityId!==principal.identityId) throw Object.assign(new Error('Scoped credentials may only create credentials for the authenticated identity'),{code:'CREDENTIAL_IDENTITY_ESCALATION',statusCode:403});
+    }
     json(res,201,{data:await createApiCredential(body)});
     return true;
   }
@@ -133,6 +136,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const tenantPlanMatch=match(url.pathname,/^\/api\/runtime\/tenants\/([^/]+)\/plan$/);
   if (req.method === 'PATCH' && tenantPlanMatch) {
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'commercial:write',tenantId:tenantPlanMatch[1],method:req.method,path:url.pathname});
     const body=await readBody(req);
     json(res,200,{data:await assignTenantPlan({tenantId:tenantPlanMatch[1],planKey:body.planKey})});
     return true;
@@ -148,7 +152,12 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (req.method === 'GET' && url.pathname === '/api/runtime/rate-limit-policies') {
     if(!principal?.platformAdmin) await assertAccess({principal,permission:'commercial:read',tenantId:principal.tenantId,workspaceId:principal.workspaceId||null,method:req.method,path:url.pathname});
-    json(res,200,{data:await listRateLimitPolicies({operationKey:url.searchParams.get('operationKey')||null})});
+    json(res,200,{data:await listRateLimitPolicies({
+      operationKey:url.searchParams.get('operationKey')||null,
+      tenantId:principal?.platformAdmin?null:principal.tenantId,
+      workspaceId:principal?.platformAdmin?null:principal.workspaceId,
+      planKey:null
+    })});
     return true;
   }
 
@@ -184,18 +193,26 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const reservationCommitMatch=match(url.pathname,/^\/api\/runtime\/usage-reservations\/([^/]+)\/commit$/);
   if (req.method === 'POST' && reservationCommitMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveReservationScope(reservationCommitMatch[1]); await assertAccess({principal,permission:'commercial:write',...scope,method:req.method,path:url.pathname}); }
     json(res,200,{data:await commitUsageReservation(reservationCommitMatch[1],await readBody(req))});
     return true;
   }
 
   const reservationReleaseMatch=match(url.pathname,/^\/api\/runtime\/usage-reservations\/([^/]+)\/release$/);
   if (req.method === 'POST' && reservationReleaseMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveReservationScope(reservationReleaseMatch[1]); await assertAccess({principal,permission:'commercial:write',...scope,method:req.method,path:url.pathname}); }
     json(res,200,{data:await releaseUsageReservation(reservationReleaseMatch[1],await readBody(req))});
     return true;
   }
 
   if (req.method === 'GET' && url.pathname === '/api/runtime/usage-reservations') {
-    json(res,200,{data:await listUsageReservations({runId:url.searchParams.get('runId')||null})});
+    const reservationRunId=url.searchParams.get('runId')||null;
+    if(!principal?.platformAdmin){
+      if(!reservationRunId) throw Object.assign(new Error('runId is required for scoped reservation listing'),{code:'SCOPED_RUN_ID_REQUIRED',statusCode:400});
+      const scope=await resolveRunScope(reservationRunId);
+      await assertAccess({principal,permission:'commercial:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listUsageReservations({runId:reservationRunId})});
     return true;
   }
 
@@ -359,6 +376,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/budget-policies') {
+    requirePlatformAdmin(principal);
     const result = await upsertProjectBudgetPolicy(await readBody(req));
     json(res, 201, { data: result });
     return true;
@@ -366,6 +384,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const providerHealthMatch = match(url.pathname, /^\/api\/runtime\/providers\/([^/]+)\/health$/);
   if (req.method === 'PATCH' && providerHealthMatch) {
+    requirePlatformAdmin(principal);
     const result = await setProviderHealth(providerHealthMatch[1], await readBody(req));
     json(res, 200, { data: result });
     return true;
@@ -396,6 +415,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/context-packets') {
+    requirePlatformAdmin(principal);
     const result = createEphemeralContextPacket(await readBody(req));
     json(res, 201, { data: result });
     return true;
@@ -403,6 +423,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const contextMetadataMatch = match(url.pathname, /^\/api\/runtime\/context-packets\/([^/]+)\/metadata$/);
   if (req.method === 'GET' && contextMetadataMatch) {
+    requirePlatformAdmin(principal);
     const result = getEphemeralContextPacketMetadata(contextMetadataMatch[1]);
     json(res, 200, { data: result });
     return true;
@@ -410,6 +431,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const contextExecuteMatch = match(url.pathname, /^\/api\/runtime\/context-packets\/([^/]+)\/execute$/);
   if (req.method === 'POST' && contextExecuteMatch) {
+    requirePlatformAdmin(principal);
     const body = await readBody(req);
     const packet = consumeEphemeralContextPacket(contextExecuteMatch[1]);
     const result = await executeScriptContinuityAgent({
@@ -441,6 +463,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/orchestrate') {
+    requirePlatformAdmin(principal);
     const result = await orchestrateContextPacket(await readBody(req));
     json(res, 200, { data: result });
     return true;
@@ -448,6 +471,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const taskMatch = match(url.pathname, /^\/api\/runtime\/tasks\/([^/]+)$/);
   if (req.method === 'PATCH' && taskMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveTaskScope(taskMatch[1]); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
     const result = await updateTask(taskMatch[1], await readBody(req));
     json(res, 200, { data: result });
     return true;
