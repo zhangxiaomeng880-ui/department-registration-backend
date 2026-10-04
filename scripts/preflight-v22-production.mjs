@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import { pathToFileURL } from 'node:url';
 
 const parseDatabaseUrl = value => {
   const url = new URL(value);
@@ -81,32 +82,40 @@ const TARGET_COLUMNS = {
   ],
 };
 
-const TARGET_CONSTRAINTS = [
-  'fk_workspace_tenant','fk_project_tenant','fk_project_workspace',
-  'fk_run_tenant','fk_run_workspace','fk_usage_tenant','fk_usage_workspace',
-  'fk_quota_policy_tenant','fk_quota_eval_tenant','fk_quota_eval_workspace',
-  'fk_quota_eval_run','fk_quota_eval_policy',
-  'fk_tenant_plan','fk_entitlement_plan','fk_ent_eval_tenant','fk_ent_eval_workspace',
-  'fk_ent_eval_run','fk_ent_eval_plan','fk_rate_plan','fk_rate_tenant',
-  'fk_rate_workspace','fk_rate_bucket_policy','fk_rate_decision_tenant',
-  'fk_rate_decision_workspace','fk_rate_decision_run','fk_rate_decision_policy',
-  'fk_reservation_tenant','fk_reservation_workspace','fk_reservation_project',
-  'fk_reservation_run','fk_reservation_plan','fk_reservation_tool',
-  'fk_m224_role_permission_role','fk_m224_tenant_membership_tenant',
-  'fk_m224_tenant_membership_identity','fk_m224_tenant_membership_role',
-  'fk_m224_workspace_membership_workspace','fk_m224_workspace_membership_identity',
-  'fk_m224_workspace_membership_role','fk_m224_credential_identity',
-  'fk_m224_credential_tenant','fk_m224_credential_workspace',
-  'fk_m224_authz_credential','fk_m224_authz_identity','fk_m224_authz_tenant',
-  'fk_m224_authz_workspace',
-  'fk_m225_billing_term_plan','fk_m225_subscription_tenant','fk_m225_subscription_plan',
-  'fk_m225_subscription_term','fk_m225_cycle_subscription','fk_m225_cycle_tenant',
-  'fk_m225_cycle_plan','fk_m225_cycle_term','fk_m225_invoice_tenant',
-  'fk_m225_invoice_subscription','fk_m225_invoice_cycle','fk_m225_invoice_item_invoice',
-  'fk_m225_settlement_usage','fk_m225_settlement_tenant','fk_m225_settlement_cycle',
-  'fk_m225_settlement_invoice','fk_m225_credit_tenant','fk_m225_credit_subscription',
-  'fk_m225_credit_cycle','fk_m225_credit_invoice',
-];
+const TARGET_CONSTRAINTS = {
+  '008_tenant_workspace_quota_meter.sql': [
+    'fk_workspace_tenant','fk_project_tenant','fk_project_workspace',
+    'fk_run_tenant','fk_run_workspace','fk_usage_tenant','fk_usage_workspace',
+    'fk_quota_policy_tenant','fk_quota_eval_tenant','fk_quota_eval_workspace',
+    'fk_quota_eval_run','fk_quota_eval_policy',
+  ],
+  '009_commercial_control.sql': [
+    'fk_tenant_plan','fk_entitlement_plan','fk_ent_eval_tenant','fk_ent_eval_workspace',
+    'fk_ent_eval_run','fk_ent_eval_plan','fk_rate_plan','fk_rate_tenant',
+    'fk_rate_workspace','fk_rate_bucket_policy','fk_rate_decision_tenant',
+    'fk_rate_decision_workspace','fk_rate_decision_run','fk_rate_decision_policy',
+    'fk_reservation_tenant','fk_reservation_workspace','fk_reservation_project',
+    'fk_reservation_run','fk_reservation_plan','fk_reservation_tool',
+  ],
+  '010_tenant_identity_rbac.sql': [
+    'fk_m224_role_permission_role','fk_m224_tenant_membership_tenant',
+    'fk_m224_tenant_membership_identity','fk_m224_tenant_membership_role',
+    'fk_m224_workspace_membership_workspace','fk_m224_workspace_membership_identity',
+    'fk_m224_workspace_membership_role','fk_m224_credential_identity',
+    'fk_m224_credential_tenant','fk_m224_credential_workspace',
+    'fk_m224_authz_credential','fk_m224_authz_identity','fk_m224_authz_tenant',
+    'fk_m224_authz_workspace',
+  ],
+  '011_subscription_billing_ledger.sql': [
+    'fk_m225_billing_term_plan','fk_m225_subscription_tenant','fk_m225_subscription_plan',
+    'fk_m225_subscription_term','fk_m225_cycle_subscription','fk_m225_cycle_tenant',
+    'fk_m225_cycle_plan','fk_m225_cycle_term','fk_m225_invoice_tenant',
+    'fk_m225_invoice_subscription','fk_m225_invoice_cycle','fk_m225_invoice_item_invoice',
+    'fk_m225_settlement_usage','fk_m225_settlement_tenant','fk_m225_settlement_cycle',
+    'fk_m225_settlement_invoice','fk_m225_credit_tenant','fk_m225_credit_subscription',
+    'fk_m225_credit_cycle','fk_m225_credit_invoice',
+  ],
+};
 
 const assert = (condition, code, message, details={}) => {
   if (!condition) {
@@ -283,17 +292,21 @@ export async function runV22ProductionPreflight({ config = resolveDbConfig() } =
     }
 
     if (summary.pendingV22Migrations.length) {
-      const placeholders = TARGET_CONSTRAINTS.map(() => '?').join(',');
-      const [constraintRows] = await db.execute(`
-        SELECT constraint_name, table_name
-        FROM information_schema.referential_constraints
-        WHERE constraint_schema=? AND constraint_name IN (${placeholders})
-      `, [config.database, ...TARGET_CONSTRAINTS]);
+      const pendingConstraints = summary.pendingV22Migrations
+        .flatMap(migration => TARGET_CONSTRAINTS[migration] || []);
+      if (pendingConstraints.length) {
+        const placeholders = pendingConstraints.map(() => '?').join(',');
+        const [constraintRows] = await db.execute(`
+          SELECT constraint_name, table_name
+          FROM information_schema.referential_constraints
+          WHERE constraint_schema=? AND constraint_name IN (${placeholders})
+        `, [config.database, ...pendingConstraints]);
 
-      assert(constraintRows.length === 0,
-        'PREFLIGHT_FK_NAME_COLLISION',
-        'One or more V2.2 foreign-key names already exist in the schema',
-        { collisions: constraintRows });
+        assert(constraintRows.length === 0,
+          'PREFLIGHT_FK_NAME_COLLISION',
+          'One or more pending V2.2 foreign-key names already exist in the schema',
+          { collisions: constraintRows });
+      }
       summary.checks.foreignKeyNamesAvailable = 'PASS';
     }
 
@@ -320,7 +333,7 @@ export async function runV22ProductionPreflight({ config = resolveDbConfig() } =
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runV22ProductionPreflight().catch(() => {
     process.exitCode = 1;
   });
