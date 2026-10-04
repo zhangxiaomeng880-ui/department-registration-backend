@@ -8,6 +8,7 @@ RUN npm install --omit=dev && npm cache clean --force
 COPY src ./src
 COPY migrations ./migrations
 COPY scripts ./scripts
+COPY pricing ./pricing
 
 ENV NODE_ENV=production
 

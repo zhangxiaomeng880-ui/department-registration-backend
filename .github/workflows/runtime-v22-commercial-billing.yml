@@ -34,6 +34,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Validate production image contains pricing catalog
+        run: |
+          docker build -t runtime-v22-m22-1 .
+          docker run --rm --entrypoint sh runtime-v22-m22-1 -c 'test -f /app/pricing/openai-gpt-6-luna-2026-10-04.json'
+
       - name: Apply Runtime migrations twice
         env:
           DB_HOST: 127.0.0.1
