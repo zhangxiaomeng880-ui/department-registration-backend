@@ -11,9 +11,10 @@ const parseDate=value=>{
 const pct=(num,den)=>den>0?Number(((num/den)*100).toFixed(4)):0;
 const round=value=>Number(Number(value||0).toFixed(10));
 
-const loadInvoiceRows=async({tenantId=null,planKey=null}={})=>{
+const loadInvoiceRows=async({tenantId=null,planKey=null,asOf=new Date()}={})=>{
+  const at=parseDate(asOf);
   const db=getRuntimePool();
-  const clauses=[],params=[];
+  const clauses=['i.issued_at<=?'],params=[at,at];
   if(tenantId){clauses.push('i.tenant_id=?');params.push(tenantId);}
   if(planKey){clauses.push('s.plan_key=?');params.push(planKey);}
   const [rows]=await db.execute(
@@ -21,11 +22,12 @@ const loadInvoiceRows=async({tenantId=null,planKey=null}={})=>{
        i.id,i.tenant_id,i.subscription_id,i.currency,i.total_due,i.amount_paid,
        i.issued_at,i.due_at,i.paid_at,i.status,
        s.plan_key,
+       COALESCE((SELECT SUM(p.amount) FROM invoice_payments p WHERE p.invoice_id=i.id AND p.received_at<=?),0) AS amount_paid_as_of,
        COALESCE(b.provider_cost_total,0) AS provider_cost_total
      FROM invoices i
      LEFT JOIN subscriptions s ON s.id=i.subscription_id
      LEFT JOIN billing_cycles b ON b.id=i.billing_cycle_id
-     ${clauses.length?'WHERE '+clauses.join(' AND '):''}
+     WHERE ${clauses.join(' AND ')}
      ORDER BY i.issued_at,i.id`,
     params
   );
@@ -44,7 +46,7 @@ const classifyAging=(dueAt,asOf)=>{
 
 export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date()}={})=>{
   const at=parseDate(asOf);
-  const rows=await loadInvoiceRows({tenantId,planKey});
+  const rows=await loadInvoiceRows({tenantId,planKey,asOf:at});
   const byCurrency=new Map();
 
   for(const row of rows){
@@ -57,7 +59,7 @@ export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date
       });
     }
     const x=byCurrency.get(currency);
-    const billed=Number(row.total_due||0),paid=Number(row.amount_paid||0);
+    const billed=Number(row.total_due||0),paid=Number(row.amount_paid_as_of||0);
     const outstanding=Math.max(0,billed-paid);
     x.invoiceCount+=1;
     x.totalBilled+=billed;
@@ -136,7 +138,7 @@ export const getRevenuePerformance=async({tenantId=null,planKey=null,asOf=new Da
   if(!Number.isInteger(parsedLimit)||parsedLimit<1||parsedLimit>500){
     throw errorOf('limit must be an integer from 1 to 500','INVALID_ANALYTICS_LIMIT');
   }
-  const rows=await loadInvoiceRows({tenantId,planKey});
+  const rows=await loadInvoiceRows({tenantId,planKey,asOf:at});
   const groups=new Map();
   for(const row of rows){
     if(new Date(row.issued_at).getTime()>at.getTime()) continue;
@@ -149,7 +151,7 @@ export const getRevenuePerformance=async({tenantId=null,planKey=null,asOf=new Da
       });
     }
     const x=groups.get(key);
-    const billed=Number(row.total_due||0),paid=Number(row.amount_paid||0),provider=Number(row.provider_cost_total||0);
+    const billed=Number(row.total_due||0),paid=Number(row.amount_paid_as_of||0),provider=Number(row.provider_cost_total||0);
     x.invoiceCount+=1;
     x.billedRevenue+=billed;
     x.collectedRevenue+=paid;
