@@ -5,6 +5,13 @@
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
+CREATE TABLE IF NOT EXISTS finance_close_lock (
+  id TINYINT UNSIGNED PRIMARY KEY,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+INSERT IGNORE INTO finance_close_lock (id) VALUES (1);
+
 CREATE TABLE IF NOT EXISTS finance_close_periods (
   id CHAR(36) PRIMARY KEY,
   period_start TIMESTAMP(6) NOT NULL,
