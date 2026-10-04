@@ -1,0 +1,80 @@
+name: Runtime Deployment Validation
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-persistence
+  workflow_dispatch:
+
+jobs:
+  deployment-stack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build deployment environment
+        run: |
+          cat > .env.runtime.ci <<'EOF'
+          MYSQL_DATABASE=ai_native_runtime
+          MYSQL_USER=ai_native_runtime
+          MYSQL_PASSWORD=runtime_ci_password
+          MYSQL_ROOT_PASSWORD=runtime_ci_root_password
+          RUNTIME_HOST_PORT=3100
+          RUNTIME_API_TOKEN=ci-runtime-token
+          OPENAI_MODEL=test-model
+          EOF
+
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env.runtime.ci -f docker-compose.runtime.yml config >/tmp/runtime-compose.rendered.yml
+
+      - name: Start private Runtime stack
+        run: |
+          docker compose --env-file .env.runtime.ci -f docker-compose.runtime.yml up -d --build
+
+          for i in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl --fail http://127.0.0.1:3100/health
+          curl --fail http://127.0.0.1:3100/ready
+
+      - name: Verify private port bindings
+        run: |
+          MYSQL_PUBLISHED=$(docker inspect ai-native-mysql --format '{{with index .NetworkSettings.Ports "3306/tcp"}}{{json .}}{{end}}')
+          test -z "$MYSQL_PUBLISHED"
+
+          RUNTIME_HOST_IP=$(docker inspect ai-native-runtime --format '{{(index (index .NetworkSettings.Ports "3100/tcp") 0).HostIp}}')
+          test "$RUNTIME_HOST_IP" = "127.0.0.1"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate Runtime ingress behavior
+        env:
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3100
+          RUNTIME_API_TOKEN: ci-runtime-token
+        run: node test/runtime-ingress.test.mjs
+
+      - name: Verify restart with existing database volume
+        run: |
+          docker compose --env-file .env.runtime.ci -f docker-compose.runtime.yml restart runtime
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3100/ready >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:3100/ready
+
+      - name: Show stack state
+        if: always()
+        run: docker compose --env-file .env.runtime.ci -f docker-compose.runtime.yml ps
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file .env.runtime.ci -f docker-compose.runtime.yml down -v
