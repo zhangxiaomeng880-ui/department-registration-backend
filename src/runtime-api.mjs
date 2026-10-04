@@ -151,9 +151,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     const body=await readBody(req);
     json(res,201,{data:await runEvalReplayManifest(evalReplayRunMatch[1],{
       idempotencyKey:body.idempotencyKey,
-      executionProjectId:body.executionProjectId,
-      runtimeCommitSha:body.runtimeCommitSha||resolveEvalRuntimeSha(),
-      contextsByCaseKey:body.contextsByCaseKey||{}
+      runtimeCommitSha:resolveEvalRuntimeSha()
     })});
     return true;
   }
