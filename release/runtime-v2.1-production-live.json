@@ -1,0 +1,71 @@
+{
+  "release": "ai-native-runtime-v2.1",
+  "releaseCandidate": "ai-native-runtime-v2.1-rc1",
+  "status": "PRODUCTION_LIVE",
+  "candidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+  "production": {
+    "platform": "Railway",
+    "projectId": "34abdc88-da14-4ada-b2a2-bdf1b61240a4",
+    "environmentId": "e8afc1ed-80e4-42d3-85d9-3e3ec193c5f7",
+    "runtimeServiceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+    "runtimeDeploymentId": "ebb07381-56c5-4bab-85ef-59de1a13358f",
+    "runtimeStatus": "SUCCESS",
+    "runtimeDomain": "runtime-production-9c39.up.railway.app",
+    "databaseServiceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31",
+    "databaseDeploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+    "databaseStatus": "SUCCESS",
+    "databasePublicTcpExposed": false,
+    "readinessHttpStatus": 200,
+    "unauthorizedRuntimeApiHttpStatus": 401
+  },
+  "migrations": {
+    "result": "RUNTIME_MIGRATIONS_PASS applied=3 skipped=4 total=7",
+    "total": 7,
+    "appliedInPromotion": 3,
+    "previouslyApplied": 4
+  },
+  "productionSmoke": {
+    "syntheticContextOnly": true,
+    "orchestrationHttpStatus": 200,
+    "provider": "openai-responses",
+    "model": "gpt-6-luna",
+    "providerInvoked": true,
+    "structuredContractPass": true,
+    "gateQaCheckpointPass": true,
+    "sourceBodyPersisted": false,
+    "observabilityHttpStatus": 200,
+    "correlationConsistent": true,
+    "sourceBodyExposed": false,
+    "policyMode": "LEGACY_SINGLE_PROVIDER",
+    "selectedProviderKey": "openai-responses",
+    "selectedModelKey": "gpt-6-luna",
+    "costSummaryHttpStatus": 200,
+    "costStatus": "UNKNOWN",
+    "unknownCostCount": 1,
+    "budgetHttpStatus": 200,
+    "budgetDecision": "ALLOW",
+    "budgetReason": "NO_BUDGET_POLICY",
+    "providerRegistryReadable": true
+  },
+  "costTruth": {
+    "officialProductionPricingImported": false,
+    "behavior": "Without a production pricing version, real provider executions are recorded as UNKNOWN/null rather than fabricated zero cost."
+  },
+  "cleanup": {
+    "temporaryProductionSmokeServiceDeleted": true
+  },
+  "rollback": {
+    "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+    "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+    "capturedBeforePromotion": true
+  },
+  "gateEvidence": [
+    "release/runtime-v2.1-m21.1-observability.json",
+    "release/runtime-v2.1-m21.2-policy-router.json",
+    "release/runtime-v2.1-m21.3-cost-ledger.json",
+    "release/runtime-v2.1-m21.4-release-promotion.json",
+    "release/runtime-v2.1-rc1-staging.json",
+    "release/runtime-v2.1-production-approval.json"
+  ],
+  "finalDecision": "V2.1 PRODUCTION RELEASE PASS"
+}
