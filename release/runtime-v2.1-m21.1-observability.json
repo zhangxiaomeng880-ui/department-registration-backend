@@ -1,0 +1,56 @@
+{
+  "milestone": "M21.1",
+  "name": "Observable Runtime",
+  "gate": "G21-OBSERVABILITY",
+  "status": "PASS",
+  "branch": "feat/ai-native-runtime-v2.1-productization",
+  "validatedCommitSha": "588454103f4a88d5bc54b17f4aa819bea3cdfb5e",
+  "baseRelease": "v2.0.0",
+  "compatibility": {
+    "v2_0ApiBackwardCompatible": true,
+    "additiveMigrationOnly": true,
+    "migrationCount": 5,
+    "sourceBodyPersistencePolicyPreserved": true
+  },
+  "implemented": {
+    "correlationIdPropagation": true,
+    "routeLatency": true,
+    "providerLatency": true,
+    "providerAndModelEvidence": true,
+    "machineReadableErrorCategory": true,
+    "usageLedger": true,
+    "runTokenAggregation": true,
+    "observabilityReadEndpoint": true,
+    "providerFailureEvidence": true
+  },
+  "privacy": {
+    "observabilityEndpointExposesRawInputJson": false,
+    "observabilityEndpointExposesRawOutputJson": false,
+    "observabilityEndpointExposesEvidenceJson": false,
+    "observabilityEndpointExposesStateJson": false,
+    "contextSourceBodyPersistedByAutonomousProviderPath": false
+  },
+  "ci": [
+    {
+      "name": "Runtime v2.1 Observability Gate",
+      "runId": 37187573549,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime Orchestrator Validation",
+      "runId": 37187573547,
+      "conclusion": "success"
+    },
+    {
+      "name": "Backend Validation",
+      "runId": 37187573540,
+      "conclusion": "success"
+    },
+    {
+      "name": "Railway Runtime Compatibility",
+      "runId": 37187573518,
+      "conclusion": "success"
+    }
+  ],
+  "decision": "M21.1 PASS. M21.2 may begin."
+}
