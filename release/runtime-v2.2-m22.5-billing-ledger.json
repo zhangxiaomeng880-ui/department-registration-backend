@@ -1,0 +1,26 @@
+{
+  "milestone": "M22.5",
+  "title": "Subscription / Credit Balance / Billing Cycle + Invoice Ledger",
+  "version": "V2.2",
+  "status": "IMPLEMENTED_PENDING_GATE",
+  "branch": "feat/ai-native-runtime-v2.2-m22.5-billing-ledger",
+  "baseCommit": "55a503e4188dc51d2d4dee75ee0cc672794e56f4",
+  "productionTouched": false,
+  "accountingModel": {
+    "providerCost": "COST_LEDGER_EVIDENCE",
+    "revenue": "BILLING_TERM_SNAPSHOT",
+    "revenueFormula": "RECURRING_FEE + COST_PLUS_OVERAGE - SERVICE_CREDITS",
+    "historicalRepricing": false
+  },
+  "scope": {
+    "billingTermVersioning": true,
+    "subscriptionCycleSnapshot": true,
+    "serviceCreditDoubleEntryStyle": "SIGNED_LEDGER",
+    "invoiceIdempotency": true,
+    "usageSettlementUnique": true,
+    "unknownCostInvoiceBehavior": "BLOCK",
+    "currencyMismatchBehavior": "BLOCK",
+    "reconciliation": true
+  },
+  "acceptanceGate": "G22_5_BILLING_LEDGER_PASS"
+}

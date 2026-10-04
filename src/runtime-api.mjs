@@ -47,6 +47,11 @@ import {
   authorizeCommercialExecution,commitUsageReservation,releaseUsageReservation,listUsageReservations
 } from './commercial-control.mjs';
 import {
+  createPlanBillingTerm,listPlanBillingTerms,createSubscription,getTenantSubscription,
+  issueCredit,getCreditBalance,finalizeBillingCycle,listTenantInvoices,getInvoice,
+  resolveInvoiceScope,resolveBillingCycleScope,reconcileBillingCycle
+} from './billing-ledger.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -60,6 +65,73 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/plan-billing-terms') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createPlanBillingTerm(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/plan-billing-terms') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listPlanBillingTerms({planKey:url.searchParams.get('planKey')||null})});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/subscriptions') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createSubscription(await readBody(req))});
+    return true;
+  }
+
+  const tenantSubscriptionMatch=match(url.pathname,/^\/api\/runtime\/tenants\/([^/]+)\/subscription$/);
+  if (req.method === 'GET' && tenantSubscriptionMatch) {
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'billing:read',tenantId:tenantSubscriptionMatch[1],method:req.method,path:url.pathname});
+    json(res,200,{data:await getTenantSubscription(tenantSubscriptionMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/credits') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await issueCredit(await readBody(req))});
+    return true;
+  }
+
+  const tenantCreditMatch=match(url.pathname,/^\/api\/runtime\/tenants\/([^/]+)\/credit-balance$/);
+  if (req.method === 'GET' && tenantCreditMatch) {
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'billing:read',tenantId:tenantCreditMatch[1],method:req.method,path:url.pathname});
+    json(res,200,{data:await getCreditBalance({tenantId:tenantCreditMatch[1],currency:url.searchParams.get('currency')||'USD'})});
+    return true;
+  }
+
+  const billingFinalizeMatch=match(url.pathname,/^\/api\/runtime\/billing-cycles\/([^/]+)\/finalize$/);
+  if (req.method === 'POST' && billingFinalizeMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,200,{data:await finalizeBillingCycle({cycleId:billingFinalizeMatch[1],finalizedAt:body.finalizedAt||new Date()})});
+    return true;
+  }
+
+  const billingReconcileMatch=match(url.pathname,/^\/api\/runtime\/billing-cycles\/([^/]+)\/reconcile$/);
+  if (req.method === 'GET' && billingReconcileMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveBillingCycleScope(billingReconcileMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await reconcileBillingCycle(billingReconcileMatch[1])});
+    return true;
+  }
+
+  const tenantInvoicesMatch=match(url.pathname,/^\/api\/runtime\/tenants\/([^/]+)\/invoices$/);
+  if (req.method === 'GET' && tenantInvoicesMatch) {
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'billing:read',tenantId:tenantInvoicesMatch[1],method:req.method,path:url.pathname});
+    json(res,200,{data:await listTenantInvoices(tenantInvoicesMatch[1])});
+    return true;
+  }
+
+  const invoiceMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)$/);
+  if (req.method === 'GET' && invoiceMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveInvoiceScope(invoiceMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await getInvoice(invoiceMatch[1])});
     return true;
   }
 
