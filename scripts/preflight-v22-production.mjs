@@ -132,26 +132,24 @@ const queryScalar = async (db, sql, params=[]) => {
   return Number(Object.values(first)[0] || 0);
 };
 
-const tableExists = async (db, schema, table) =>
+const tableExists = async (db, _schema, table) =>
   queryScalar(db, `
     SELECT COUNT(*) AS c
     FROM information_schema.tables
-    WHERE table_schema=? AND table_name=?
-  `, [schema, table]) > 0;
+    WHERE table_schema=DATABASE() AND table_name=?
+  `, [table]) > 0;
 
-const columnExists = async (db, schema, table, column) =>
+const columnExists = async (db, _schema, table, column) =>
   queryScalar(db, `
     SELECT COUNT(*) AS c
     FROM information_schema.columns
-    WHERE table_schema=? AND table_name=? AND column_name=?
-  `, [schema, table, column]) > 0;
+    WHERE table_schema=DATABASE() AND table_name=? AND column_name=?
+  `, [table, column]) > 0;
 
-const indexExists = async (db, schema, table, index) =>
-  queryScalar(db, `
-    SELECT COUNT(*) AS c
-    FROM information_schema.statistics
-    WHERE table_schema=? AND table_name=? AND index_name=?
-  `, [schema, table, index]) > 0;
+const indexExists = async (db, _schema, table, index) => {
+  const [rows] = await db.query(`SHOW INDEX FROM \`${table}\``);
+  return rows.some(row => row.Key_name === index);
+};
 
 const summarizeRows = async db => {
   const tables = ['projects','runs','usage_ledger','pricing_versions'];
