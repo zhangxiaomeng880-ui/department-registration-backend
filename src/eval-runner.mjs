@@ -103,12 +103,18 @@ const enrichEvidence=(output,refs)=>{
   for(const finding of output?.findings||[]){
     for(const evidence of finding?.evidence||[]){
       const ref=refMap.get(String(evidence?.sourceFileId));
+      const versionMatches=ref
+        ? String(evidence?.sourceVersion??'')===String(ref.sourceVersion??'')
+        : false;
+      const lineStartValid=ref && (evidence?.lineStart==null||ref.lineStart==null||Number(evidence.lineStart)>=Number(ref.lineStart));
+      const lineEndValid=ref && (evidence?.lineEnd==null||ref.lineEnd==null||Number(evidence.lineEnd)<=Number(ref.lineEnd));
       rows.push({
         sourceFileId:evidence?.sourceFileId??null,
         sourceVersion:evidence?.sourceVersion??null,
         lineStart:evidence?.lineStart??null,
         lineEnd:evidence?.lineEnd??null,
-        contentSha256:ref?.contentSha256||null
+        contentSha256:ref?.contentSha256||null,
+        provenanceValid:Boolean(ref&&versionMatches&&lineStartValid&&lineEndValid)
       });
     }
   }
@@ -153,7 +159,9 @@ const evaluateAssertions=({evalCase,route,output,evidence,execution})=>{
         actual.every(id=>id!=null&&allowed.has(String(id))),expected.allowedSourceFileIds,actual,'EVIDENCE_SOURCE_NOT_ALLOWED');
     }
     if(expected.requireContentHash===true){
-      const pass=evidence.length>0&&evidence.every(item=>/^[a-f0-9]{64}$/i.test(item.contentSha256||''));
+      const pass=evidence.length>0&&evidence.every(item=>
+        /^[a-f0-9]{64}$/i.test(item.contentSha256||'')&&item.provenanceValid===true
+      );
       addAssertion(results,'evidence','contentHashes',pass,true,
         evidence.map(x=>({sourceFileId:x.sourceFileId,contentSha256:x.contentSha256})),'EVIDENCE_CONTENT_HASH_MISMATCH');
     }
