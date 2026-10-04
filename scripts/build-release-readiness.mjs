@@ -65,6 +65,7 @@ const requiredCi = [
   'Runtime v2.1 Observability Gate',
   'Runtime v2.1 Policy Router Gate',
   'Runtime v2.1 Cost Ledger Gate',
+  'Runtime v2.1 Release Promotion Gate',
 ];
 const ciByName=new Map((data.ci || []).map(x=>[x.name,x]));
 for (const name of requiredCi) {
