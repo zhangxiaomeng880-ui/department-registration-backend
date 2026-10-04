@@ -2,14 +2,22 @@
 
 - Gate: Step 2.4B
 - Scope: Runtime -> OpenAI Responses API -> Structured Output -> Runtime Evidence
-- Trigger branch: `feat/ai-native-runtime-persistence`
-- Live model: `gpt-5.6-terra`
-- Secret required: `OPENAI_API_KEY`
-- Source-body policy: transient context only; no Library source body persisted to MySQL
-- Status: BLOCKED — GitHub Actions did not expose OPENAI_API_KEY to the workflow environment after user configuration; do not ask the user to repeat secret setup.
+- Branch: `feat/ai-native-runtime-persistence`
+- Provider bridge: IMPLEMENTED
+- Protocol validation: PASS
+- Hybrid real chain: PASS
+- Live provider call: BLOCKED_EXTERNAL_CREDENTIAL_INJECTION
+- Blocker evidence: GitHub Actions runtime receives an empty `OPENAI_API_KEY` value even after the user completed secret configuration.
+- Interpretation: external secret-delivery/integration blocker, not Runtime/provider-code failure.
+- User action: NONE REQUIRED
+- Source-body policy: ChatGPT Library remains the canonical source; Library source body must not be persisted to Git or MySQL.
 
-This file exists only as an auditable trigger/status marker for the live provider gate.
+## Current Gate State
 
-## Handling rule
+`AUTONOMOUS_RUNTIME_CORE = PASS`
 
-Do not re-run or ask the user to reconfigure the same secret again. Keep Step 2.4A as PASS, Step 2.4B as BLOCKED on secret-injection verification, and continue with work that does not depend on this unresolved external secret path.
+`OPENAI_PROVIDER_PROTOCOL = PASS`
+
+`OPENAI_PROVIDER_LIVE = BLOCKED_EXTERNAL_CREDENTIAL_INJECTION`
+
+This blocker must not cause repeated user setup requests. Continue Runtime/Context Bridge work independently and re-run live validation only when a server-side credential becomes programmatically available.
