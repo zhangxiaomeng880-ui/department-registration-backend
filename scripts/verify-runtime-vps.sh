@@ -5,26 +5,35 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT_DIR/.env.runtime}"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT_DIR/docker-compose.runtime.yml}"
 
-set -a
-source "$ENV_FILE"
-set +a
+read_env() {
+  local key="$1"
+  local value
+  value="$(grep -E "^${key}=" "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  printf '%s' "$value"
+}
 
-base_url="http://127.0.0.1:${RUNTIME_HOST_PORT:-3100}"
+runtime_host_port="$(read_env RUNTIME_HOST_PORT)"
+runtime_host_port="${runtime_host_port:-3100}"
+runtime_api_token="$(read_env RUNTIME_API_TOKEN)"
+test -n "$runtime_api_token"
+
+base_url="http://127.0.0.1:${runtime_host_port}"
 
 curl --fail --silent "$base_url/health" >/dev/null
 ready="$(curl --fail --silent "$base_url/ready")"
 
-node -e "
-const d=JSON.parse(process.argv[1]);
-if (!['ready','degraded'].includes(d.status)) process.exit(1);
-if (!d.components?.database?.ready) process.exit(2);
-if (!d.components?.runtimeAuth?.ready) process.exit(3);
-" "$ready"
+printf '%s' "$ready" | grep -Eq '"status":"(ready|degraded)"'
+printf '%s' "$ready" | grep -q '"database":{"ready":true}'
+printf '%s' "$ready" | grep -Eq '"runtimeAuth":\{"required":true,"ready":true'
 
 unauth_status="$(curl -s -o /tmp/runtime-unauth.json -w '%{http_code}'   -H 'content-type: application/json'   -d '{"projectKey":"verify-unauth","name":"verify","projectType":"AIGC_CONTENT"}'   "$base_url/api/runtime/projects")"
 test "$unauth_status" = "401"
 
-auth_status="$(curl -s -o /tmp/runtime-auth.json -w '%{http_code}'   -H 'content-type: application/json'   -H "authorization: Bearer $RUNTIME_API_TOKEN"   -d '{"projectKey":"verify-'$(date +%s)'","name":"VPS Verify","projectType":"AIGC_CONTENT"}'   "$base_url/api/runtime/projects")"
+auth_status="$(curl -s -o /tmp/runtime-auth.json -w '%{http_code}'   -H 'content-type: application/json'   -H "authorization: Bearer $runtime_api_token"   -d '{"projectKey":"verify-'$(date +%s)'","name":"VPS Verify","projectType":"AIGC_CONTENT"}'   "$base_url/api/runtime/projects")"
 test "$auth_status" = "201"
 
 mysql_port="$(docker inspect ai-native-mysql --format '{{with index .NetworkSettings.Ports "3306/tcp"}}{{json .}}{{end}}')"
