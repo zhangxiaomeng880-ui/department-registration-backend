@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release/ai-native-runtime-v2.2-production
+      - hotfix/v2.2-mysql2-security
   workflow_dispatch:
 
 jobs:
@@ -32,6 +33,8 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Verify frozen M22.6 RC evidence
         run: |
           node -e "const x=require('./release/runtime-v2.2-m22.6-commercial-rc-freeze.json'); if(x.status!=='STAGING_PASS'||x.frozen!==true||x.productionTouched!==false) process.exit(1); console.log('M22_6_RC_EVIDENCE_PASS')"
