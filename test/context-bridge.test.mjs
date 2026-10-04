@@ -59,6 +59,19 @@ assert.equal(r.body.data.routeRuleKey,'P86');
 const routeExecutionId = r.body.data.id;
 
 r = await request('POST','/api/runtime/context-packets',{
+  query:'历史版本不应进入默认Agent上下文',
+  scope:'SC049',
+  items:[{
+    sourceFileId:'historical-file',
+    sourceVersion:'old-v1',
+    sourceStatus:'HISTORICAL',
+    sourceText:'This stale content must not enter default execution.'
+  }]
+});
+assert.equal(r.status,409);
+assert.equal(r.body.error,'CONTEXT_SOURCE_STATUS_NOT_ALLOWED');
+
+r = await request('POST','/api/runtime/context-packets',{
   query:'检查SC049连续性，只输出真实问题和证据。',
   scope:'SC049',
   ttlSeconds:300,
