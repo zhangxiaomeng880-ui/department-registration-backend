@@ -24,7 +24,8 @@
     "validate:commercial-control": "node test/commercial-control.test.mjs",
     "validate:tenant-rbac": "node test/tenant-rbac.test.mjs",
     "validate:billing-ledger": "node test/billing-ledger.test.mjs",
-    "validate:billing-operations": "node test/billing-operations.test.mjs"
+    "validate:billing-operations": "node test/billing-operations.test.mjs",
+    "validate:collections": "node test/collections.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
