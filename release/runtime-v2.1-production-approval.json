@@ -1,0 +1,20 @@
+{
+  "release": "ai-native-runtime-v2.1",
+  "releaseCandidate": "ai-native-runtime-v2.1-rc1",
+  "candidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+  "approval": {
+    "requiredByGate": "G21-RELEASE-PROMOTION",
+    "approved": true,
+    "approvedBy": "release-owner",
+    "approvalSource": "explicit user approval in ChatGPT",
+    "approvedAt": "2026-10-04T09:55:00Z",
+    "scope": "Promote the exact verified RC1 candidate to Railway production while preserving the captured v2.0 rollback target."
+  },
+  "preApprovalEvidence": "release/runtime-v2.1-rc1-readiness.json",
+  "stagingEvidence": "release/runtime-v2.1-rc1-staging.json",
+  "rollback": {
+    "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+    "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18"
+  },
+  "decision": "APPROVED_FOR_MANUAL_PRODUCTION_PROMOTION"
+}
