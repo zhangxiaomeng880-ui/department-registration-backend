@@ -1,0 +1,82 @@
+{
+  "milestone": "M21.2",
+  "name": "Policy Router v2",
+  "gate": "G21-MULTI-PROVIDER",
+  "status": "PASS",
+  "branch": "feat/ai-native-runtime-v2.1-productization",
+  "validatedCommitSha": "25edc671358b394b2c4a6bd4b8531504ae911bab",
+  "baseMilestone": "M21.1",
+  "compatibility": {
+    "v2_0LegacySingleProviderPathPreserved": true,
+    "additiveMigrationOnly": true,
+    "migrationCount": 6,
+    "currentOpenAiResponsesPathBackwardCompatible": true,
+    "railwayProductionModified": false
+  },
+  "implemented": {
+    "providerRegistry": true,
+    "modelRegistry": true,
+    "providerHealthEvents": true,
+    "deterministicPolicyModes": [
+      "QUALITY_FIRST",
+      "COST_FIRST",
+      "LATENCY_FIRST",
+      "FALLBACK_ONLY"
+    ],
+    "providerHealthAwareSelection": true,
+    "deterministicFallbackChain": true,
+    "explicitProviderModelDecisionEvidence": true,
+    "observabilityProviderDecisionSurface": true,
+    "noAllowedRouteFailClosed": true,
+    "unsupportedAdapterFailClosed": true,
+    "policySelectedOpenAiModelOverride": true
+  },
+  "safetyAndSecrets": {
+    "registryPersistsCredentials": false,
+    "secretLikeRegistryFieldsRejected": true,
+    "silentProviderSubstitutionAllowed": false,
+    "privateContextBodyPersistencePolicyPreserved": true
+  },
+  "acceptance": {
+    "syntheticProviderRegistry": true,
+    "mockResponsesProvider": true,
+    "repeatedPolicyInputDeterministic": true,
+    "providerDownTriggersFallback": true,
+    "fallbackRunCreatesGateQaCheckpoint": true,
+    "unsupportedAdapterRecordedAsFail": true,
+    "allProvidersUnavailableReturnsBlock": true
+  },
+  "productionTruth": {
+    "secondExternalProviderLiveConnected": false,
+    "currentProductionProvider": "openai-responses",
+    "note": "M21.2 validates multi-provider routing infrastructure and fallback semantics in CI. It does not claim a second real external provider is live."
+  },
+  "ci": [
+    {
+      "name": "Runtime v2.1 Policy Router Gate",
+      "runId": 37188536758,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime v2.1 Observability Gate",
+      "runId": 37188536722,
+      "conclusion": "success"
+    },
+    {
+      "name": "Backend Validation",
+      "runId": 37188536743,
+      "conclusion": "success"
+    },
+    {
+      "name": "Railway Runtime Compatibility",
+      "runId": 37188536732,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime Orchestrator Validation",
+      "runId": 37188536720,
+      "conclusion": "success"
+    }
+  ],
+  "decision": "M21.2 PASS in CI. M21.3 Cost Ledger may begin. Real second-provider production onboarding remains a separate future evidence gate."
+}
