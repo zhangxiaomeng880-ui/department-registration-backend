@@ -73,6 +73,7 @@ assert.equal(r.body.data.contextHash,contextHash);
 assert.equal(r.body.data.findingCount,1);
 assert.equal(r.body.data.findings[0].code,'SC049_MOTHER_CALL_SEQUENCE_OMITTED');
 assert.ok(r.body.data.runId);
+assert.match(r.body.data.correlationId,/^[0-9a-f-]{36}$/i);
 assert.ok(r.body.data.taskId);
 assert.ok(r.body.data.gateResultId);
 assert.ok(r.body.data.qaEvidenceId);
@@ -80,6 +81,7 @@ assert.ok(r.body.data.checkpointId);
 assert.equal(r.body.data.resumeFromTaskKey,'resolve-sc049-or-accept-film-compression');
 
 const runId = r.body.data.runId;
+const correlationId = r.body.data.correlationId;
 
 r = await request('GET',`/api/runtime/context-packets/${contextPacketId}/metadata`);
 assert.equal(r.status,404);
@@ -99,10 +101,19 @@ for (const [table, expected] of [
   ['tool_executions',1],
   ['gate_results',1],
   ['qa_evidence',1],
-  ['checkpoints',1]
+  ['checkpoints',1],
+  ['usage_ledger',1]
 ]) {
   const [[row]] = await db.execute(`SELECT COUNT(*) AS count FROM ${table} WHERE run_id = ?`,[runId]);
   assert.equal(Number(row.count),expected,`${table} count`);
+}
+
+for (const table of ['runs','tasks','route_executions','tool_executions','gate_results','qa_evidence','checkpoints','usage_ledger']) {
+  const [[row]] = await db.execute(
+    `SELECT correlation_id FROM ${table} WHERE ${table === 'runs' ? 'id' : 'run_id'} = ? LIMIT 1`,
+    [runId]
+  );
+  assert.equal(row.correlation_id,correlationId,`${table} correlation_id`);
 }
 
 const [[gate]] = await db.execute(
@@ -126,12 +137,42 @@ assert.equal(checkpoint.dependency_fingerprint,contextHash);
 assert.equal(checkpoint.resume_from_task_key,'resolve-sc049-or-accept-film-compression');
 
 const [toolRows] = await db.execute(
-  'SELECT input_json, output_json FROM tool_executions WHERE run_id = ?',
+  `SELECT input_json, output_json, provider_key, model_key, duration_ms,
+          token_input, token_output, error_category
+   FROM tool_executions
+   WHERE run_id = ?`,
   [runId]
 );
 const persistedTool = JSON.stringify(toolRows);
 assert.equal(persistedTool.includes('LIBRARY_CONTEXT_SENTINEL'),false);
 assert.equal(persistedTool.includes('sourceText'),false);
+assert.equal(toolRows[0].provider_key,'openai-responses');
+assert.equal(toolRows[0].model_key,'test-model');
+assert.ok(Number(toolRows[0].duration_ms) >= 0);
+assert.equal(toolRows[0].error_category,null);
+
+const [[usage]] = await db.execute(
+  `SELECT provider_key, model_key, token_input, token_output, duration_ms,
+          error_category, correlation_id
+   FROM usage_ledger
+   WHERE run_id = ?`,
+  [runId]
+);
+assert.equal(usage.provider_key,'openai-responses');
+assert.equal(usage.model_key,'test-model');
+assert.equal(Number(usage.token_input),Number(toolRows[0].token_input));
+assert.equal(Number(usage.token_output),Number(toolRows[0].token_output));
+assert.ok(Number(usage.duration_ms) >= 0);
+assert.equal(usage.error_category,null);
+assert.equal(usage.correlation_id,correlationId);
+
+const [[runUsage]] = await db.execute(
+  'SELECT token_input, token_output, correlation_id FROM runs WHERE id = ?',
+  [runId]
+);
+assert.equal(Number(runUsage.token_input),Number(toolRows[0].token_input));
+assert.equal(Number(runUsage.token_output),Number(toolRows[0].token_output));
+assert.equal(runUsage.correlation_id,correlationId);
 
 const [[contextTables]] = await db.execute(
   `SELECT COUNT(*) AS count
