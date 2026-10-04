@@ -1,0 +1,90 @@
+name: Runtime v2.2 Production Promotion Gate
+
+on:
+  push:
+    branches:
+      - release/ai-native-runtime-v2.2-production
+  workflow_dispatch:
+
+jobs:
+  v22-production-promotion-gate:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: ci
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Verify frozen M22.6 RC evidence
+        run: |
+          node -e "const x=require('./release/runtime-v2.2-m22.6-commercial-rc-freeze.json'); if(x.status!=='STAGING_PASS'||x.frozen!==true||x.productionTouched!==false) process.exit(1); console.log('M22_6_RC_EVIDENCE_PASS')"
+      - name: Validate production preflight and migration
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+        run: node test/v22-production-preflight.test.mjs
+      - name: Validate M21 and commercial regressions
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+          PORT: 3700
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3700
+          RUNTIME_REQUIRE_AUTH: "false"
+        run: |
+          node src/server.mjs > /tmp/runtime-v22-production-regression.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:3700/ready >/dev/null && break; sleep 1; done
+          node test/cost-ledger.test.mjs
+          npm run validate:commercial-billing
+          npm run validate:tenant-quota
+          npm run validate:commercial-control
+          kill $PID
+      - name: Validate authenticated RC chain
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+          MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
+          PORT: 3800
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3800
+          RUNTIME_REQUIRE_AUTH: "true"
+          RUNTIME_API_TOKEN: ci-token
+        run: |
+          node src/server.mjs > /tmp/runtime-v22-production-auth.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 30); do curl --fail --silent http://127.0.0.1:3800/ready >/dev/null && break; sleep 1; done
+          npm run validate:tenant-rbac
+          npm run validate:billing-ledger
+          node test/runtime-v22-commercial-rc-e2e.test.mjs
+          node test/railway-compatibility.test.mjs
+          kill $PID
+      - name: Print logs on failure
+        if: failure()
+        run: |
+          cat /tmp/runtime-v22-production-regression.log || true
+          cat /tmp/runtime-v22-production-auth.log || true
