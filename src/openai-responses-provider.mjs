@@ -13,8 +13,8 @@ const extractOutputText = payload => {
   return parts.join('\n').trim();
 };
 
-export const modelProviderConfigured = () =>
-  Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL);
+export const modelProviderConfigured = modelKey =>
+  Boolean(process.env.OPENAI_API_KEY && (modelKey || process.env.OPENAI_MODEL));
 
 export const classifyProviderError = error => {
   if (error?.name === 'AbortError') return 'TIMEOUT';
@@ -31,8 +31,10 @@ export const invokeOpenAiResponses = async ({
   schema,
   schemaName = 'agent_output',
   metadata = {},
+  modelKey,
 }) => {
-  if (!modelProviderConfigured()) {
+  const resolvedModel = modelKey || process.env.OPENAI_MODEL || null;
+  if (!modelProviderConfigured(resolvedModel)) {
     const error = new Error('OpenAI model provider is not configured');
     error.code = 'MODEL_PROVIDER_NOT_CONFIGURED';
     error.statusCode = 503;
@@ -53,7 +55,7 @@ export const invokeOpenAiResponses = async ({
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL,
+        model: resolvedModel,
         instructions,
         input,
         store: false,
@@ -103,7 +105,7 @@ export const invokeOpenAiResponses = async ({
     return {
       provider: 'openai-responses',
       providerResponseId: payload.id || null,
-      model: payload.model || process.env.OPENAI_MODEL,
+      model: payload.model || resolvedModel,
       status: payload.status || 'completed',
       output,
       usage: payload.usage || null,
