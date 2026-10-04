@@ -132,19 +132,25 @@ const queryScalar = async (db, sql, params=[]) => {
   return Number(Object.values(first)[0] || 0);
 };
 
-const tableExists = async (db, _schema, table) =>
-  queryScalar(db, `
-    SELECT COUNT(*) AS c
-    FROM information_schema.tables
-    WHERE table_schema=DATABASE() AND table_name=?
-  `, [table]) > 0;
+const tableExists = async (db, _schema, table) => {
+  try {
+    await db.query(`SELECT 1 FROM \`${table}\` LIMIT 0`);
+    return true;
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') return false;
+    throw error;
+  }
+};
 
-const columnExists = async (db, _schema, table, column) =>
-  queryScalar(db, `
-    SELECT COUNT(*) AS c
-    FROM information_schema.columns
-    WHERE table_schema=DATABASE() AND table_name=? AND column_name=?
-  `, [table, column]) > 0;
+const columnExists = async (db, _schema, table, column) => {
+  try {
+    const [rows] = await db.query(`SHOW COLUMNS FROM \`${table}\``);
+    return rows.some(row => row.Field === column);
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') return false;
+    throw error;
+  }
+};
 
 const indexExists = async (db, _schema, table, index) => {
   const [rows] = await db.query(`SHOW INDEX FROM \`${table}\``);
