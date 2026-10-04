@@ -1,0 +1,27 @@
+{
+  "milestone": "V2.2 Security Hotfix",
+  "status": "READY_FOR_PRODUCTION",
+  "productionTouched": false,
+  "branch": "hotfix/v2.2-mysql2-security",
+  "packageChange": {
+    "name": "mysql2",
+    "from": "3.15.1",
+    "to": "3.24.5"
+  },
+  "securityGate": {
+    "npmAuditCommand": "npm audit --omit=dev --audit-level=high",
+    "result": "PASS",
+    "vulnerabilities": 0
+  },
+  "validation": {
+    "workflow": "Runtime v2.2 Production Promotion Gate",
+    "runId": 37204104859,
+    "status": "SUCCESS",
+    "productionPreflightAndMigration": "PASS",
+    "v21RollbackCompatibility": "PASS",
+    "m21AndCommercialRegressions": "PASS",
+    "authenticatedRcChain": "PASS"
+  },
+  "ciEnvironmentNote": "CI MySQL enables log_bin_trust_function_creators only for test parity with the already-successful production migration 012 trigger behavior; production configuration was not changed.",
+  "productionPromotion": "NOT_STARTED"
+}
