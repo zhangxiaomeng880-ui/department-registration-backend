@@ -49,7 +49,7 @@ assert.equal(Number(migrationCount.count),migrationFiles.length);
 const required = [
   'projects','runs','tasks','checkpoints','stage_snapshots',
   'route_executions','tool_executions','usage_ledger','gate_results','qa_evidence','audit_logs',
-  'provider_registry','model_registry','provider_health_events',
+  'provider_registry','model_registry','provider_health_events','pricing_versions','project_budget_policies',
   'knowledge_contexts','knowledge_sources','knowledge_documents','knowledge_sync_runs',
   'knowledge_retrievals','knowledge_retrieval_items'
 ];
