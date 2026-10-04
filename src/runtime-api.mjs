@@ -62,6 +62,7 @@ import {
   createEvalSuite,listEvalSuites,createEvalSuiteVersion,addEvalCase,getEvalSuiteVersion,
   freezeEvalSuiteVersion,createEvalReplayManifest,getEvalReplayManifest
 } from './eval-replay.mjs';
+import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -141,6 +142,26 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && evalReplayManifestMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getEvalReplayManifest(evalReplayManifestMatch[1])});
+    return true;
+  }
+
+  const evalReplayRunMatch=match(url.pathname,/^\/api\/runtime\/eval-replay-manifests\/([^/]+)\/run$/);
+  if (req.method === 'POST' && evalReplayRunMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await runEvalReplayManifest(evalReplayRunMatch[1],{
+      idempotencyKey:body.idempotencyKey,
+      executionProjectId:body.executionProjectId,
+      runtimeCommitSha:body.runtimeCommitSha||resolveEvalRuntimeSha(),
+      contextsByCaseKey:body.contextsByCaseKey||{}
+    })});
+    return true;
+  }
+
+  const evalRunMatch=match(url.pathname,/^\/api\/runtime\/eval-runs\/([^/]+)$/);
+  if (req.method === 'GET' && evalRunMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalRun(evalRunMatch[1])});
     return true;
   }
 
