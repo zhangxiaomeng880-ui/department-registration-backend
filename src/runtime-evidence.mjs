@@ -118,6 +118,12 @@ export const recordToolExecution = async input => {
   let correlationId = input.correlationId || null;
   const providerKey = input.providerKey || null;
   const errorCategory = input.errorCategory || null;
+  let calculatedCost = {
+    costStatus:'UNKNOWN',
+    pricingVersionId:null,
+    estimatedCost:null,
+    currency:null,
+  };
 
   try {
     await connection.beginTransaction();
@@ -138,7 +144,7 @@ export const recordToolExecution = async input => {
       modelKey:input.modelKey || null,
       at:new Date(),
     });
-    const calculatedCost = calculateEstimatedCost({
+    calculatedCost = calculateEstimatedCost({
       tokenInput,
       tokenOutput,
       pricingVersion,
