@@ -141,7 +141,7 @@ const syncInvoiceAndCollection=async(connection,invoiceId,occurredAt,reason)=>{
         `INSERT INTO collection_actions
          (id,case_id,invoice_id,tenant_id,action_type,amount,promise_due_at,idempotency_key,metadata_json,occurred_at)
          VALUES (?,?,?,?, 'AUTO_RESOLVED_ADJUSTMENT',NULL,NULL,?,NULL,?)`,
-        [randomUUID(),current.id,invoiceId,current.tenant_id,`auto-financial-resolve:${reason}:${invoiceId}:${occurredAt.toISOString()}`,occurredAt]
+        [randomUUID(),current.id,invoiceId,current.tenant_id,`auto-financial-resolve:${randomUUID()}`,occurredAt]
       );
     }else if(u.outstanding>0n&&current.status==='RESOLVED'){
       await connection.execute(
@@ -152,7 +152,7 @@ const syncInvoiceAndCollection=async(connection,invoiceId,occurredAt,reason)=>{
         `INSERT INTO collection_actions
          (id,case_id,invoice_id,tenant_id,action_type,amount,promise_due_at,idempotency_key,metadata_json,occurred_at)
          VALUES (?,?,?,?, 'AUTO_REOPEN_FINANCIAL',NULL,NULL,?,NULL,?)`,
-        [randomUUID(),current.id,invoiceId,current.tenant_id,`auto-financial-reopen:${reason}:${invoiceId}:${occurredAt.toISOString()}`,occurredAt]
+        [randomUUID(),current.id,invoiceId,current.tenant_id,`auto-financial-reopen:${randomUUID()}`,occurredAt]
       );
     }
   }
@@ -341,9 +341,13 @@ export const recordBillingDisputeAction=async({
     await connection.beginTransaction();
     const [existing]=await connection.execute('SELECT * FROM billing_dispute_actions WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
-      const [drows]=await connection.execute('SELECT * FROM billing_disputes WHERE id=?',[existing[0].dispute_id]);
+      const row=existing[0];
+      if(row.dispute_id!==disputeId||row.action_type!==type) throw errorOf(
+        'Idempotency key was already used for a different dispute action','DISPUTE_IDEMPOTENCY_CONFLICT',409
+      );
+      const [drows]=await connection.execute('SELECT * FROM billing_disputes WHERE id=?',[row.dispute_id]);
       await connection.commit();
-      return {action:normalizeDisputeAction(existing[0]),dispute:normalizeDispute(drows[0]),idempotent:true};
+      return {action:normalizeDisputeAction(row),dispute:normalizeDispute(drows[0]),idempotent:true};
     }
     const [rows]=await connection.execute('SELECT * FROM billing_disputes WHERE id=? FOR UPDATE',[disputeId]);
     if(!rows.length) throw errorOf('Billing dispute not found','BILLING_DISPUTE_NOT_FOUND',404);
