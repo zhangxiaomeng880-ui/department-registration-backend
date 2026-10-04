@@ -57,6 +57,7 @@ import {
   recordCollectionAction,resolveCollectionCaseScope
 } from './collections.mjs';
 import { getRevenueAnalytics, getRevenuePerformance } from './revenue-analytics.mjs';
+import { closeFinancePeriod,getFinanceClose,listFinanceCloses,getFinanceCloseExport } from './finance-close.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -76,6 +77,38 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/finance-closes') {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await closeFinancePeriod({
+      periodStart:body.periodStart,periodEnd:body.periodEnd,idempotencyKey:body.idempotencyKey,
+      sourceLabel:body.sourceLabel||null,metadata:body.metadata||null
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/finance-closes') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listFinanceCloses({limit:url.searchParams.get('limit')||100})});
+    return true;
+  }
+
+  const financeCloseExportMatch=match(url.pathname,/^\/api\/runtime\/finance-closes\/([^/]+)\/export$/);
+  if (req.method === 'GET' && financeCloseExportMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getFinanceCloseExport(financeCloseExportMatch[1],{
+      format:url.searchParams.get('format')||'JSON'
+    })});
+    return true;
+  }
+
+  const financeCloseMatch=match(url.pathname,/^\/api\/runtime\/finance-closes\/([^/]+)$/);
+  if (req.method === 'GET' && financeCloseMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getFinanceClose(financeCloseMatch[1])});
     return true;
   }
 
