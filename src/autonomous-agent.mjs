@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { invokeOpenAiResponses, classifyProviderError } from './openai-responses-provider.mjs';
 import { recordToolExecution } from './runtime-evidence.mjs';
-import { evaluateRunQuota } from './quota-meter.mjs';
+import { authorizeCommercialExecution, commitUsageReservation, releaseUsageReservation } from './commercial-control.mjs';
 
 const sha256 = value => createHash('sha256').update(String(value)).digest('hex');
 
@@ -128,26 +128,15 @@ export const executeScriptContinuityAgent = async input => {
     throw error;
   }
 
-  const quotaDecision = await evaluateRunQuota({
+  const commercialAuthorization=await authorizeCommercialExecution({
     runId:input.runId,
-    persist:true,
+    entitlementKey:'MODEL_EXECUTION',
+    operationKey:'MODEL_EXECUTION',
+    reservationMetric:'TOOL_EXECUTION_COUNT',
+    reservationAmount:1,
+    reservationTtlSeconds:300,
     source:'AUTONOMOUS_AGENT',
   });
-  if (quotaDecision.decision !== 'ALLOW') {
-    const error = new Error(quotaDecision.decision === 'BLOCK'
-      ? 'Usage quota blocked model execution'
-      : 'Usage quota requires hold before model execution');
-    error.code = quotaDecision.decision === 'BLOCK' ? 'QUOTA_BLOCKED' : 'QUOTA_HOLD';
-    error.statusCode = quotaDecision.decision === 'BLOCK' ? 429 : 409;
-    error.errorCategory = 'QUOTA';
-    error.details = {
-      decision:quotaDecision.decision,
-      tenantId:quotaDecision.tenantId,
-      workspaceId:quotaDecision.workspaceId,
-      policyCount:quotaDecision.policyCount,
-    };
-    throw error;
-  }
 
   let providerResult;
   try {
@@ -170,25 +159,36 @@ export const executeScriptContinuityAgent = async input => {
       modelKey: selectedModelKey || undefined,
     });
   } catch (error) {
-    await recordToolExecution({
-      runId: input.runId,
-      taskId: input.taskId,
-      routeExecutionId: input.routeExecutionId,
-      correlationId: input.correlationId || null,
-      toolType: 'MODEL_PROVIDER',
-      toolKey: 'openai.responses',
-      providerKey: selectedProviderKey,
-      modelKey: selectedModelKey || process.env.OPENAI_MODEL || null,
-      status: 'FAIL',
-      input: evidenceInput,
-      output: null,
-      tokenInput: 0,
-      tokenOutput: 0,
-      durationMs: error.durationMs ?? null,
-      errorCode: error.code || 'MODEL_PROVIDER_ERROR',
-      errorCategory: error.errorCategory || classifyProviderError(error),
-      errorMessage: error.message,
-    });
+    let failureEvidence=null;
+    try{
+      failureEvidence=await recordToolExecution({
+        runId: input.runId,
+        taskId: input.taskId,
+        routeExecutionId: input.routeExecutionId,
+        correlationId: input.correlationId || null,
+        toolType: 'MODEL_PROVIDER',
+        toolKey: 'openai.responses',
+        providerKey: selectedProviderKey,
+        modelKey: selectedModelKey || process.env.OPENAI_MODEL || null,
+        status: 'FAIL',
+        input: evidenceInput,
+        output: null,
+        tokenInput: 0,
+        tokenOutput: 0,
+        durationMs: error.durationMs ?? null,
+        errorCode: error.code || 'MODEL_PROVIDER_ERROR',
+        errorCategory: error.errorCategory || classifyProviderError(error),
+        errorMessage: error.message,
+      });
+    } finally {
+      if(failureEvidence?.id){
+        await commitUsageReservation(commercialAuthorization.reservationId,{
+          actualAmount:1,toolExecutionId:failureEvidence.id
+        });
+      }else{
+        await releaseUsageReservation(commercialAuthorization.reservationId,{reasonCode:'PROVIDER_FAILURE_UNRECORDED'});
+      }
+    }
     throw error;
   }
 
@@ -217,6 +217,11 @@ export const executeScriptContinuityAgent = async input => {
     durationMs: providerResult.durationMs,
   });
 
+  await commitUsageReservation(commercialAuthorization.reservationId,{
+    actualAmount:1,
+    toolExecutionId:toolEvidence.id,
+  });
+
   return {
     executionMode: 'AUTONOMOUS_MODEL_PROVIDER',
     provider: selectedProviderKey,
@@ -226,7 +231,9 @@ export const executeScriptContinuityAgent = async input => {
     contextHash,
     correlationId: input.correlationId || null,
     sourceBodyPersisted: false,
-    quotaDecision:quotaDecision.decision,
+    commercialAuthorization:'ALLOW',
+    planKey:commercialAuthorization.planKey,
+    usageReservationId:commercialAuthorization.reservationId,
     toolExecutionId: toolEvidence.id,
     usageLedgerId: toolEvidence.usageLedgerId,
     output: providerResult.output,

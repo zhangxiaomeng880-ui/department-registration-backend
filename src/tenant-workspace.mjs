@@ -35,11 +35,15 @@ export const createTenant=async input=>{
   rejectSecrets(input);
   const db=getRuntimePool();
   const id=input.id||randomUUID();
+  const planKey=input.planKey||'LEGACY';
+  const [plans]=await db.execute('SELECT plan_key,status FROM plans WHERE plan_key=?',[planKey]);
+  if(!plans.length) throw errorOf('Plan not found','PLAN_NOT_FOUND',404);
+  if(plans[0].status!=='ACTIVE') throw errorOf('Plan is not active','PLAN_NOT_ACTIVE',409);
   try{
     await db.execute(
       `INSERT INTO tenants (id,tenant_key,name,plan_key,status,metadata_json)
        VALUES (?,?,?,?,?,?)`,
-      [id,input.tenantKey,input.name,input.planKey||null,input.status||'ACTIVE',asJson(input.metadata||null)]
+      [id,input.tenantKey,input.name,planKey,input.status||'ACTIVE',asJson(input.metadata||null)]
     );
   }catch(error){
     if(error?.code==='ER_DUP_ENTRY') throw errorOf('tenantKey already exists','TENANT_KEY_EXISTS',409);

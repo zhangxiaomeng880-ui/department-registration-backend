@@ -37,6 +37,11 @@ import {
 import { createTenant, listTenants, createWorkspace, listWorkspaces } from './tenant-workspace.mjs';
 import { upsertQuotaPolicy, listQuotaPolicies, getUsageMeter, evaluateRunQuota } from './quota-meter.mjs';
 import {
+  createPlan,listPlans,upsertPlanEntitlement,listPlanEntitlements,assignTenantPlan,
+  evaluateEntitlement,upsertRateLimitPolicy,listRateLimitPolicies,
+  authorizeCommercialExecution,commitUsageReservation,releaseUsageReservation,listUsageReservations
+} from './commercial-control.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -50,6 +55,92 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/plans') {
+    const result=await createPlan(await readBody(req));
+    json(res,201,{data:result});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/plans') {
+    json(res,200,{data:await listPlans()});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/plan-entitlements') {
+    const result=await upsertPlanEntitlement(await readBody(req));
+    json(res,201,{data:result});
+    return true;
+  }
+
+  const planEntitlementsMatch=match(url.pathname,/^\/api\/runtime\/plans\/([^/]+)\/entitlements$/);
+  if (req.method === 'GET' && planEntitlementsMatch) {
+    json(res,200,{data:await listPlanEntitlements(planEntitlementsMatch[1])});
+    return true;
+  }
+
+  const tenantPlanMatch=match(url.pathname,/^\/api\/runtime\/tenants\/([^/]+)\/plan$/);
+  if (req.method === 'PATCH' && tenantPlanMatch) {
+    const body=await readBody(req);
+    json(res,200,{data:await assignTenantPlan({tenantId:tenantPlanMatch[1],planKey:body.planKey})});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/rate-limit-policies') {
+    const result=await upsertRateLimitPolicy(await readBody(req));
+    json(res,201,{data:result});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/rate-limit-policies') {
+    json(res,200,{data:await listRateLimitPolicies({operationKey:url.searchParams.get('operationKey')||null})});
+    return true;
+  }
+
+  const entitlementMatch=match(url.pathname,/^\/api\/runtime\/runs\/([^/]+)\/entitlement-evaluate$/);
+  if (req.method === 'POST' && entitlementMatch) {
+    const body=await readBody(req);
+    const result=await evaluateEntitlement({
+      runId:entitlementMatch[1],entitlementKey:body.entitlementKey,
+      persist:body.persist!==false,source:body.source||'RUNTIME_API'
+    });
+    json(res,200,{data:result});
+    return true;
+  }
+
+  const commercialAuthorizeMatch=match(url.pathname,/^\/api\/runtime\/runs\/([^/]+)\/commercial-authorize$/);
+  if (req.method === 'POST' && commercialAuthorizeMatch) {
+    const body=await readBody(req);
+    const result=await authorizeCommercialExecution({
+      runId:commercialAuthorizeMatch[1],
+      entitlementKey:body.entitlementKey||'MODEL_EXECUTION',
+      operationKey:body.operationKey||'MODEL_EXECUTION',
+      reservationMetric:body.reservationMetric||'TOOL_EXECUTION_COUNT',
+      reservationAmount:body.reservationAmount==null?1:body.reservationAmount,
+      reservationCurrency:body.reservationCurrency||'USD',
+      reservationTtlSeconds:body.reservationTtlSeconds==null?300:body.reservationTtlSeconds,
+      source:body.source||'RUNTIME_API'
+    });
+    json(res,200,{data:result});
+    return true;
+  }
+
+  const reservationCommitMatch=match(url.pathname,/^\/api\/runtime\/usage-reservations\/([^/]+)\/commit$/);
+  if (req.method === 'POST' && reservationCommitMatch) {
+    json(res,200,{data:await commitUsageReservation(reservationCommitMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const reservationReleaseMatch=match(url.pathname,/^\/api\/runtime\/usage-reservations\/([^/]+)\/release$/);
+  if (req.method === 'POST' && reservationReleaseMatch) {
+    json(res,200,{data:await releaseUsageReservation(reservationReleaseMatch[1],await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/usage-reservations') {
+    json(res,200,{data:await listUsageReservations({runId:url.searchParams.get('runId')||null})});
     return true;
   }
 

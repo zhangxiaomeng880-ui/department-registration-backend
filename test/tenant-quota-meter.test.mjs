@@ -18,8 +18,7 @@ const suffix=randomUUID().slice(0,8);
 
 let r=await request('POST','/api/runtime/tenants',{
   tenantKey:`tenant-${suffix}`,
-  name:'Tenant Quota Test',
-  planKey:'TEST'
+  name:'Tenant Quota Test'
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const tenantId=r.body.data.id;
@@ -154,7 +153,7 @@ assert.equal(r.body.error,'QUOTA_BLOCKED');
 assert.equal(r.body.details.decision,'BLOCK');
 
 r=await request('POST','/api/runtime/tenants',{
-  tenantKey:`unknown-cost-tenant-${suffix}`,name:'Unknown Cost Tenant',planKey:'TEST'
+  tenantKey:`unknown-cost-tenant-${suffix}`,name:'Unknown Cost Tenant'
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const unknownTenantId=r.body.data.id;

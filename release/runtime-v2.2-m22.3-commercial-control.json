@@ -1,0 +1,34 @@
+{
+  "milestone": "M22.3",
+  "title": "Plan / Entitlement + Rate Limit / Usage Reservation",
+  "version": "V2.2",
+  "status": "IMPLEMENTED_PENDING_GATE",
+  "branch": "feat/ai-native-runtime-v2.2-m22.3-commercial-control",
+  "baseCommit": "7d58b105cd5eaa91c54bfc54f98181fec30242a3",
+  "productionTouched": false,
+  "scope": {
+    "entitlementDefault": "DENY",
+    "migrationCompatibility": "Existing plans receive MODEL_EXECUTION entitlement",
+    "rateLimitScopes": [
+      "PLAN",
+      "TENANT",
+      "WORKSPACE"
+    ],
+    "rateLimitResolution": "All applicable policies enforced atomically",
+    "usageReservationMetrics": [
+      "COST_AMOUNT",
+      "TOKEN_INPUT",
+      "TOKEN_OUTPUT",
+      "TOKEN_TOTAL",
+      "TOOL_EXECUTION_COUNT"
+    ],
+    "reservationLifecycle": [
+      "RESERVED",
+      "COMMITTED",
+      "RELEASED",
+      "EXPIRED"
+    ],
+    "autonomousAgentCommercialPreflight": true
+  },
+  "acceptanceGate": "G22_3_COMMERCIAL_CONTROL_PASS"
+}
