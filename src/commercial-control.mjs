@@ -573,7 +573,7 @@ const decisionError=(decision,prefix,details)=>{
     block?`${prefix} blocked execution`:`${prefix} requires hold`,
     block?`${prefix}_BLOCKED`:`${prefix}_HOLD`,
     block?429:409,
-    details
+    {decision,...(details||{})}
   );
 };
 
