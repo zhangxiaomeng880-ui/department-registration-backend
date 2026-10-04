@@ -12,7 +12,12 @@ fail() {
 
 command -v git >/dev/null 2>&1 || fail "git is required"
 command -v docker >/dev/null 2>&1 || fail "docker is required"
+command -v curl >/dev/null 2>&1 || fail "curl is required"
 docker compose version >/dev/null 2>&1 || fail "docker compose plugin is required"
+
+cd "$ROOT_DIR"
+git diff --quiet || fail "tracked working tree has uncommitted changes"
+git diff --cached --quiet || fail "index has uncommitted changes"
 
 test -f "$ENV_FILE" || fail "missing $ENV_FILE"
 test -f "$COMPOSE_FILE" || fail "missing $COMPOSE_FILE"
