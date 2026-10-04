@@ -610,6 +610,7 @@ export const getBillingOperationsSummary=async({tenantId=null,asOf=new Date()}={
 };
 
 export const listReceivables=async({tenantId=null,status='OPEN',asOf=new Date(),limit=100}={})=>{
+  const db=getRuntimePool();
   const normalizedStatus=String(status||'OPEN').toUpperCase();
   if(!['OPEN','OVERDUE','ALL'].includes(normalizedStatus)) throw errorOf('status must be OPEN, OVERDUE, or ALL','INVALID_RECEIVABLE_STATUS');
   const parsedLimit=Number(limit);
