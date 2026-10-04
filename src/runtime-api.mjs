@@ -160,6 +160,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     }
     json(res,200,{data:await getBillingOperationsSummary({
       tenantId:requestedTenant,
+      planKey:url.searchParams.get('planKey')||null,
       asOf:url.searchParams.get('asOf')||new Date()
     })});
     return true;
@@ -201,6 +202,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     }
     json(res,200,{data:await getRevenuePerformance({
       tenantId:requestedTenant,
+      planKey:url.searchParams.get('planKey')||null,
       asOf:url.searchParams.get('asOf')||new Date(),
       limit:url.searchParams.get('limit')||100
     })});
