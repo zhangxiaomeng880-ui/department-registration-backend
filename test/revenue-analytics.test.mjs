@@ -108,7 +108,7 @@ assert.equal(usd.aging.days31To60,12);
 assert.equal(usd.aging.days61To90,0);
 assert.equal(usd.aging.days90Plus,0);
 
-r=await request('GET','/api/runtime/billing-ops/analytics?asOf=2026-10-20T00:00:00.000Z');
+r=await request('GET',`/api/runtime/billing-ops/analytics?planKey=${planKey}&asOf=2026-10-20T00:00:00.000Z`);
 assert.equal(r.status,200,JSON.stringify(r.body));
 usd=r.body.data.currencies[0];
 assert.equal(usd.invoiceCount,2);
@@ -118,7 +118,7 @@ assert.equal(usd.outstanding,12);
 assert.equal(usd.overdueOutstanding,12);
 assert.equal(usd.collectionRatePct,50);
 
-r=await request('GET','/api/runtime/billing-ops/revenue-performance?asOf=2026-10-20T00:00:00.000Z');
+r=await request('GET',`/api/runtime/billing-ops/revenue-performance?planKey=${planKey}&asOf=2026-10-20T00:00:00.000Z`);
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.length,2);
 const rowA=r.body.data.find(x=>x.tenantId===a.tenantId);
