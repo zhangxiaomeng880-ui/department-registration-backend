@@ -19,6 +19,7 @@ import {
 } from './runtime-evidence.mjs';
 import { executeScriptContinuityAgent } from './autonomous-agent.mjs';
 import { orchestrateContextPacket } from './runtime-orchestrator.mjs';
+import { getRunObservability } from './runtime-observability.mjs';
 import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
@@ -130,6 +131,13 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   const taskMatch = match(url.pathname, /^\/api\/runtime\/tasks\/([^/]+)$/);
   if (req.method === 'PATCH' && taskMatch) {
     const result = await updateTask(taskMatch[1], await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const observabilityMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/observability$/);
+  if (req.method === 'GET' && observabilityMatch) {
+    const result = await getRunObservability(observabilityMatch[1]);
     json(res, 200, { data: result });
     return true;
   }
