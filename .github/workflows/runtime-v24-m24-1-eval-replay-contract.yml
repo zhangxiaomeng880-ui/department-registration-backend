@@ -1,0 +1,85 @@
+name: Runtime v2.4 M24.1 Eval Replay Contract Gate
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-v2.4-m24.1-eval-replay-contract
+  workflow_dispatch:
+
+jobs:
+  m24-1-eval-replay-contract:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: ci
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Apply Runtime migrations twice
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+        run: |
+          npm run migrate:runtime
+          npm run migrate:runtime
+
+      - name: Validate V2.3 production baseline and M24.1 contract
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+          MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
+          PORT: 4600
+          RUNTIME_API_BASE_URL: http://127.0.0.1:4600
+          RUNTIME_REQUIRE_AUTH: "true"
+          RUNTIME_API_TOKEN: m241-platform-token
+        run: |
+          node src/server.mjs > /tmp/runtime-v24-m241.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:4600/ready >/dev/null && break
+            sleep 1
+          done
+          npm run validate:billing-ledger
+          npm run validate:billing-operations
+          npm run validate:collections
+          npm run validate:revenue-analytics
+          npm run validate:financial-adjustments
+          npm run validate:finance-close
+          node test/runtime-v23-commercial-finance-rc-e2e.test.mjs
+          npm run validate:eval-replay-contract
+          node test/railway-compatibility.test.mjs
+          kill $PID
+          trap - EXIT
+
+      - name: Print Runtime logs on failure
+        if: failure()
+        run: cat /tmp/runtime-v24-m241.log || true
