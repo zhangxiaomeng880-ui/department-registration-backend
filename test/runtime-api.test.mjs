@@ -57,6 +57,40 @@ r = await request('PATCH', `/api/runtime/tasks/${taskId}`, {
 });
 assert.equal(r.status, 200);
 
+r = await request('POST', `/api/runtime/runs/${runId}/knowledge-contexts`, {
+  items: [{
+    taskId,
+    sourceProvider: 'CHATGPT_LIBRARY',
+    sourceFileId: 'library-source-ci-001',
+    sourceLibraryFileId: 'library-artifact-ci-001',
+    sourceVersion: '1',
+    sourcePath: '/project/CURRENT_INDEX.md',
+    sourceName: 'CURRENT_INDEX.md',
+    sourceModifiedAt: '2026-10-04T00:00:00.000Z',
+    sourceStatus: 'CURRENT',
+    precedenceRank: 1,
+    retrievalQuery: 'task-scoped current facts',
+    retrievalMode: 'search+read',
+    contextRole: 'PROJECT_MANIFEST',
+    content: {
+      status: 'CURRENT',
+      rule: 'Only accepted current assets are default retrieval sources'
+    }
+  }]
+});
+assert.equal(r.status, 201);
+assert.equal(r.body.data.count, 1);
+assert.equal(r.body.data.items[0].sourceProvider, 'CHATGPT_LIBRARY');
+assert.match(r.body.data.items[0].contentSha256, /^[a-f0-9]{64}$/);
+
+r = await request('GET', `/api/runtime/runs/${runId}/knowledge-contexts`);
+assert.equal(r.status, 200);
+assert.equal(r.body.data.items.length, 1);
+assert.equal(r.body.data.items[0].sourceVersion, '1');
+assert.equal(r.body.data.items[0].content.rule, 'Only accepted current assets are default retrieval sources');
+assert.match(r.body.data.fingerprint, /^[a-f0-9]{64}$/);
+const knowledgeFingerprint = r.body.data.fingerprint;
+
 r = await request('POST', `/api/runtime/runs/${runId}/checkpoints`, {
   taskId,
   stageKey: 'SCRIPT',
@@ -68,7 +102,7 @@ r = await request('POST', `/api/runtime/runs/${runId}/checkpoints`, {
   completedTaskKeys: ['sc042-sc050-continuity-read'],
   pendingTaskKeys: ['next-runtime-task'],
   blockedTaskKeys: [],
-  dependencyFingerprint: 'fp-api-001',
+  dependencyFingerprint: knowledgeFingerprint,
   runtimeCommitSha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
   knowledgeCommitSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   workflowVersion: 'workflow-api-v1',
@@ -89,7 +123,7 @@ r = await request('POST', `/api/runtime/runs/${runId}/resume`, {
   knowledgeCommitSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   workflowVersion: 'workflow-api-v1',
   routerVersion: 'router-api-v1',
-  dependencyFingerprint: 'fp-api-001',
+  dependencyFingerprint: knowledgeFingerprint,
 });
 assert.equal(r.status, 200);
 assert.equal(r.body.data.resumeFromTaskKey, 'next-runtime-task');
