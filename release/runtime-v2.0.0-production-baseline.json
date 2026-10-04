@@ -1,0 +1,74 @@
+{
+  "release": "ai-native-runtime-v2.0.0",
+  "releaseBranch": "release/ai-native-runtime-v2.0.0",
+  "releaseDate": "2026-10-04",
+  "sourceReleaseCandidate": "ai-native-runtime-v2.0-rc4-production-live",
+  "sourceRcCommitSha": "db88b491e7aaa83c57ba5656d95242344fff4cd7",
+  "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+  "production": {
+    "platform": "Railway",
+    "projectName": "ai-native-runtime-v2",
+    "environment": "production",
+    "runtimeService": {
+      "name": "runtime",
+      "serviceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+      "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+      "status": "SUCCESS",
+      "domain": "runtime-production-9c39.up.railway.app",
+      "readinessPath": "/ready",
+      "readinessHttpStatusObserved": 200
+    },
+    "databaseService": {
+      "name": "mysql-runtime",
+      "serviceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31",
+      "deploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+      "status": "SUCCESS",
+      "persistentVolume": "mysql-runtime-data",
+      "publiclyExposed": false
+    },
+    "modelProvider": {
+      "provider": "openai-responses",
+      "model": "gpt-6-luna",
+      "liveSmokeTestHttpStatus": 200,
+      "providerInvoked": true,
+      "structuredOutputPass": true
+    }
+  },
+  "gates": {
+    "runtime": "PASS",
+    "persistence": "PASS",
+    "authFailClosed": "PASS",
+    "deployment": "PASS",
+    "providerLive": "PASS",
+    "structuredOutput": "PASS",
+    "provenance": "PASS",
+    "checkpoint": "PASS",
+    "privateStoryBodyPersisted": false,
+    "final": "PASS"
+  },
+  "releaseBoundary": {
+    "includes": [
+      "Railway production Runtime",
+      "MySQL runtime persistence",
+      "Runtime auth fail-closed",
+      "Context Bridge transient-memory execution",
+      "Router/Policy execution",
+      "Gate + QA Evidence + Checkpoint persistence",
+      "OpenAI Responses provider live execution"
+    ],
+    "excludesToV2_1": [
+      "Billing and cost accounting",
+      "Multi-provider production routing",
+      "SaaS commercialization layer",
+      "Expanded production observability",
+      "Automated release promotion beyond current evidence gate"
+    ]
+  },
+  "immutableEvidence": [
+    "release/runtime-v2.0-rc1.json",
+    "release/runtime-v2.0-rc2-railway.json",
+    "release/runtime-v2.0-rc3-railway.json",
+    "release/runtime-v2.0-rc4-production-live.json"
+  ],
+  "finalStatus": "RELEASE_READY"
+}
