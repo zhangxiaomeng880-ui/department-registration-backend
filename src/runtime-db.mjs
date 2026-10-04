@@ -316,8 +316,6 @@ export const resumeRun = async (runId, expected = {}) => {
 };
 
 
-const stableJson = value => JSON.stringify(value ?? null);
-
 const normalizeKnowledgeRow = row => ({
   id: row.id,
   runId: row.run_id,
@@ -334,10 +332,22 @@ const normalizeKnowledgeRow = row => ({
   retrievalQuery: row.retrieval_query,
   retrievalMode: row.retrieval_mode,
   contextRole: row.context_role,
-  content: row.content_json,
+  sourceLineStart: row.source_line_start == null ? null : Number(row.source_line_start),
+  sourceLineEnd: row.source_line_end == null ? null : Number(row.source_line_end),
   contentSha256: row.content_sha256,
   retrievedAt: row.retrieved_at,
 });
+
+const rejectKnowledgeBody = item => {
+  const forbidden = ['content', 'body', 'text', 'snippet', 'sourceText', 'source_text'];
+  const found = forbidden.find(key => item?.[key] !== undefined);
+  if (found) {
+    const error = new Error(`Knowledge context must not persist source body field: ${found}`);
+    error.code = 'SOURCE_BODY_NOT_ALLOWED';
+    error.statusCode = 400;
+    throw error;
+  }
+};
 
 export const addKnowledgeContexts = async (runId, input) => {
   const db = getRuntimePool();
@@ -359,32 +369,30 @@ export const addKnowledgeContexts = async (runId, input) => {
 
   const stored = [];
   for (const item of items) {
-    if (!item.sourceFileId || !item.contextRole || item.content === undefined) {
-      const error = new Error('sourceFileId, contextRole and content are required');
+    rejectKnowledgeBody(item);
+    if (!item.sourceFileId || !item.contextRole || !/^[a-f0-9]{64}$/i.test(item.contentSha256 || '')) {
+      const error = new Error('sourceFileId, contextRole and a SHA-256 contentSha256 are required');
       error.code = 'INVALID_KNOWLEDGE_CONTEXT_ITEM';
       error.statusCode = 400;
       throw error;
     }
     const sourceProvider = item.sourceProvider || 'CHATGPT_LIBRARY';
     if (sourceProvider !== 'CHATGPT_LIBRARY') {
-      const error = new Error('Only CHATGPT_LIBRARY is allowed in Step 2.1');
+      const error = new Error('Only CHATGPT_LIBRARY is allowed in the current knowledge flow');
       error.code = 'UNSUPPORTED_KNOWLEDGE_PROVIDER';
       error.statusCode = 400;
       throw error;
     }
 
     const id = item.id || randomUUID();
-    const contentJson = stableJson(item.content);
-    const contentSha256 = createHash('sha256').update(contentJson, 'utf8').digest('hex');
-
     await db.execute(
       `INSERT INTO knowledge_contexts (
         id, run_id, task_id, source_provider, source_file_id,
         source_library_file_id, source_version, source_path, source_name,
         source_modified_at, source_status, precedence_rank,
         retrieval_query, retrieval_mode, context_role,
-        content_json, content_sha256
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        source_line_start, source_line_end, content_sha256
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         runId,
@@ -401,8 +409,9 @@ export const addKnowledgeContexts = async (runId, input) => {
         item.retrievalQuery || null,
         item.retrievalMode || null,
         item.contextRole,
-        contentJson,
-        contentSha256,
+        item.sourceLineStart == null ? null : Number(item.sourceLineStart),
+        item.sourceLineEnd == null ? null : Number(item.sourceLineEnd),
+        item.contentSha256.toLowerCase(),
       ]
     );
 
@@ -412,7 +421,9 @@ export const addKnowledgeContexts = async (runId, input) => {
       sourceFileId: item.sourceFileId,
       sourceVersion: item.sourceVersion || null,
       contextRole: item.contextRole,
-      contentSha256,
+      sourceLineStart: item.sourceLineStart == null ? null : Number(item.sourceLineStart),
+      sourceLineEnd: item.sourceLineEnd == null ? null : Number(item.sourceLineEnd),
+      contentSha256: item.contentSha256.toLowerCase(),
     });
   }
 
@@ -438,6 +449,8 @@ export const getKnowledgeContextFingerprint = async runId => {
       item.sourceProvider,
       item.sourceFileId,
       item.sourceVersion || '',
+      item.sourceLineStart ?? '',
+      item.sourceLineEnd ?? '',
       item.contentSha256,
       item.contextRole,
       item.precedenceRank ?? '',
