@@ -85,15 +85,18 @@ Completed:
 Current RC:
 
 - candidate: `ai-native-runtime-v2.1-rc1`
+- immutable RC branch: `release/ai-native-runtime-v2.1-rc1`
 - candidate code SHA: `7b0d0f152395e39f4bdc5ea48217c4a24b7a284f`
-- readiness: **HOLD**
-- blockers: `STAGING_NOT_VERIFIED`, `MANUAL_APPROVAL_REQUIRED`
+- isolated Railway staging: **PASS**
+- staging evidence: `release/runtime-v2.1-rc1-staging.json`
+- readiness: **AWAITING_MANUAL_APPROVAL**
+- remaining blocker: `MANUAL_APPROVAL_REQUIRED`
 - current production remains v2.0 and SUCCESS
 - rollback target is captured in the RC readiness manifest
 
 Next release action:
 
-Run the exact RC candidate in an isolated Railway staging environment/project, verify `/ready`, migrations, auth, provider smoke, observability, policy routing and cost ledger, then regenerate the readiness manifest. Only after staging is verified may the verdict become `AWAITING_MANUAL_APPROVAL`.
+An explicit release-owner approval is required before any production promotion. Production promotion remains manual; it must deploy the exact RC SHA and preserve the captured v2.0 rollback target.
 
 ## Release rule
 
