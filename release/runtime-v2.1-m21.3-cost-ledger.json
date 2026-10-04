@@ -1,0 +1,93 @@
+{
+  "milestone": "M21.3",
+  "name": "Cost Ledger",
+  "gate": "G21-COST-ACCOUNTING",
+  "status": "PASS",
+  "branch": "feat/ai-native-runtime-v2.1-productization",
+  "validatedCommitSha": "9de3d396fd3424bdcfb223941e63d359b7c36826",
+  "baseMilestone": "M21.2",
+  "compatibility": {
+    "v2_0RuntimeApiBackwardCompatible": true,
+    "schemaExtensionBackwardCompatible": true,
+    "migrationCount": 7,
+    "railwayProductionModified": false
+  },
+  "implemented": {
+    "immutablePricingVersions": true,
+    "priceVersionPinnedPerExecution": true,
+    "tokenToEstimatedCost": true,
+    "unknownPriceIsNullNotZero": true,
+    "runCostSummary": true,
+    "projectCostSummary": true,
+    "taskAndStageRollups": true,
+    "providerModelRollups": true,
+    "budgetPolicyHooks": true,
+    "missingPricingBudgetHold": true,
+    "budgetExceededHoldOrBlock": true,
+    "budgetCurrencyMismatchHold": true,
+    "mixedCurrencyHold": true,
+    "costMetadataSecretGuard": true
+  },
+  "accountingSemantics": {
+    "costType": "ESTIMATED_EXECUTION_COST",
+    "chargingOrPayment": false,
+    "subscriptions": false,
+    "checkout": false,
+    "historicalCostRecalculation": false,
+    "missingPriceBehavior": "UNKNOWN/HOLD"
+  },
+  "acceptance": {
+    "priceV1ThenV2HistoryPreserved": true,
+    "priorUsageRetainsOriginalPricingVersion": true,
+    "knownTokenUsageReconcilesToCalculatedCost": true,
+    "missingPricingPersistsNullCost": true,
+    "projectRunTaskStageProviderModelAggregation": true,
+    "budgetUnknownCostHold": true,
+    "budgetThresholdBlock": true,
+    "budgetCurrencyMismatchHold": true
+  },
+  "pricingTruth": {
+    "acceptancePricing": "SYNTHETIC_ONLY",
+    "currentOfficialProviderPricesHardcoded": false,
+    "liveOfficialPricingImported": false,
+    "note": "M21.3 validates versioning and accounting behavior with synthetic pricing fixtures. No claim is made that synthetic rates represent current provider prices."
+  },
+  "privacyAndSecurity": {
+    "privateSourceBodyAddedToCostLedger": false,
+    "pricingMetadataCredentialsAllowed": false,
+    "budgetMetadataCredentialsAllowed": false
+  },
+  "ci": [
+    {
+      "name": "Runtime v2.1 Cost Ledger Gate",
+      "runId": 37189375192,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime v2.1 Policy Router Gate",
+      "runId": 37189375215,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime v2.1 Observability Gate",
+      "runId": 37189375191,
+      "conclusion": "success"
+    },
+    {
+      "name": "Railway Runtime Compatibility",
+      "runId": 37189375196,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime Orchestrator Validation",
+      "runId": 37189375199,
+      "conclusion": "success"
+    },
+    {
+      "name": "Backend Validation",
+      "runId": 37189375202,
+      "conclusion": "success"
+    }
+  ],
+  "decision": "M21.3 PASS in CI. M21.4 Release Promotion may begin. Production v2.0 remains unchanged."
+}
