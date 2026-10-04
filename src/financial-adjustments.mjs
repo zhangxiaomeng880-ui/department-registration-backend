@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
+import { assertFinancePeriodOpen } from './finance-close.mjs';
 
 const SCALE=10000000000n;
 const ADJUSTMENT_TYPES=new Set(['CREDIT_NOTE','WRITE_OFF','DEBIT_ADJUSTMENT']);
@@ -176,6 +177,7 @@ export const createInvoiceAdjustment=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await assertFinancePeriodOpen(connection,effective);
     const [existing]=await connection.execute('SELECT * FROM invoice_adjustments WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
       const row=existing[0];
@@ -227,6 +229,7 @@ export const recordPaymentRefund=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await assertFinancePeriodOpen(connection,refunded);
     const [existing]=await connection.execute('SELECT * FROM payment_refunds WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
       const row=existing[0];
@@ -349,6 +352,7 @@ export const recordBillingDisputeAction=async({
       await connection.commit();
       return {action:normalizeDisputeAction(row),dispute:normalizeDispute(drows[0]),idempotent:true};
     }
+    if(type==='ACCEPT') await assertFinancePeriodOpen(connection,occurred);
     const [rows]=await connection.execute('SELECT * FROM billing_disputes WHERE id=? FOR UPDATE',[disputeId]);
     if(!rows.length) throw errorOf('Billing dispute not found','BILLING_DISPUTE_NOT_FOUND',404);
     const dispute=rows[0];
