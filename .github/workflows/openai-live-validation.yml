@@ -1,0 +1,80 @@
+name: OpenAI Live Provider Validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  openai-live-provider:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: runtime_ci_password
+          MYSQL_ROOT_PASSWORD: runtime_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pruntime_ci_root_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Require OpenAI live credentials
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: |
+          test -n "$OPENAI_API_KEY" || (echo "Missing GitHub Actions secret: OPENAI_API_KEY" && exit 1)
+          test -n "$OPENAI_MODEL" || (echo "Missing GitHub Actions secret: OPENAI_MODEL" && exit 1)
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Apply MySQL migrations
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+          bash scripts/validate-runtime-persistence.sh
+
+      - name: Run live OpenAI Responses validation
+        env:
+          PORT: 3100
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3100
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_BASE_URL: https://api.openai.com/v1
+          OPENAI_TIMEOUT_MS: 120000
+        run: |
+          node src/server.mjs > /tmp/openai-live-runtime.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          node test/openai-live-provider.test.mjs
