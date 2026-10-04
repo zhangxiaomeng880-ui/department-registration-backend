@@ -89,6 +89,7 @@ export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date
   const db=getRuntimePool();
   const promiseParams=[at],promiseClauses=["a.action_type='PROMISE_TO_PAY'","a.promise_due_at<=?"];
   if(tenantId){promiseClauses.push('a.tenant_id=?');promiseParams.push(tenantId);}
+  if(planKey){promiseClauses.push('s.plan_key=?');promiseParams.push(planKey);}
   const [promises]=await db.execute(
     `SELECT a.id,a.invoice_id,a.tenant_id,a.amount,a.occurred_at,a.promise_due_at,
        COALESCE((
@@ -98,6 +99,8 @@ export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date
            AND p.received_at<=a.promise_due_at
        ),0) AS paid_by_due
      FROM collection_actions a
+     JOIN invoices i ON i.id=a.invoice_id
+     LEFT JOIN subscriptions s ON s.id=i.subscription_id
      WHERE ${promiseClauses.join(' AND ')}
      ORDER BY a.promise_due_at,a.id`,
     promiseParams
