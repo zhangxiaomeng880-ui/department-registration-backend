@@ -19,7 +19,6 @@
       "TOKEN_INPUT",
       "TOKEN_OUTPUT",
       "TOKEN_TOTAL",
-      "RUN_COUNT",
       "TOOL_EXECUTION_COUNT"
     ],
     "decisions": [
@@ -27,7 +26,10 @@
       "HOLD",
       "BLOCK"
     ],
-    "autonomousAgentPreflight": true
+    "autonomousAgentPreflight": true,
+    "meterOnlyMetrics": [
+      "RUN_COUNT"
+    ]
   },
   "acceptanceGate": "G22_2_TENANT_QUOTA_METER_PASS"
 }
