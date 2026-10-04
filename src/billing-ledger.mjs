@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
+import { getInvoiceFinancialPosition } from './financial-adjustments.mjs';
 
 const SCALE=10000000000n;
 const TERM_INTERVALS=new Set(['MONTHLY','ANNUAL']);
@@ -524,10 +525,10 @@ export const recordInvoicePayment=async({
     const paymentCurrency=String(currency||invoice.currency).toUpperCase();
     if(paymentCurrency!==invoice.currency) throw errorOf('Payment currency does not match invoice','PAYMENT_CURRENCY_MISMATCH',409);
 
-    const totalDue=toUnits(invoice.total_due);
+    const beforePosition=await getInvoiceFinancialPosition(connection,invoiceId,{asOf:new Date()});
     const alreadyPaid=toUnits(invoice.amount_paid||0);
-    const outstanding=totalDue-alreadyPaid;
-    if(outstanding<=0n) throw errorOf('Invoice is already fully paid','INVOICE_ALREADY_PAID',409);
+    const outstanding=beforePosition._units.outstanding;
+    if(outstanding<=0n) throw errorOf('Invoice has no collectible outstanding balance','INVOICE_ALREADY_SETTLED',409);
     if(amountUnits>outstanding) throw errorOf('Payment exceeds invoice outstanding amount','PAYMENT_EXCEEDS_OUTSTANDING',409,{
       outstandingAmount:unitsToNumber(outstanding)
     });
@@ -542,10 +543,14 @@ export const recordInvoicePayment=async({
     );
 
     const newPaid=alreadyPaid+amountUnits;
-    const fullyPaid=newPaid===totalDue;
+    const netCollectedAfter=beforePosition._units.netCollected+amountUnits;
+    const fullyPaid=netCollectedAfter===beforePosition._units.collectible;
+    const adjustedSettlement=beforePosition._units.creditNotes>0n||beforePosition._units.writeOffs>0n||
+      beforePosition._units.debitAdjustments>0n||beforePosition._units.refundTotal>0n;
+    const nextStatus=fullyPaid?(adjustedSettlement?'SETTLED':'PAID'):'PARTIALLY_PAID';
     await connection.execute(
       'UPDATE invoices SET amount_paid=?, status=?, paid_at=? WHERE id=?',
-      [unitsToString(newPaid),fullyPaid?'PAID':'PARTIALLY_PAID',fullyPaid?received:null,invoiceId]
+      [unitsToString(newPaid),nextStatus,fullyPaid&&!adjustedSettlement?received:null,invoiceId]
     );
 
     if(fullyPaid){
@@ -574,8 +579,12 @@ export const recordInvoicePayment=async({
 
     const [paymentRows]=await connection.execute('SELECT * FROM invoice_payments WHERE id=?',[paymentId]);
     const [updatedInvoices]=await connection.execute('SELECT * FROM invoices WHERE id=?',[invoiceId]);
+    const afterPosition=await getInvoiceFinancialPosition(connection,invoiceId,{asOf:new Date()});
     await connection.commit();
-    return {payment:normalizePayment(paymentRows[0]),invoice:normalizeInvoice(updatedInvoices[0]),idempotent:false};
+    return {
+      payment:normalizePayment(paymentRows[0]),invoice:normalizeInvoice(updatedInvoices[0]),
+      financialPosition:{...afterPosition,_units:undefined,invoice:undefined},idempotent:false
+    };
   }catch(error){
     await connection.rollback();
     throw error;
