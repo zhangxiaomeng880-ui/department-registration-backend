@@ -108,6 +108,7 @@ export const orchestrateContextPacket = async input => {
   try {
     const run = await createRun({
       projectId:input.projectId,
+      correlationId,
       runType:'WORKFLOW',
       triggerSource:'CONTEXT_BRIDGE',
       input:{
