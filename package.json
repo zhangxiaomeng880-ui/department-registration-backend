@@ -18,7 +18,8 @@
     "migrate:runtime": "node scripts/migrate-runtime.mjs",
     "validate:commercial-billing": "node test/commercial-billing.test.mjs",
     "import:pricing-catalog": "node scripts/import-pricing-catalog.mjs",
-    "validate:tenant-quota": "node test/tenant-quota-meter.test.mjs"
+    "validate:tenant-quota": "node test/tenant-quota-meter.test.mjs",
+    "validate:commercial-control": "node test/commercial-control.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.15.1"
