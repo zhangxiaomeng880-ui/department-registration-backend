@@ -29,6 +29,11 @@ required_tables=(
   qa_evidence
   audit_logs
   knowledge_contexts
+  knowledge_sources
+  knowledge_documents
+  knowledge_sync_runs
+  knowledge_retrievals
+  knowledge_retrieval_items
 )
 for table in "${required_tables[@]}"; do
   count="$("${MYSQL[@]}" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '$table';")"
