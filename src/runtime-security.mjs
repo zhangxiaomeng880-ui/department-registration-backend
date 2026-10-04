@@ -14,8 +14,12 @@ const safeEqual = (leftValue, rightValue) => {
   return timingSafeEqual(left, right);
 };
 
-export const runtimeAuthRequired = () =>
-  String(process.env.RUNTIME_REQUIRE_AUTH || '').toLowerCase() === 'true';
+export const runtimeAuthRequired = () => {
+  const configured = String(process.env.RUNTIME_REQUIRE_AUTH || '').toLowerCase();
+  if (configured === 'false') return false;
+  if (configured === 'true') return true;
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+};
 
 export const assertRuntimeSecurityConfig = () => {
   if (runtimeAuthRequired() && !process.env.RUNTIME_API_TOKEN) {
