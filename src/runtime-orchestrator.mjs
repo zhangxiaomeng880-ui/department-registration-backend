@@ -145,6 +145,12 @@ export const orchestrateContextPacket = async input => {
       taskType:input.taskType || 'SCRIPT_CONTINUITY',
       query,
       executionMode:'AUTONOMOUS_CONTEXT_ORCHESTRATOR',
+      policyMode:input.policyMode,
+      requiredStructuredOutput:true,
+      allowedProviderKeys:input.allowedProviderKeys,
+      preferredProviderKey:input.preferredProviderKey,
+      preferredModelKey:input.preferredModelKey,
+      fallbackProviderKeys:input.fallbackProviderKeys,
     });
     routeExecutionId = route.id;
 
@@ -163,6 +169,9 @@ export const orchestrateContextPacket = async input => {
       routeExecutionId,
       correlationId,
       routeRuleKey:route.routeRuleKey,
+      selectedProviderKey:route.selectedProviderKey,
+      selectedModelKey:route.selectedModelKey,
+      selectedAdapterKey:route.selectedAdapterKey,
       query,
       scope,
       contextPacket:{
@@ -341,6 +350,10 @@ export const orchestrateContextPacket = async input => {
       correlationId,
       routeExecutionId,
       routeRuleKey:route.routeRuleKey,
+      policyMode:route.policyMode,
+      selectedProviderKey:route.selectedProviderKey,
+      selectedModelKey:route.selectedModelKey,
+      fallbackChain:route.fallbackChain,
       contextPacketId:packet.id,
       contextHash:packet.contextHash,
       contextPacketConsumed:true,
