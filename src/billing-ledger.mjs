@@ -528,7 +528,7 @@ export const recordInvoicePayment=async({
     const beforePosition=await getInvoiceFinancialPosition(connection,invoiceId,{asOf:new Date()});
     const alreadyPaid=toUnits(invoice.amount_paid||0);
     const outstanding=beforePosition._units.outstanding;
-    if(outstanding<=0n) throw errorOf('Invoice has no collectible outstanding balance','INVOICE_ALREADY_SETTLED',409);
+    if(outstanding<=0n) throw errorOf('Invoice is already fully paid or settled','INVOICE_ALREADY_PAID',409);
     if(amountUnits>outstanding) throw errorOf('Payment exceeds invoice outstanding amount','PAYMENT_EXCEEDS_OUTSTANDING',409,{
       outstandingAmount:unitsToNumber(outstanding)
     });
