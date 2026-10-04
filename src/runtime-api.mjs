@@ -18,6 +18,7 @@ import {
   recordQaEvidence,
 } from './runtime-evidence.mjs';
 import { executeScriptContinuityAgent } from './autonomous-agent.mjs';
+import { orchestrateContextPacket } from './runtime-orchestrator.mjs';
 import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
@@ -116,6 +117,12 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/agent-executions') {
     const result = await executeScriptContinuityAgent(await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/orchestrate') {
+    const result = await orchestrateContextPacket(await readBody(req));
     json(res, 200, { data: result });
     return true;
   }
