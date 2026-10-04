@@ -1,0 +1,77 @@
+{
+  "releaseCandidate": "ai-native-runtime-v2.0-rc4-live-provider",
+  "releaseBranch": "release/ai-native-runtime-v2.0-rc4-live-provider",
+  "runtimeCodeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+  "evidenceRecordedAt": "2026-10-04",
+  "platform": "Railway",
+  "railway": {
+    "projectName": "ai-native-runtime-v2",
+    "projectId": "34abdc88-da14-4ada-b2a2-bdf1b61240a4",
+    "environment": "production",
+    "environmentId": "e8afc1ed-80e4-42d3-85d9-3e3ec193c5f7",
+    "runtimeService": {
+      "serviceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+      "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+      "status": "SUCCESS",
+      "domain": "runtime-production-9c39.up.railway.app",
+      "healthcheckPath": "/ready",
+      "runtimePortObserved": 8080
+    },
+    "databaseService": {
+      "serviceName": "mysql-runtime",
+      "serviceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31",
+      "deploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+      "status": "SUCCESS",
+      "publicTcpProxy": false,
+      "persistentVolume": "mysql-runtime-data"
+    }
+  },
+  "provider": {
+    "provider": "openai-responses",
+    "model": "gpt-6-luna",
+    "apiKeyVariableName": "OPENAI_API_KEY",
+    "apiKeyValueRecorded": false,
+    "responsesApiLive": true
+  },
+  "evidence": {
+    "migrations": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=4 total=4",
+    "runtimeListen": "department-registration-backend listening on 8080",
+    "railwayDeploymentHealth": "SUCCESS",
+    "runtimeReplica": "1/1",
+    "databaseReplica": "1/1",
+    "providerSmokeHttpStatus": 200,
+    "providerInvoked": true,
+    "providerResponseType": "openai-responses",
+    "providerModelObserved": "gpt-6-luna",
+    "structuredJsonContract": "PASS",
+    "findingCount": 0,
+    "gateResultRecorded": true,
+    "qaEvidenceRecorded": true,
+    "checkpointRecorded": true,
+    "runtimeBodyPersistence": false,
+    "syntheticDataOnly": true
+  },
+  "cleanup": {
+    "obsoleteMysqlServiceDeleted": true,
+    "obsoleteMysqlDataVolumeRetainedDetached": true,
+    "temporaryProviderSmokeServiceDeleted": true,
+    "incorrectVariableOPEN_API_KEYRemoved": true,
+    "effectiveStagedChanges": 0
+  },
+  "knownState": {
+    "modelProviderConfigured": true,
+    "readinessMode": "ready",
+    "runtimeServiceOnline": true,
+    "mysqlRuntimeOnline": true,
+    "secretsStoredInEvidence": false
+  },
+  "acceptance": {
+    "runtimeDeployment": "PASS",
+    "mysqlPersistence": "PASS",
+    "runtimeAuthFailClosed": "PASS",
+    "openaiProviderLive": "PASS",
+    "structuredOutputContract": "PASS",
+    "evidenceProvenance": "PASS",
+    "overall": "PASS"
+  }
+}
