@@ -150,6 +150,11 @@ export const createTask = async input => {
     throw error;
   }
   const id = input.id || randomUUID();
+  let correlationId = input.correlationId || null;
+  if (!correlationId) {
+    const [runRows] = await db.execute('SELECT correlation_id FROM runs WHERE id = ?', [input.runId]);
+    correlationId = runRows[0]?.correlation_id || null;
+  }
   await db.execute(
     `INSERT INTO tasks (
       id, run_id, correlation_id, parent_task_id, stage_key, task_key, task_type,
@@ -158,7 +163,7 @@ export const createTask = async input => {
     [
       id,
       input.runId,
-      input.correlationId || null,
+      correlationId,
       input.parentTaskId || null,
       input.stageKey,
       input.taskKey,
@@ -173,7 +178,7 @@ export const createTask = async input => {
   return {
     id,
     runId: input.runId,
-    correlationId: input.correlationId || null,
+    correlationId,
     taskKey: input.taskKey,
     status: input.status || 'RUNNING'
   };
@@ -215,7 +220,7 @@ export const saveCheckpoint = async (runId, input) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
-    const [runRows] = await connection.execute('SELECT id FROM runs WHERE id = ? FOR UPDATE', [runId]);
+    const [runRows] = await connection.execute('SELECT id, correlation_id FROM runs WHERE id = ? FOR UPDATE', [runId]);
     if (!runRows.length) {
       const error = new Error('Run not found');
       error.code = 'RUN_NOT_FOUND';
@@ -229,6 +234,7 @@ export const saveCheckpoint = async (runId, input) => {
     );
     const sequenceNo = Number(sequenceRows[0].next_sequence);
     const id = input.id || randomUUID();
+    const correlationId = input.correlationId || runRows[0].correlation_id || null;
 
     await connection.execute(
       `INSERT INTO checkpoints (
@@ -242,7 +248,7 @@ export const saveCheckpoint = async (runId, input) => {
         id,
         runId,
         input.taskId || null,
-        input.correlationId || null,
+        correlationId,
         sequenceNo,
         input.checkpointType || 'AUTO',
         input.status || 'VALID',
@@ -266,7 +272,14 @@ export const saveCheckpoint = async (runId, input) => {
       [runId]
     );
     await connection.commit();
-    return { id, runId, sequenceNo, status: input.status || 'VALID', resumeFromTaskKey: input.resumeFromTaskKey || null };
+    return {
+      id,
+      runId,
+      correlationId,
+      sequenceNo,
+      status: input.status || 'VALID',
+      resumeFromTaskKey: input.resumeFromTaskKey || null
+    };
   } catch (error) {
     await connection.rollback();
     throw error;
