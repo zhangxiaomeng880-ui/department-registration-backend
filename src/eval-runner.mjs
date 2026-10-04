@@ -144,10 +144,14 @@ const evaluateAssertions=({evalCase,route,observation})=>{
   return results;
 };
 
-const executeSyntheticCase=async evalCase=>{
+const executeSyntheticCase=async(evalCase,runtimeSha)=>{
   const replay=evalCase.replayInput||{};
-  const observation=replay.syntheticObservation&&typeof replay.syntheticObservation==='object'
-    ? replay.syntheticObservation:{};
+  const profiles=replay.syntheticObservationsByRuntimeSha&&typeof replay.syntheticObservationsByRuntimeSha==='object'
+    ? replay.syntheticObservationsByRuntimeSha:null;
+  const selectedProfile=profiles&&profiles[String(runtimeSha).toLowerCase()];
+  const observation=selectedProfile&&typeof selectedProfile==='object'
+    ? selectedProfile
+    : (replay.syntheticObservation&&typeof replay.syntheticObservation==='object'?replay.syntheticObservation:{});
   const routeDecision=routeRuntimeTask(replay);
   const providerPolicy=await selectProviderModel({
     policyMode:replay.policyMode,
@@ -270,7 +274,7 @@ export const runEvalReplayManifest=async(manifestId,{idempotencyKey,runtimeCommi
     const caseHashes=[];
     let passedCases=0,failedCases=0,assertionCount=0,passedAssertions=0,failedAssertions=0;
     for(const evalCase of suiteVersion.cases){
-      const result=await executeSyntheticCase(evalCase);
+      const result=await executeSyntheticCase(evalCase,resolvedRuntimeSha);
       const caseResultId=randomUUID();
       const resultSha256=sha256({
         evalCaseSha256:evalCase.caseSha256,route:result.route,
