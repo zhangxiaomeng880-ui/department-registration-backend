@@ -2,25 +2,138 @@
   "milestone": "M22.5",
   "title": "Subscription / Credit Balance / Billing Cycle + Invoice Ledger",
   "version": "V2.2",
-  "status": "IMPLEMENTED_PENDING_GATE",
-  "branch": "feat/ai-native-runtime-v2.2-m22.5-billing-ledger",
-  "baseCommit": "55a503e4188dc51d2d4dee75ee0cc672794e56f4",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionPromotion": "NOT_STARTED",
   "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.2-m22.5-billing-ledger",
+    "stagingCodeSha": "766f45c1ddf14c2fa25aa70cf26a6fffbd16e37a",
+    "baseM224EvidenceCommit": "55a503e4188dc51d2d4dee75ee0cc672794e56f4"
+  },
+  "gates": {
+    "githubActions": {
+      "workflow": "Runtime v2.2 M22.5 Billing Ledger Gate",
+      "runId": 37200512826,
+      "status": "PASS",
+      "migrationIdempotency": true,
+      "regressionsThroughM223": true,
+      "m224AuthenticatedRbacRegression": true,
+      "railwayCompatibility": true,
+      "acceptance": "G22_5_BILLING_LEDGER_PASS"
+    },
+    "staging": {
+      "deploymentId": "7a1f5e66-a7e5-4d4b-a170-dfb578ddee96",
+      "status": "SUCCESS",
+      "runtime": "ONLINE",
+      "mysql": "ONLINE",
+      "readyHttp": 200,
+      "unauthenticatedBillingTermsHttp": 401,
+      "unauthenticatedSubscriptionHttp": 401,
+      "unauthenticatedInvoicesHttp": 401,
+      "warnings": 0,
+      "criticals": 0
+    },
+    "migrations": {
+      "total": 12,
+      "latest": "011_subscription_billing_ledger.sql",
+      "appliedOnStaging": true,
+      "status": "PASS"
+    },
+    "pricingRegression": {
+      "model": "gpt-6-luna",
+      "targets": 1,
+      "inserted": 0,
+      "skipped": 4,
+      "conclusion": "M22.1 immutable pricing catalog preserved"
+    }
+  },
   "accountingModel": {
     "providerCost": "COST_LEDGER_EVIDENCE",
-    "revenue": "BILLING_TERM_SNAPSHOT",
-    "revenueFormula": "RECURRING_FEE + COST_PLUS_OVERAGE - SERVICE_CREDITS",
-    "historicalRepricing": false
+    "revenue": "IMMUTABLE_BILLING_TERM_SNAPSHOT",
+    "providerCostEqualsRevenue": false,
+    "revenueFormula": "RECURRING_FEE + COST_PLUS_OVERAGE - SERVICE_CREDIT",
+    "historicalRepricing": false,
+    "unknownCostBehavior": "BLOCK_INVOICE_FINALIZATION",
+    "currencyMismatchBehavior": "BLOCK_INVOICE_FINALIZATION"
+  },
+  "testedExample": {
+    "providerCost": 0.004,
+    "includedUsageCredit": 0.001,
+    "overageCostBasis": 0.003,
+    "overageMarkupBps": 5000,
+    "usageRevenue": 0.0045,
+    "recurringFee": 10,
+    "invoiceSubtotal": 10.0045,
+    "serviceCreditApplied": 2,
+    "totalDue": 8.0045,
+    "reconciliation": "PASS"
   },
   "scope": {
-    "billingTermVersioning": true,
-    "subscriptionCycleSnapshot": true,
-    "serviceCreditDoubleEntryStyle": "SIGNED_LEDGER",
-    "invoiceIdempotency": true,
-    "usageSettlementUnique": true,
-    "unknownCostInvoiceBehavior": "BLOCK",
-    "currencyMismatchBehavior": "BLOCK",
-    "reconciliation": true
+    "versionedPlanBillingTerms": true,
+    "subscriptionPlanBinding": true,
+    "frozenBillingCycleSnapshots": true,
+    "signedCreditLedger": true,
+    "creditEntryTypes": [
+      "GRANT",
+      "ADJUSTMENT",
+      "REFUND",
+      "APPLY"
+    ],
+    "creditIdempotency": true,
+    "invoiceFinalizationIdempotency": true,
+    "usageSettlementUniquePerUsageLedgerRow": true,
+    "nextCycleCarriesFrozenSubscriptionTerm": true,
+    "invoiceItems": [
+      "BASE_SUBSCRIPTION",
+      "USAGE_OVERAGE",
+      "CREDIT_APPLIED"
+    ],
+    "reconciliation": true,
+    "tenantScopedBillingReads": true,
+    "billingMutationsPlatformOnly": true
   },
-  "acceptanceGate": "G22_5_BILLING_LEDGER_PASS"
+  "invariants": {
+    "billingTermChangesDoNotRewriteOpenHistoricalCycle": true,
+    "providerCostAndRevenueSeparated": true,
+    "duplicateCreditDoesNotDoubleGrant": true,
+    "duplicateFinalizeDoesNotDoubleInvoice": true,
+    "duplicateUsageSettlementPrevented": true,
+    "creditDoubleSpendProtected": true,
+    "unknownCostNeverInvoicedAsZero": true,
+    "crossTenantBillingReadDenied": true,
+    "scopedCredentialCannotChangeBillingTerms": true,
+    "invoiceReconciliationTested": true,
+    "failClosedAuth": true,
+    "privateBodyPersistence": false
+  },
+  "supersededHistoricalGate": {
+    "gate": "G21_COST_ACCOUNTING_PASS",
+    "formerConstraint": "subscriptions table must not exist",
+    "supersededBy": "M22.5 intentionally introduces subscriptions",
+    "stillForbidden": [
+      "payments",
+      "charges",
+      "checkout_sessions"
+    ],
+    "costAccountingBehaviorRegression": "PASS"
+  },
+  "knownNonBlockingState": {
+    "historicalM224FailedDeployment": {
+      "deploymentId": "a78879cf-790f-45cd-ac28-bae8498116da",
+      "cause": "MySQL schema-global foreign key name collision during first 010 attempt",
+      "currentImpact": "NONE"
+    },
+    "historicalM221FailedDeployment": {
+      "deploymentId": "d630ab7c-5ae4-4846-bb49-2767900ada4c",
+      "cause": "Historical Docker image omitted pricing catalog directory",
+      "currentImpact": "NONE"
+    },
+    "emptyStagedPatch": {
+      "status": "STAGED",
+      "changes": [],
+      "currentImpact": "NONE"
+    }
+  },
+  "conclusion": "M22.5 STAGING PASS / FROZEN. Production promotion requires separate human approval."
 }
