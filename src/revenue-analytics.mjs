@@ -11,10 +11,11 @@ const parseDate=value=>{
 const pct=(num,den)=>den>0?Number(((num/den)*100).toFixed(4)):0;
 const round=value=>Number(Number(value||0).toFixed(10));
 
-const loadInvoiceRows=async({tenantId=null}={})=>{
+const loadInvoiceRows=async({tenantId=null,planKey=null}={})=>{
   const db=getRuntimePool();
   const clauses=[],params=[];
   if(tenantId){clauses.push('i.tenant_id=?');params.push(tenantId);}
+  if(planKey){clauses.push('s.plan_key=?');params.push(planKey);}
   const [rows]=await db.execute(
     `SELECT
        i.id,i.tenant_id,i.subscription_id,i.currency,i.total_due,i.amount_paid,
@@ -41,9 +42,9 @@ const classifyAging=(dueAt,asOf)=>{
   return 'days90Plus';
 };
 
-export const getRevenueAnalytics=async({tenantId=null,asOf=new Date()}={})=>{
+export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date()}={})=>{
   const at=parseDate(asOf);
-  const rows=await loadInvoiceRows({tenantId});
+  const rows=await loadInvoiceRows({tenantId,planKey});
   const byCurrency=new Map();
 
   for(const row of rows){
@@ -112,6 +113,7 @@ export const getRevenueAnalytics=async({tenantId=null,asOf=new Date()}={})=>{
 
   return {
     tenantId:tenantId||null,
+    planKey:planKey||null,
     asOf:at.toISOString(),
     currencies,
     promiseToPay:{
@@ -125,13 +127,13 @@ export const getRevenueAnalytics=async({tenantId=null,asOf=new Date()}={})=>{
   };
 };
 
-export const getRevenuePerformance=async({tenantId=null,asOf=new Date(),limit=100}={})=>{
+export const getRevenuePerformance=async({tenantId=null,planKey=null,asOf=new Date(),limit=100}={})=>{
   const at=parseDate(asOf);
   const parsedLimit=Number(limit);
   if(!Number.isInteger(parsedLimit)||parsedLimit<1||parsedLimit>500){
     throw errorOf('limit must be an integer from 1 to 500','INVALID_ANALYTICS_LIMIT');
   }
-  const rows=await loadInvoiceRows({tenantId});
+  const rows=await loadInvoiceRows({tenantId,planKey});
   const groups=new Map();
   for(const row of rows){
     if(new Date(row.issued_at).getTime()>at.getTime()) continue;
