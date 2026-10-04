@@ -76,7 +76,7 @@ await db.execute(
   `INSERT INTO pricing_versions
     (id,provider_key,model_key,currency,input_rate_per_million,output_rate_per_million,effective_from,source_label)
    VALUES (?,?,?,?,?,?,?,?)`,
-  [randomUUID(), providerKey, modelKey, 'USD', 1, 5, '2026-01-01T00:00:00.000Z', 'PREFLIGHT_TEST']
+  [randomUUID(), providerKey, modelKey, 'USD', 1, 5, '2026-01-01 00:00:00.000000', 'PREFLIGHT_TEST']
 );
 
 await db.end();
