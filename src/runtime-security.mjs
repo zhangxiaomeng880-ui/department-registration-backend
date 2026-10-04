@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { authenticateScopedCredential } from './runtime-rbac.mjs';
 
 const errorOf = (message, code, statusCode) => {
   const error = new Error(message);
@@ -31,15 +32,20 @@ export const assertRuntimeSecurityConfig = () => {
   }
 };
 
-export const authorizeRuntimeRequest = req => {
-  if (!runtimeAuthRequired()) return;
+export const authorizeRuntimeRequest = async req => {
+  if (!runtimeAuthRequired()) return {type:'ANONYMOUS_DEV',platformAdmin:true};
   assertRuntimeSecurityConfig();
 
   const header = String(req.headers.authorization || '');
   const prefix = 'Bearer ';
   const token = header.startsWith(prefix) ? header.slice(prefix.length) : '';
 
-  if (!safeEqual(token, process.env.RUNTIME_API_TOKEN)) {
-    throw errorOf('Runtime API authentication failed', 'RUNTIME_UNAUTHORIZED', 401);
+  if (safeEqual(token, process.env.RUNTIME_API_TOKEN)) {
+    return {type:'PLATFORM',platformAdmin:true};
   }
+
+  const scoped=await authenticateScopedCredential(token);
+  if(scoped) return scoped;
+
+  throw errorOf('Runtime API authentication failed', 'RUNTIME_UNAUTHORIZED', 401);
 };

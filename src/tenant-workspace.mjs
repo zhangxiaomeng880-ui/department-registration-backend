@@ -53,9 +53,11 @@ export const createTenant=async input=>{
   return normalizeTenant(rows[0]);
 };
 
-export const listTenants=async()=>{
+export const listTenants=async({tenantId=null}={})=>{
   const db=getRuntimePool();
-  const [rows]=await db.execute('SELECT * FROM tenants ORDER BY created_at,id');
+  const [rows]=tenantId
+    ? await db.execute('SELECT * FROM tenants WHERE id=? ORDER BY created_at,id',[tenantId])
+    : await db.execute('SELECT * FROM tenants ORDER BY created_at,id');
   return rows.map(normalizeTenant);
 };
 
@@ -81,10 +83,12 @@ export const createWorkspace=async input=>{
   return normalizeWorkspace(rows[0]);
 };
 
-export const listWorkspaces=async({tenantId=null}={})=>{
+export const listWorkspaces=async({tenantId=null,workspaceId=null}={})=>{
   const db=getRuntimePool();
-  const [rows]=tenantId
-    ? await db.execute('SELECT * FROM workspaces WHERE tenant_id=? ORDER BY created_at,id',[tenantId])
-    : await db.execute('SELECT * FROM workspaces ORDER BY tenant_id,created_at,id');
+  const [rows]=workspaceId
+    ? await db.execute('SELECT * FROM workspaces WHERE id=? ORDER BY created_at,id',[workspaceId])
+    : tenantId
+      ? await db.execute('SELECT * FROM workspaces WHERE tenant_id=? ORDER BY created_at,id',[tenantId])
+      : await db.execute('SELECT * FROM workspaces ORDER BY tenant_id,created_at,id');
   return rows.map(normalizeWorkspace);
 };

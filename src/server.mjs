@@ -17,7 +17,7 @@ const data = {
   registrations: []
 };
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'access-control-allow-origin': '*' }); res.end(JSON.stringify(body)); };
-const readBody = async req => { let body = ''; for await (const chunk of req) body += chunk; return body ? JSON.parse(body) : {}; };
+const readBody = async req => { if (req._runtimeParsedBody !== undefined) return req._runtimeParsedBody; let body = ''; for await (const chunk of req) body += chunk; req._runtimeParsedBody = body ? JSON.parse(body) : {}; return req._runtimeParsedBody; };
 const route = async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {});
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -48,9 +48,10 @@ const route = async (req, res) => {
       }
     });
   }
-  if (url.pathname.startsWith('/api/runtime/')) authorizeRuntimeRequest(req);
+  let runtimePrincipal=null;
+  if (url.pathname.startsWith('/api/runtime/')) runtimePrincipal=await authorizeRuntimeRequest(req);
   if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
-  if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
+  if (await handleRuntimeRoute(req, res, url, { json, readBody, principal:runtimePrincipal })) return;
   if (req.method === 'GET' && url.pathname === '/api/cities') return json(res, 200, { data: data.cities });
   if (req.method === 'GET' && url.pathname === '/api/hospitals') { const cityId = url.searchParams.get('cityId'); return json(res, 200, { data: data.hospitals.filter(x => !cityId || x.cityId === cityId) }); }
   if (req.method === 'GET' && url.pathname === '/api/campuses') { const hospitalId = url.searchParams.get('hospitalId'); return json(res, 200, { data: data.campuses.filter(x => !hospitalId || x.hospitalId === hospitalId) }); }
