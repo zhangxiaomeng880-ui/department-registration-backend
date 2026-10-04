@@ -15,7 +15,7 @@
   },
   "deploy": {
     "preDeployCommand": [
-      "npm run preflight:v22-production && npm run migrate:runtime"
+      "npm run predeploy:v22-production"
     ],
     "startCommand": "npm run start",
     "healthcheckPath": "/ready",
