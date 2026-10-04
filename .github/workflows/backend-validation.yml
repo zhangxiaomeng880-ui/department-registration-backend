@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/ai-native-2.0-backend-validation
+      - feat/ai-native-runtime-persistence
   pull_request:
     branches:
       - main
@@ -26,3 +27,35 @@ jobs:
           trap 'kill $PID' EXIT
           sleep 1
           curl --fail http://127.0.0.1:3000/health
+
+  runtime-persistence-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: runtime_ci_password
+          MYSQL_ROOT_PASSWORD: runtime_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pruntime_ci_root_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+      - name: Validate Runtime Persistence on MySQL 8
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+        run: bash scripts/validate-runtime-persistence.sh
