@@ -1,0 +1,20 @@
+name: Runtime v2.1 Release Promotion Gate
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-v2.1-productization
+  workflow_dispatch:
+
+jobs:
+  g21-release-promotion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate G21 Release Promotion
+        run: node test/release-promotion.test.mjs
