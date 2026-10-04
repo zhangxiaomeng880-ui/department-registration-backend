@@ -135,6 +135,22 @@ const normalizeManifest=row=>({
   manifestSha256:row.manifest_sha256,status:row.status,idempotencyKey:row.idempotency_key,
   metadata:row.metadata_json,generatedAt:row.generated_at
 });
+const computeStoredCaseHash=row=>sha256({
+  contractVersion:REPLAY_CONTRACT_VERSION,
+  caseKey:row.case_key,
+  sequenceNo:Number(row.sequence_no),
+  fixtureKind:row.fixture_kind,
+  replayInput:row.replay_input_json,
+  sourceRefs:row.source_refs_json||[],
+  assertions:row.assertions_json
+});
+const assertStoredCaseIntegrity=row=>{
+  const actual=computeStoredCaseHash(row);
+  if(actual!==row.case_sha256) throw errorOf(
+    'Eval case content no longer matches its stored SHA-256','EVAL_CASE_INTEGRITY_MISMATCH',500,{caseKey:row.case_key}
+  );
+  return actual;
+};
 
 export const createEvalSuite=async({suiteKey,name,description=null}={})=>{
   if(!suiteKey||!name) throw errorOf('suiteKey and name are required','INVALID_EVAL_SUITE');
@@ -211,6 +227,7 @@ export const getEvalSuiteVersion=async suiteVersionId=>{
   const [cases]=await db.execute(
     'SELECT * FROM eval_cases WHERE suite_version_id=? ORDER BY sequence_no,case_key,id',[suiteVersionId]
   );
+  for(const row of cases) assertStoredCaseIntegrity(row);
   return {...normalizeVersion(versions[0]),cases:cases.map(normalizeCase)};
 };
 
@@ -225,6 +242,7 @@ export const freezeEvalSuiteVersion=async suiteVersionId=>{
       'SELECT * FROM eval_cases WHERE suite_version_id=? ORDER BY sequence_no,case_key,id',[suiteVersionId]
     );
     if(!cases.length) throw errorOf('Cannot freeze an empty eval suite version','EVAL_SUITE_VERSION_EMPTY',409);
+    for(const row of cases) assertStoredCaseIntegrity(row);
     const fixtureHash=sha256({
       replayContractVersion:version.replay_contract_version,
       cases:cases.map(row=>({caseKey:row.case_key,sequenceNo:Number(row.sequence_no),caseSha256:row.case_sha256}))
@@ -266,9 +284,16 @@ export const createEvalReplayManifest=async({
     );
     if(existing.length){
       const row=existing[0];
-      if(row.suite_version_id!==suiteVersionId||row.candidate_runtime_sha.toLowerCase()!==candidateRuntimeSha.toLowerCase()){
-        throw errorOf('Idempotency key was already used for a different replay manifest','EVAL_REPLAY_IDEMPOTENCY_CONFLICT',409);
-      }
+      const same=
+        row.suite_version_id===suiteVersionId &&
+        row.candidate_runtime_sha.toLowerCase()===candidateRuntimeSha.toLowerCase() &&
+        (row.baseline_runtime_sha||null)===(baselineRuntimeSha?baselineRuntimeSha.toLowerCase():null) &&
+        (row.workflow_version||null)===(workflowVersion||null) &&
+        (row.router_version||null)===(routerVersion||null) &&
+        (row.rag_index_version||null)===(ragIndexVersion||null);
+      if(!same) throw errorOf(
+        'Idempotency key was already used for a different replay manifest','EVAL_REPLAY_IDEMPOTENCY_CONFLICT',409
+      );
       await connection.commit();
       return {...normalizeManifest(row),idempotent:true};
     }
