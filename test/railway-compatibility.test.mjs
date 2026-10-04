@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import mysql from 'mysql2/promise';
+import { readdir } from 'node:fs/promises';
 
 const baseUrl = process.env.RUNTIME_API_BASE_URL || 'http://127.0.0.1:3200';
 const token = process.env.RUNTIME_API_TOKEN || 'railway-ci-token';
@@ -41,7 +42,9 @@ assert.equal(r.body.data.projectKey,projectKey);
 
 const db = await mysql.createConnection(process.env.MYSQL_URL);
 const [[migrationCount]] = await db.query('SELECT COUNT(*) AS count FROM schema_migrations');
-assert.equal(Number(migrationCount.count),5);
+const migrationFiles = (await readdir(new URL('../migrations/', import.meta.url)))
+  .filter(name => name.endsWith('.sql'));
+assert.equal(Number(migrationCount.count),migrationFiles.length);
 
 const required = [
   'projects','runs','tasks','checkpoints','stage_snapshots',
