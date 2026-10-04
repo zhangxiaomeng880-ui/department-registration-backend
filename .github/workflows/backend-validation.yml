@@ -6,6 +6,7 @@ on:
       - main
       - fix/ai-native-2.0-backend-validation
       - feat/ai-native-runtime-persistence
+      - feat/ai-native-runtime-v2.1-productization
   pull_request:
     branches:
       - main
