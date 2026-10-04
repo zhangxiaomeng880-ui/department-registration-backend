@@ -20,6 +20,22 @@ export const runtimeDbConfigured = () =>
     (process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD)
   );
 
+export const checkRuntimeDbReady = async () => {
+  if (!runtimeDbConfigured()) {
+    return { ready: false, reason: 'RUNTIME_DB_NOT_CONFIGURED' };
+  }
+  try {
+    const db = getRuntimePool();
+    await db.query('SELECT 1');
+    return { ready: true };
+  } catch (error) {
+    return {
+      ready: false,
+      reason: error.code || 'RUNTIME_DB_UNAVAILABLE',
+    };
+  }
+};
+
 export const getRuntimePool = () => {
   if (!runtimeDbConfigured()) {
     const error = new Error('Runtime database is not configured');
