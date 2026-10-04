@@ -1,0 +1,86 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: ai-native-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: UTC
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+00:00
+    volumes:
+      - ai_native_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ai_native_private
+
+  migrate:
+    image: mysql:8.4
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - ./migrations:/migrations:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        for f in /migrations/*.sql; do
+          echo "Applying $$f"
+          mysql -hmysql -u"$$MYSQL_USER" -p"$$MYSQL_PASSWORD" "$$MYSQL_DATABASE" < "$$f"
+        done
+    networks:
+      - ai_native_private
+
+  runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-native-runtime
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3100
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      RUNTIME_REQUIRE_AUTH: "true"
+      RUNTIME_API_TOKEN: ${RUNTIME_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-terra}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_TIMEOUT_MS: ${OPENAI_TIMEOUT_MS:-120000}
+    ports:
+      - "127.0.0.1:${RUNTIME_HOST_PORT:-3100}:3100"
+    networks:
+      - ai_native_private
+
+networks:
+  ai_native_private:
+    driver: bridge
+
+volumes:
+  ai_native_mysql_data:
