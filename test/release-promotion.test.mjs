@@ -34,7 +34,8 @@ const base={
     {name:'Runtime Orchestrator Validation',conclusion:'success'},
     {name:'Runtime v2.1 Observability Gate',conclusion:'success'},
     {name:'Runtime v2.1 Policy Router Gate',conclusion:'success'},
-    {name:'Runtime v2.1 Cost Ledger Gate',conclusion:'success'}
+    {name:'Runtime v2.1 Cost Ledger Gate',conclusion:'success'},
+    {name:'Runtime v2.1 Release Promotion Gate',conclusion:'success'}
   ],
   manualApproval:{approved:false},
   productionPromotion:{performed:false}
