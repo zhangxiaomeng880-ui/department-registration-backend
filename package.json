@@ -11,7 +11,8 @@
     "validate:knowledge-source": "node test/knowledge-source.test.mjs",
     "validate:knowledge-retrieval": "node test/knowledge-retrieval.test.mjs",
     "validate:real-chain:phase1": "node test/real-runtime-chain-phase1.test.mjs",
-    "validate:real-chain:phase2": "node test/real-runtime-chain-phase2.test.mjs"
+    "validate:real-chain:phase2": "node test/real-runtime-chain-phase2.test.mjs",
+    "validate:autonomous-agent-provider": "node test/autonomous-agent-provider.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.15.1"
