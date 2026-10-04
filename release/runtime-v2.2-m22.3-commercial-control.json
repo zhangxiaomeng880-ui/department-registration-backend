@@ -2,20 +2,70 @@
   "milestone": "M22.3",
   "title": "Plan / Entitlement + Rate Limit / Usage Reservation",
   "version": "V2.2",
-  "status": "IMPLEMENTED_PENDING_GATE",
-  "branch": "feat/ai-native-runtime-v2.2-m22.3-commercial-control",
-  "baseCommit": "7d58b105cd5eaa91c54bfc54f98181fec30242a3",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionPromotion": "NOT_STARTED",
   "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.2-m22.3-commercial-control",
+    "stagingCodeSha": "fb65f0097dc12b6ffe3899037e844ef6b3c64c95",
+    "baseM222EvidenceCommit": "7d58b105cd5eaa91c54bfc54f98181fec30242a3"
+  },
+  "gates": {
+    "githubActions": {
+      "workflow": "Runtime v2.2 M22.3 Commercial Control Gate",
+      "runId": 37198678143,
+      "status": "PASS",
+      "migrationIdempotency": true,
+      "v21CostAccountingRegression": true,
+      "m221CommercialBillingRegression": true,
+      "m222TenantQuotaRegression": true,
+      "acceptance": "G22_3_COMMERCIAL_CONTROL_PASS"
+    },
+    "staging": {
+      "deploymentId": "935486d9-ac30-4edb-b044-7fb023ea548d",
+      "status": "SUCCESS",
+      "runtime": "ONLINE",
+      "mysql": "ONLINE",
+      "readyHttp": 200,
+      "unauthenticatedPlansHttp": 401,
+      "unauthenticatedRateLimitPoliciesHttp": 401,
+      "unauthenticatedUsageReservationsHttp": 401,
+      "warnings": 0,
+      "criticals": 0
+    },
+    "migrations": {
+      "total": 10,
+      "latest": "009_commercial_control.sql",
+      "appliedOnStaging": true,
+      "status": "PASS"
+    },
+    "pricingRegression": {
+      "model": "gpt-6-luna",
+      "targets": 1,
+      "inserted": 0,
+      "skipped": 4,
+      "conclusion": "M22.1 immutable pricing catalog preserved"
+    }
+  },
   "scope": {
+    "planCatalog": true,
+    "tenantPlanAssignment": true,
     "entitlementDefault": "DENY",
-    "migrationCompatibility": "Existing plans receive MODEL_EXECUTION entitlement",
+    "migrationCompatibility": "Existing plan keys imported and granted MODEL_EXECUTION compatibility entitlement",
+    "entitlementAudit": true,
     "rateLimitScopes": [
       "PLAN",
       "TENANT",
       "WORKSPACE"
     ],
-    "rateLimitResolution": "All applicable policies enforced atomically",
-    "usageReservationMetrics": [
+    "rateLimitAlgorithm": "Atomic fixed-window buckets; all applicable policies evaluated before increment",
+    "rateLimitDecisions": [
+      "ALLOW",
+      "HOLD",
+      "BLOCK"
+    ],
+    "reservationMetrics": [
       "COST_AMOUNT",
       "TOKEN_INPUT",
       "TOKEN_OUTPUT",
@@ -28,7 +78,35 @@
       "RELEASED",
       "EXPIRED"
     ],
+    "quotaReservationAccounting": "Current usage plus active reservations are evaluated together",
+    "rateRejectReservationCleanup": true,
     "autonomousAgentCommercialPreflight": true
   },
-  "acceptanceGate": "G22_3_COMMERCIAL_CONTROL_PASS"
+  "invariants": {
+    "entitlementFailClosed": true,
+    "legacyRuntimeCompatibility": true,
+    "quotaErrorContractPreserved": true,
+    "quotaConcurrentOverbookingProtected": true,
+    "rateLimitRejectedReservationReleased": true,
+    "rateLimitAtomicBucket": true,
+    "unknownCostNeverTreatedAsZero": true,
+    "commercialAuthorizationBeforeProviderCall": true,
+    "failedProviderAttemptReservationSettled": true,
+    "failClosedAuth": true,
+    "privateBodyPersistence": false
+  },
+  "knownNonBlockingState": {
+    "historicalRecentFailure": {
+      "deploymentId": "d630ab7c-5ae4-4846-bb49-2767900ada4c",
+      "milestone": "M22.1",
+      "cause": "Historical Docker image omitted pricing catalog directory",
+      "currentImpact": "NONE"
+    },
+    "emptyStagedPatch": {
+      "status": "STAGED",
+      "changes": [],
+      "currentImpact": "NONE"
+    }
+  },
+  "conclusion": "M22.3 STAGING PASS / FROZEN. Production promotion requires separate human approval."
 }
