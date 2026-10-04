@@ -53,7 +53,7 @@ const required = [
   'tenants','workspaces','quota_policies','quota_evaluations',
   'plans','plan_entitlements','entitlement_evaluations','rate_limit_policies','rate_limit_buckets','rate_limit_decisions','usage_reservations',
   'identities','rbac_roles','rbac_role_permissions','tenant_memberships','workspace_memberships','api_credentials','authorization_decisions',
-  'plan_billing_terms','subscriptions','billing_cycles','invoices','invoice_items','billing_usage_settlements','credit_ledger',
+  'plan_billing_terms','subscriptions','billing_cycles','invoices','invoice_items','billing_usage_settlements','credit_ledger','invoice_payments',
   'knowledge_contexts','knowledge_sources','knowledge_documents','knowledge_sync_runs',
   'knowledge_retrievals','knowledge_retrieval_items'
 ];
