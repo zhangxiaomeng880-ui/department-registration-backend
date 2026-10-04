@@ -5,282 +5,87 @@ import { getEvalReplayManifest } from './eval-replay.mjs';
 
 const POLICY_VERSION='eval-release-gate-v1';
 const DEFAULT_POLICY=Object.freeze({
-  requireBaselinePass:true,
-  requireCandidatePass:true,
-  allowNewFailedAssertions:false,
-  allowRouteDrift:false,
-  allowEvidenceDrift:false,
-  maxDurationIncreasePct:0,
-  maxCostIncreasePct:0
+  requireBaselinePass:true,requireCandidatePass:true,
+  maxCasePassRateDropPct:0,maxAssertionPassRateDropPct:0,
+  maxStructuredOutputPassRateDropPct:0,maxEvidencePassRateDropPct:0,maxRouterPassRateDropPct:0,
+  blockOnRouteDrift:true,blockOnNewFailureCodes:true,
+  warnP95DurationIncreasePct:10,maxP95DurationIncreasePct:20,
+  warnCostIncreasePct:10,maxCostIncreasePct:20
 });
-
-const errorOf=(message,code,statusCode=400,details)=>{
-  const error=new Error(message);error.code=code;error.statusCode=statusCode;if(details) error.details=details;return error;
-};
-const stableValue=value=>{
-  if(Array.isArray(value)) return value.map(stableValue);
-  if(value&&typeof value==='object') return Object.fromEntries(Object.keys(value).sort().map(k=>[k,stableValue(value[k])]));
-  return value;
-};
-const stableJson=value=>JSON.stringify(stableValue(value));
-const sha256=value=>createHash('sha256').update(typeof value==='string'?value:stableJson(value),'utf8').digest('hex');
+const errorOf=(message,code,statusCode=400,details)=>{const e=new Error(message);e.code=code;e.statusCode=statusCode;if(details)e.details=details;return e;};
+const stableValue=v=>Array.isArray(v)?v.map(stableValue):(v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,stableValue(v[k])])):v);
+const stableJson=v=>JSON.stringify(stableValue(v));
+const sha256=v=>createHash('sha256').update(typeof v==='string'?v:stableJson(v),'utf8').digest('hex');
+const round=v=>Number(Number(v||0).toFixed(6));
+const pct=(n,d)=>d>0?round((n/d)*100):100;
+const dropPct=(b,c)=>round(Number(b||0)-Number(c||0));
+const increasePct=(c,b)=>{c=Number(c||0);b=Number(b||0);if(b===0)return c===0?0:null;return round(((c-b)/b)*100);};
+const p95=xs=>{const a=xs.map(Number).filter(Number.isFinite).sort((a,b)=>a-b);return a.length?a[Math.max(0,Math.ceil(a.length*.95)-1)]:0;};
+const routeFingerprint=r=>({matched:Boolean(r?.matched),policyResult:r?.policyResult||null,routeRuleKey:r?.routeRuleKey||null,selectedProviderKey:r?.selectedProviderKey||null,selectedModelKey:r?.selectedModelKey||null,providerHealthStatus:r?.providerHealthStatus||null});
 const normalizePolicy=input=>{
   const p={...DEFAULT_POLICY,...(input&&typeof input==='object'&&!Array.isArray(input)?input:{})};
-  for(const key of ['maxDurationIncreasePct','maxCostIncreasePct']){
-    const value=Number(p[key]);
-    if(!Number.isFinite(value)||value<0) throw errorOf('Regression thresholds must be non-negative','INVALID_REGRESSION_GATE_POLICY',400,{field:key});
-    p[key]=value;
+  for(const k of ['maxCasePassRateDropPct','maxAssertionPassRateDropPct','maxStructuredOutputPassRateDropPct','maxEvidencePassRateDropPct','maxRouterPassRateDropPct','warnP95DurationIncreasePct','maxP95DurationIncreasePct','warnCostIncreasePct','maxCostIncreasePct']){
+    const v=Number(p[k]);if(!Number.isFinite(v)||v<0)throw errorOf('Regression thresholds must be non-negative','INVALID_REGRESSION_GATE_POLICY',400,{field:k});p[k]=v;
   }
-  for(const key of ['requireBaselinePass','requireCandidatePass','allowNewFailedAssertions','allowRouteDrift','allowEvidenceDrift']){
-    p[key]=Boolean(p[key]);
-  }
+  if(p.warnP95DurationIncreasePct>p.maxP95DurationIncreasePct)throw errorOf('Latency warning threshold exceeds blocker threshold','INVALID_REGRESSION_GATE_POLICY');
+  if(p.warnCostIncreasePct>p.maxCostIncreasePct)throw errorOf('Cost warning threshold exceeds blocker threshold','INVALID_REGRESSION_GATE_POLICY');
+  for(const k of ['requireBaselinePass','requireCandidatePass','blockOnRouteDrift','blockOnNewFailureCodes'])p[k]=Boolean(p[k]);
   return p;
 };
-const pctIncrease=(baseline,candidate)=>{
-  const b=Number(baseline||0),c=Number(candidate||0);
-  if(c<=b) return 0;
-  if(b===0) return Infinity;
-  return ((c-b)/b)*100;
+const groupStats=(run,g)=>{const xs=run.cases.flatMap(c=>c.assertions||[]).filter(a=>a.group===g);const passed=xs.filter(a=>a.status==='PASS').length;return{total:xs.length,passed,failed:xs.length-passed,passRatePct:pct(passed,xs.length)};};
+const runMetrics=run=>{
+  const as=run.cases.flatMap(c=>c.assertions||[]),pc=run.cases.filter(c=>c.status==='PASS').length,pa=as.filter(a=>a.status==='PASS').length,costs={};
+  for(const c of run.cases){const n=Number(c.observedExecution?.estimatedCost);if(!Number.isFinite(n))continue;const cur=String(c.observedExecution?.costCurrency||'UNSPECIFIED');costs[cur]=round((costs[cur]||0)+n);}
+  return{status:run.status,caseCount:run.cases.length,passedCases:pc,failedCases:run.cases.length-pc,casePassRatePct:pct(pc,run.cases.length),assertionCount:as.length,passedAssertions:pa,failedAssertions:as.length-pa,assertionPassRatePct:pct(pa,as.length),structuredOutput:groupStats(run,'structuredOutput'),evidence:groupStats(run,'evidence'),router:groupStats(run,'router'),execution:groupStats(run,'execution'),p95DurationMs:round(p95(run.cases.map(c=>Number(c.observedExecution?.durationMs)).filter(Number.isFinite))),totalEstimatedCostByCurrency:costs,failureCodes:[...new Set(as.map(a=>a.failureCode).filter(Boolean))].sort()};
 };
-const routeFingerprint=route=>({
-  matched:Boolean(route?.matched),
-  policyResult:route?.policyResult??null,
-  routeRuleKey:route?.routeRuleKey??null,
-  selectedProviderKey:route?.selectedProviderKey??null,
-  selectedModelKey:route?.selectedModelKey??null,
-  providerHealthStatus:route?.providerHealthStatus??null
-});
-const evidenceFingerprint=evidence=>(Array.isArray(evidence)?evidence:[])
-  .map(item=>({
-    sourceFileId:item?.sourceFileId??null,
-    contentSha256:item?.contentSha256??null,
-    lineStart:item?.lineStart??null,
-    lineEnd:item?.lineEnd??null
-  }))
-  .sort((a,b)=>stableJson(a).localeCompare(stableJson(b)));
-const assertionFailures=evalCase=>new Set(
-  (evalCase.assertions||[]).filter(x=>x.status==='FAIL').map(x=>`${x.group}:${x.key}`)
-);
-const normalizeComparison=row=>({
-  id:row.id,baselineEvalRunId:row.baseline_eval_run_id,candidateEvalRunId:row.candidate_eval_run_id,
-  suiteVersionId:row.suite_version_id,fixtureSha256:row.fixture_sha256,
-  baselineRuntimeSha:row.baseline_runtime_sha,candidateRuntimeSha:row.candidate_runtime_sha,
-  policyVersion:row.policy_version,policySha256:row.policy_sha256,policy:row.policy_json,
-  status:row.status,blockerCount:Number(row.blocker_count),summary:row.summary_json,
-  comparisonSha256:row.comparison_sha256,idempotencyKey:row.idempotency_key,createdAt:row.created_at
-});
-const normalizeCase=row=>({
-  id:row.id,comparisonId:row.comparison_id,caseKey:row.case_key,sequenceNo:Number(row.sequence_no),
-  baselineStatus:row.baseline_status,candidateStatus:row.candidate_status,transition:row.transition,
-  assertionRegressionCount:Number(row.assertion_regression_count),
-  assertionImprovementCount:Number(row.assertion_improvement_count),
-  assertionSetDrift:Boolean(row.assertion_set_drift),routerDrift:Boolean(row.router_drift),
-  evidenceDrift:Boolean(row.evidence_drift),
-  baselineDurationMs:row.baseline_duration_ms==null?null:Number(row.baseline_duration_ms),
-  candidateDurationMs:row.candidate_duration_ms==null?null:Number(row.candidate_duration_ms),
-  durationChangePct:row.duration_change_pct==null?null:Number(row.duration_change_pct),
-  baselineEstimatedCost:row.baseline_estimated_cost==null?null:Number(row.baseline_estimated_cost),
-  candidateEstimatedCost:row.candidate_estimated_cost==null?null:Number(row.candidate_estimated_cost),
-  costChangePct:row.cost_change_pct==null?null:Number(row.cost_change_pct),
-  costCurrency:row.cost_currency||null,blockerCount:Number(row.blocker_count),
-  blockers:row.blockers_json||[],diff:row.diff_json,diffSha256:row.diff_sha256,createdAt:row.created_at
-});
-const normalizeGate=row=>({
-  id:row.id,comparisonId:row.comparison_id,gateKey:row.gate_key,decision:row.decision,
-  blockerCount:Number(row.blocker_count),blockers:row.blockers_json||[],
-  policySha256:row.policy_sha256,gateSha256:row.gate_sha256,
-  idempotencyKey:row.idempotency_key,decidedAt:row.decided_at,createdAt:row.created_at
-});
-
-const compareCase=(baseline,candidate,policy)=>{
-  const blockers=[];
-  const beforeFailures=assertionFailures(baseline),afterFailures=assertionFailures(candidate);
-  const newFailures=[...afterFailures].filter(x=>!beforeFailures.has(x)).sort();
-  const assertionSetBefore=[...(baseline.assertions||[])].map(x=>`${x.group}:${x.key}`).sort();
-  const assertionSetAfter=[...(candidate.assertions||[])].map(x=>`${x.group}:${x.key}`).sort();
-  const assertionSetDrift=stableJson(assertionSetBefore)!==stableJson(assertionSetAfter);
-  const assertionRegressionCount=newFailures.length;
-  const assertionImprovementCount=[...beforeFailures].filter(x=>!afterFailures.has(x)).length;
-  if(baseline.status==='PASS'&&candidate.status!=='PASS') blockers.push({code:'CASE_STATUS_REGRESSION'});
-  if(newFailures.length&&!policy.allowNewFailedAssertions) blockers.push({code:'NEW_FAILED_ASSERTIONS',assertions:newFailures});
-  if(assertionSetDrift&&!policy.allowNewFailedAssertions) blockers.push({code:'ASSERTION_SET_DRIFT'});
-
-  const beforeRoute=routeFingerprint(baseline.route),afterRoute=routeFingerprint(candidate.route);
-  const routerDrift=stableJson(beforeRoute)!==stableJson(afterRoute);
-  if(routerDrift&&!policy.allowRouteDrift) blockers.push({code:'ROUTE_DRIFT',baseline:beforeRoute,candidate:afterRoute});
-
-  const beforeEvidence=evidenceFingerprint(baseline.observedEvidence),afterEvidence=evidenceFingerprint(candidate.observedEvidence);
-  const evidenceDrift=stableJson(beforeEvidence)!==stableJson(afterEvidence);
-  if(evidenceDrift&&!policy.allowEvidenceDrift) blockers.push({
-    code:'EVIDENCE_DRIFT',baselineSha256:sha256(beforeEvidence),candidateSha256:sha256(afterEvidence)
-  });
-
-  const baselineDurationMs=Number(baseline.observedExecution?.durationMs||0);
-  const candidateDurationMs=Number(candidate.observedExecution?.durationMs||0);
-  const durationChangePct=pctIncrease(baselineDurationMs,candidateDurationMs);
-  if(durationChangePct>policy.maxDurationIncreasePct) blockers.push({
-    code:'LATENCY_REGRESSION',baselineMs:baselineDurationMs,candidateMs:candidateDurationMs,
-    increasePct:Number.isFinite(durationChangePct)?Number(durationChangePct.toFixed(6)):'INF',
-    allowedIncreasePct:policy.maxDurationIncreasePct
-  });
-
-  const baselineEstimatedCost=Number(baseline.observedExecution?.estimatedCost||0);
-  const candidateEstimatedCost=Number(candidate.observedExecution?.estimatedCost||0);
-  const beforeCurrency=baseline.observedExecution?.costCurrency||null;
-  const afterCurrency=candidate.observedExecution?.costCurrency||null;
-  if(beforeCurrency!==afterCurrency) blockers.push({code:'COST_CURRENCY_CHANGED',baseline:beforeCurrency,candidate:afterCurrency});
-  const costChangePct=pctIncrease(baselineEstimatedCost,candidateEstimatedCost);
-  if(beforeCurrency===afterCurrency&&costChangePct>policy.maxCostIncreasePct) blockers.push({
-    code:'COST_REGRESSION',baselineCost:baselineEstimatedCost,candidateCost:candidateEstimatedCost,
-    increasePct:Number.isFinite(costChangePct)?Number(costChangePct.toFixed(6)):'INF',
-    allowedIncreasePct:policy.maxCostIncreasePct
-  });
-
-  const transition=baseline.status===candidate.status?'UNCHANGED':`${baseline.status}_TO_${candidate.status}`;
-  const diff={
-    baselineRoute:beforeRoute,candidateRoute:afterRoute,
-    baselineEvidence:beforeEvidence,candidateEvidence:afterEvidence,
-    newFailedAssertions:newFailures
-  };
-  const material={
-    caseKey:candidate.caseKey,sequenceNo:candidate.sequenceNo,baselineStatus:baseline.status,candidateStatus:candidate.status,
-    transition,assertionRegressionCount,assertionImprovementCount,assertionSetDrift,routerDrift,evidenceDrift,
-    baselineDurationMs,candidateDurationMs,durationChangePct:Number.isFinite(durationChangePct)?Number(durationChangePct.toFixed(6)):null,
-    baselineEstimatedCost,candidateEstimatedCost,costChangePct:Number.isFinite(costChangePct)?Number(costChangePct.toFixed(6)):null,
-    costCurrency:afterCurrency,blockers,diff
-  };
-  return {...material,diffSha256:sha256(material)};
+const groupRate=(rows,g)=>{const xs=(rows||[]).filter(a=>a.group===g),p=xs.filter(a=>a.status==='PASS').length;return pct(p,xs.length);};
+const failureCodes=rows=>[...new Set((rows||[]).map(a=>a.failureCode).filter(Boolean))].sort();
+const compareCase=(b,c,p)=>{
+  const blockers=[],warnings=[],ba=b.assertions||[],ca=c.assertions||[],br=routeFingerprint(b.route),cr=routeFingerprint(c.route),routeChanged=stableJson(br)!==stableJson(cr);
+  const bd=Number(b.observedExecution?.durationMs||0),cd=Number(c.observedExecution?.durationMs||0),di=increasePct(cd,bd);
+  const bc=Number(b.observedExecution?.estimatedCost||0),cc=Number(c.observedExecution?.estimatedCost||0),bcur=String(b.observedExecution?.costCurrency||''),ccur=String(c.observedExecution?.costCurrency||''),same=bcur===ccur,ci=same?increasePct(cc,bc):null;
+  if(b.status==='PASS'&&c.status!=='PASS')blockers.push('CASE_STATUS_REGRESSION');
+  for(const [g,l,code] of [['structuredOutput',p.maxStructuredOutputPassRateDropPct,'STRUCTURED_OUTPUT_PASS_RATE_REGRESSION'],['evidence',p.maxEvidencePassRateDropPct,'EVIDENCE_PASS_RATE_REGRESSION'],['router',p.maxRouterPassRateDropPct,'ROUTER_PASS_RATE_REGRESSION']])if(dropPct(groupRate(ba,g),groupRate(ca,g))>l)blockers.push(code);
+  if(p.blockOnRouteDrift&&routeChanged)blockers.push('ROUTE_DRIFT');
+  if(di===null){if(cd>0)blockers.push('LATENCY_FROM_ZERO_BASELINE');}else if(di>p.maxP95DurationIncreasePct)blockers.push('LATENCY_REGRESSION');else if(di>p.warnP95DurationIncreasePct)warnings.push('LATENCY_WARNING');
+  if(!same)blockers.push('COST_CURRENCY_CHANGED');else if(ci===null){if(cc>0)blockers.push('COST_FROM_ZERO_BASELINE');}else if(ci>p.maxCostIncreasePct)blockers.push('COST_REGRESSION');else if(ci>p.warnCostIncreasePct)warnings.push('COST_WARNING');
+  const bf=new Set(failureCodes(ba)),nf=failureCodes(ca).filter(x=>!bf.has(x));if(p.blockOnNewFailureCodes&&nf.length)blockers.push('NEW_FAILURE_CODES');
+  const transition=b.status===c.status?'UNCHANGED':`${b.status}_TO_${c.status}`,status=blockers.length?'BLOCKED':warnings.length?'WARNING':'PASS';
+  const metrics={baselineStatus:b.status,candidateStatus:c.status,baselineRoute:br,candidateRoute:cr,routeChanged,baselineDurationMs:round(bd),candidateDurationMs:round(cd),durationIncreasePct:di,baselineEstimatedCost:round(bc),candidateEstimatedCost:round(cc),baselineCostCurrency:bcur||null,candidateCostCurrency:ccur||null,costIncreasePct:ci,structuredOutputPassRateDropPct:dropPct(groupRate(ba,'structuredOutput'),groupRate(ca,'structuredOutput')),evidencePassRateDropPct:dropPct(groupRate(ba,'evidence'),groupRate(ca,'evidence')),routerPassRateDropPct:dropPct(groupRate(ba,'router'),groupRate(ca,'router')),newFailureCodes:nf};
+  const mat={caseKey:c.caseKey,sequenceNo:c.sequenceNo,transition,status,blockers,warnings,metrics};
+  return{...mat,comparisonSha256:sha256(mat)};
 };
-
-export const getEvalRegressionComparison=async comparisonId=>{
-  const db=getRuntimePool();
-  const [rows]=await db.execute('SELECT * FROM eval_regression_comparisons WHERE id=?',[comparisonId]);
-  if(!rows.length) throw errorOf('Eval regression comparison not found','EVAL_REGRESSION_COMPARISON_NOT_FOUND',404);
-  const [cases]=await db.execute('SELECT * FROM eval_case_regressions WHERE comparison_id=? ORDER BY sequence_no,case_key,id',[comparisonId]);
-  const [gates]=await db.execute('SELECT * FROM eval_release_gates WHERE comparison_id=? LIMIT 1',[comparisonId]);
-  return {...normalizeComparison(rows[0]),cases:cases.map(normalizeCase),gate:gates.length?normalizeGate(gates[0]):null};
-};
-
-export const getEvalReleaseGate=async gateId=>{
-  const db=getRuntimePool();
-  const [rows]=await db.execute('SELECT * FROM eval_release_gates WHERE id=?',[gateId]);
-  if(!rows.length) throw errorOf('Eval release gate not found','EVAL_RELEASE_GATE_NOT_FOUND',404);
-  return normalizeGate(rows[0]);
-};
-
+const normalizeComparison=row=>({id:row.id,baselineEvalRunId:row.baseline_eval_run_id,candidateEvalRunId:row.candidate_eval_run_id,suiteVersionId:row.suite_version_id,fixtureSha256:row.fixture_sha256,baselineRuntimeSha:row.baseline_runtime_sha,candidateRuntimeSha:row.candidate_runtime_sha,policyVersion:row.policy_version,policySha256:row.policy_sha256,policy:row.policy_json,status:row.status,blockerCount:Number(row.blocker_count),warningCount:Number(row.warning_count),caseRegressions:Number(row.case_regressions),caseImprovements:Number(row.case_improvements),assertionRegressions:Number(row.assertion_regressions),assertionImprovements:Number(row.assertion_improvements),evidenceRegressions:Number(row.evidence_regressions),routerRegressions:Number(row.router_regressions),latencyRegressions:Number(row.latency_regressions),costRegressions:Number(row.cost_regressions),summary:row.summary_json,comparisonSha256:row.comparison_sha256,idempotencyKey:row.idempotency_key,createdAt:row.created_at});
+const normalizeCase=row=>({id:row.id,comparisonId:row.comparison_id,caseKey:row.case_key,sequenceNo:Number(row.sequence_no),baselineStatus:row.baseline_status,candidateStatus:row.candidate_status,transition:row.transition,status:row.status,blockerCount:Number(row.blocker_count),warningCount:Number(row.warning_count),blockers:row.blockers_json||[],warnings:row.warnings_json||[],metrics:row.metrics_json,comparisonSha256:row.comparison_sha256,createdAt:row.created_at});
+const normalizeGate=row=>({id:row.id,comparisonId:row.comparison_id,gateKey:row.gate_key,decision:row.decision,blockerCount:Number(row.blocker_count),warningCount:Number(row.warning_count),blockers:row.blockers_json||[],warnings:row.warnings_json||[],policySha256:row.policy_sha256,gateSha256:row.gate_sha256,idempotencyKey:row.idempotency_key,decidedAt:row.decided_at,createdAt:row.created_at});
+export const getEvalRegressionComparison=async id=>{const db=getRuntimePool();const [rows]=await db.execute('SELECT * FROM eval_regression_comparisons WHERE id=?',[id]);if(!rows.length)throw errorOf('Eval regression comparison not found','EVAL_REGRESSION_COMPARISON_NOT_FOUND',404);const [cases]=await db.execute('SELECT * FROM eval_case_regressions WHERE comparison_id=? ORDER BY sequence_no,case_key,id',[id]);const [gates]=await db.execute('SELECT * FROM eval_release_gates WHERE comparison_id=? ORDER BY decided_at,id',[id]);return{...normalizeComparison(rows[0]),cases:cases.map(normalizeCase),releaseGates:gates.map(normalizeGate)};};
 export const compareEvalRuns=async({baselineEvalRunId,candidateEvalRunId,idempotencyKey,policy=null}={})=>{
-  if(!baselineEvalRunId||!candidateEvalRunId||!idempotencyKey) throw errorOf(
-    'baselineEvalRunId, candidateEvalRunId and idempotencyKey are required','INVALID_EVAL_REGRESSION_COMPARISON'
-  );
-  if(baselineEvalRunId===candidateEvalRunId) throw errorOf('Baseline and candidate runs must differ','EVAL_REGRESSION_SAME_RUN',409);
-  const normalizedPolicy=normalizePolicy(policy);
-  const policySha256=sha256({policyVersion:POLICY_VERSION,policy:normalizedPolicy});
-
-  const db=getRuntimePool(),conn=await db.getConnection();
-  try{
-    await conn.beginTransaction();
-    const [byKey]=await conn.execute('SELECT * FROM eval_regression_comparisons WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
-    if(byKey.length){
-      const row=byKey[0];
-      if(row.baseline_eval_run_id!==baselineEvalRunId||row.candidate_eval_run_id!==candidateEvalRunId||row.policy_sha256!==policySha256){
-        throw errorOf('Idempotency key already used for another comparison','EVAL_REGRESSION_IDEMPOTENCY_CONFLICT',409);
-      }
-      await conn.commit();
-      return {...await getEvalRegressionComparison(row.id),idempotent:true};
-    }
-    const [logical]=await conn.execute(
-      'SELECT * FROM eval_regression_comparisons WHERE baseline_eval_run_id=? AND candidate_eval_run_id=? AND policy_sha256=? LIMIT 1 FOR UPDATE',
-      [baselineEvalRunId,candidateEvalRunId,policySha256]
-    );
-    if(logical.length){
-      await conn.commit();
-      return {...await getEvalRegressionComparison(logical[0].id),idempotent:true,deduplicated:true};
-    }
-    await conn.commit();
-  }catch(error){await conn.rollback();throw error;}finally{conn.release();}
-
-  const [baseline,candidate]=await Promise.all([getEvalRun(baselineEvalRunId),getEvalRun(candidateEvalRunId)]);
-  if(!['PASS','FAIL'].includes(baseline.status)||!['PASS','FAIL'].includes(candidate.status)){
-    throw errorOf('Only terminal PASS/FAIL runs are comparable','EVAL_REGRESSION_RUN_NOT_COMPARABLE',409);
-  }
-  if(baseline.executionMode!==candidate.executionMode) throw errorOf('Execution modes differ','EVAL_EXECUTION_MODE_MISMATCH',409);
-
-  const [baseManifest,candManifest]=await Promise.all([
-    getEvalReplayManifest(baseline.replayManifestId),getEvalReplayManifest(candidate.replayManifestId)
-  ]);
-  if(baseManifest.suiteVersionId!==candManifest.suiteVersionId) throw errorOf('Suite versions differ','EVAL_REGRESSION_SUITE_VERSION_MISMATCH',409);
-  if(baseManifest.fixtureSha256!==candManifest.fixtureSha256) throw errorOf('Fixture SHA differs','EVAL_REGRESSION_FIXTURE_MISMATCH',409);
-  if(candManifest.baselineRuntimeSha&&candManifest.baselineRuntimeSha!==baseline.candidateRuntimeSha){
-    throw errorOf('Candidate manifest baselineRuntimeSha does not match baseline run','EVAL_BASELINE_SHA_MISMATCH',409);
-  }
-
-  const baseMap=new Map(baseline.cases.map(c=>[c.caseKey,c])),candMap=new Map(candidate.cases.map(c=>[c.caseKey,c]));
-  const baseKeys=[...baseMap.keys()].sort(),candKeys=[...candMap.keys()].sort();
-  if(stableJson(baseKeys)!==stableJson(candKeys)) throw errorOf('Case sets differ','EVAL_REGRESSION_CASE_SET_MISMATCH',409);
-
-  const blockers=[];
-  if(normalizedPolicy.requireBaselinePass&&baseline.status!=='PASS') blockers.push({code:'BASELINE_RUN_NOT_PASS',status:baseline.status});
-  if(normalizedPolicy.requireCandidatePass&&candidate.status!=='PASS') blockers.push({code:'CANDIDATE_RUN_NOT_PASS',status:candidate.status});
-
-  const caseRows=candidate.cases.map(c=>compareCase(baseMap.get(c.caseKey),c,normalizedPolicy));
-  for(const row of caseRows) blockers.push(...row.blockers.map(b=>({caseKey:row.caseKey,...b})));
-  const dedup=[...new Map(blockers.map(x=>[stableJson(x),x])).values()];
-  const status=dedup.length?'BLOCK':'PASS';
-
-  const summary={
-    baseline:{runId:baseline.id,status:baseline.status,runtimeSha:baseline.candidateRuntimeSha,resultSha256:baseline.resultSha256},
-    candidate:{runId:candidate.id,status:candidate.status,runtimeSha:candidate.candidateRuntimeSha,resultSha256:candidate.resultSha256},
-    caseCount:caseRows.length,
-    caseRegressions:caseRows.filter(x=>x.baselineStatus==='PASS'&&x.candidateStatus!=='PASS').length,
-    assertionRegressions:caseRows.reduce((n,x)=>n+x.assertionRegressionCount,0),
-    routerDrifts:caseRows.filter(x=>x.routerDrift).length,
-    evidenceDrifts:caseRows.filter(x=>x.evidenceDrift).length,
-    latencyRegressions:caseRows.filter(x=>x.blockers.some(b=>b.code==='LATENCY_REGRESSION')).length,
-    costRegressions:caseRows.filter(x=>x.blockers.some(b=>b.code==='COST_REGRESSION'||b.code==='COST_CURRENCY_CHANGED')).length
-  };
-  const comparisonSha256=sha256({
-    baselineEvalRunId,candidateEvalRunId,suiteVersionId:baseManifest.suiteVersionId,
-    fixtureSha256:baseManifest.fixtureSha256,policyVersion:POLICY_VERSION,policySha256,status,
-    summary,cases:caseRows.map(x=>({caseKey:x.caseKey,diffSha256:x.diffSha256}))
-  });
-
-  const comparisonId=randomUUID(),gateId=randomUUID(),gateKey='V2_4_RELEASE';
-  const gateSha256=sha256({comparisonSha256,gateKey,decision:status,blockers:dedup,policySha256});
-  const write=await db.getConnection();
-  try{
-    await write.beginTransaction();
-    await write.execute(
-      `INSERT INTO eval_regression_comparisons
-       (id,baseline_eval_run_id,candidate_eval_run_id,suite_version_id,fixture_sha256,baseline_runtime_sha,
-        candidate_runtime_sha,policy_version,policy_sha256,policy_json,status,blocker_count,summary_json,comparison_sha256,idempotency_key)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [comparisonId,baselineEvalRunId,candidateEvalRunId,baseManifest.suiteVersionId,baseManifest.fixtureSha256,
-       baseline.candidateRuntimeSha,candidate.candidateRuntimeSha,POLICY_VERSION,policySha256,JSON.stringify(normalizedPolicy),
-       status,dedup.length,JSON.stringify(summary),comparisonSha256,idempotencyKey]
-    );
-    for(const row of caseRows){
-      await write.execute(
-        `INSERT INTO eval_case_regressions
-         (id,comparison_id,case_key,sequence_no,baseline_status,candidate_status,transition,
-          assertion_regression_count,assertion_improvement_count,assertion_set_drift,router_drift,evidence_drift,
-          baseline_duration_ms,candidate_duration_ms,duration_change_pct,baseline_estimated_cost,candidate_estimated_cost,
-          cost_change_pct,cost_currency,blocker_count,blockers_json,diff_json,diff_sha256)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [randomUUID(),comparisonId,row.caseKey,row.sequenceNo,row.baselineStatus,row.candidateStatus,row.transition,
-         row.assertionRegressionCount,row.assertionImprovementCount,row.assertionSetDrift,row.routerDrift,row.evidenceDrift,
-         row.baselineDurationMs,row.candidateDurationMs,row.durationChangePct,row.baselineEstimatedCost,row.candidateEstimatedCost,
-         row.costChangePct,row.costCurrency,row.blockers.length,JSON.stringify(row.blockers),JSON.stringify(row.diff),row.diffSha256]
-      );
-    }
-    await write.execute(
-      `INSERT INTO eval_release_gates
-       (id,comparison_id,gate_key,decision,blocker_count,blockers_json,policy_sha256,gate_sha256,idempotency_key)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [gateId,comparisonId,gateKey,status,dedup.length,JSON.stringify(dedup),policySha256,gateSha256,`gate:${idempotencyKey}`]
-    );
-    await write.commit();
-  }catch(error){await write.rollback();throw error;}finally{write.release();}
-  return {...await getEvalRegressionComparison(comparisonId),idempotent:false};
+  if(!baselineEvalRunId||!candidateEvalRunId||!idempotencyKey)throw errorOf('baselineEvalRunId, candidateEvalRunId and idempotencyKey are required','INVALID_EVAL_REGRESSION_COMPARISON');
+  if(baselineEvalRunId===candidateEvalRunId)throw errorOf('Baseline and candidate runs must differ','EVAL_REGRESSION_SAME_RUN',409);
+  const p=normalizePolicy(policy),policySha256=sha256({policyVersion:POLICY_VERSION,policy:p}),db=getRuntimePool(),lock=await db.getConnection();
+  try{await lock.beginTransaction();const [x]=await lock.execute('SELECT * FROM eval_regression_comparisons WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);if(x.length){const row=x[0];if(row.baseline_eval_run_id!==baselineEvalRunId||row.candidate_eval_run_id!==candidateEvalRunId||row.policy_sha256!==policySha256)throw errorOf('Idempotency key already used','EVAL_REGRESSION_IDEMPOTENCY_CONFLICT',409);await lock.commit();return{...await getEvalRegressionComparison(row.id),idempotent:true};}const [y]=await lock.execute('SELECT * FROM eval_regression_comparisons WHERE baseline_eval_run_id=? AND candidate_eval_run_id=? AND policy_sha256=? LIMIT 1 FOR UPDATE',[baselineEvalRunId,candidateEvalRunId,policySha256]);if(y.length){await lock.commit();return{...await getEvalRegressionComparison(y[0].id),idempotent:true,deduplicated:true};}await lock.commit();}catch(e){await lock.rollback();throw e;}finally{lock.release();}
+  const [b,c]=await Promise.all([getEvalRun(baselineEvalRunId),getEvalRun(candidateEvalRunId)]);if(!['PASS','FAIL'].includes(b.status)||!['PASS','FAIL'].includes(c.status))throw errorOf('Only terminal runs are comparable','EVAL_REGRESSION_RUN_NOT_COMPARABLE',409);if(b.executionMode!==c.executionMode)throw errorOf('Execution modes differ','EVAL_EXECUTION_MODE_MISMATCH',409);
+  const [bm,cm]=await Promise.all([getEvalReplayManifest(b.replayManifestId),getEvalReplayManifest(c.replayManifestId)]);if(bm.suiteVersionId!==cm.suiteVersionId)throw errorOf('Suite versions differ','EVAL_REGRESSION_SUITE_VERSION_MISMATCH',409);if(bm.fixtureSha256!==cm.fixtureSha256)throw errorOf('Fixture SHA differs','EVAL_REGRESSION_FIXTURE_MISMATCH',409);if(cm.baselineRuntimeSha&&cm.baselineRuntimeSha!==b.candidateRuntimeSha)throw errorOf('Baseline SHA mismatch','EVAL_BASELINE_SHA_MISMATCH',409);
+  const bmap=new Map(b.cases.map(x=>[x.caseKey,x])),cmap=new Map(c.cases.map(x=>[x.caseKey,x]));if(stableJson([...bmap.keys()].sort())!==stableJson([...cmap.keys()].sort()))throw errorOf('Case sets differ','EVAL_REGRESSION_CASE_SET_MISMATCH',409);
+  const B=runMetrics(b),C=runMetrics(c),blocks=[],warns=[],block=(code,d={})=>blocks.push({code,...d}),warn=(code,d={})=>warns.push({code,...d});
+  if(p.requireBaselinePass&&b.status!=='PASS')block('BASELINE_RUN_NOT_PASS',{status:b.status});if(p.requireCandidatePass&&c.status!=='PASS')block('CANDIDATE_RUN_NOT_PASS',{status:c.status});
+  for(const [k,l,code] of [['casePassRatePct',p.maxCasePassRateDropPct,'CASE_PASS_RATE_REGRESSION'],['assertionPassRatePct',p.maxAssertionPassRateDropPct,'ASSERTION_PASS_RATE_REGRESSION']]){const d=dropPct(B[k],C[k]);if(d>l)block(code,{baseline:B[k],candidate:C[k],dropPct:d,limitPct:l});}
+  for(const [g,l,code] of [['structuredOutput',p.maxStructuredOutputPassRateDropPct,'STRUCTURED_OUTPUT_PASS_RATE_REGRESSION'],['evidence',p.maxEvidencePassRateDropPct,'EVIDENCE_PASS_RATE_REGRESSION'],['router',p.maxRouterPassRateDropPct,'ROUTER_PASS_RATE_REGRESSION']]){const d=dropPct(B[g].passRatePct,C[g].passRatePct);if(d>l)block(code,{baseline:B[g].passRatePct,candidate:C[g].passRatePct,dropPct:d,limitPct:l});}
+  const li=increasePct(C.p95DurationMs,B.p95DurationMs);if(li===null){if(C.p95DurationMs>0)block('P95_LATENCY_FROM_ZERO_BASELINE',{candidateMs:C.p95DurationMs});}else if(li>p.maxP95DurationIncreasePct)block('P95_LATENCY_REGRESSION',{increasePct:li});else if(li>p.warnP95DurationIncreasePct)warn('P95_LATENCY_WARNING',{increasePct:li});
+  const costByCurrency={};for(const cur of [...new Set([...Object.keys(B.totalEstimatedCostByCurrency),...Object.keys(C.totalEstimatedCostByCurrency)])].sort()){const bv=B.totalEstimatedCostByCurrency[cur]||0,cv=C.totalEstimatedCostByCurrency[cur]||0,inc=increasePct(cv,bv);costByCurrency[cur]={baseline:bv,candidate:cv,increasePct:inc};if(inc===null){if(cv>0)block('COST_FROM_ZERO_BASELINE',{currency:cur,candidate:cv});}else if(inc>p.maxCostIncreasePct)block('COST_REGRESSION',{currency:cur,increasePct:inc});else if(inc>p.warnCostIncreasePct)warn('COST_WARNING',{currency:cur,increasePct:inc});}
+  const bfs=new Set(B.failureCodes),nf=C.failureCodes.filter(x=>!bfs.has(x));if(p.blockOnNewFailureCodes&&nf.length)block('NEW_FAILURE_CODES',{failureCodes:nf});
+  const cases=[];for(const bc of b.cases){const row=compareCase(bc,cmap.get(bc.caseKey),p);if(p.blockOnRouteDrift&&row.metrics.routeChanged)block('ROUTE_DRIFT',{caseKey:bc.caseKey});cases.push(row);}
+  const dedup=xs=>[...new Map(xs.map(x=>[stableJson(x),x])).values()],blockers=dedup(blocks),warnings=dedup(warns),status=blockers.length?'BLOCKED':warnings.length?'WARNING':'PASS';
+  const summary={baseline:{runId:b.id,runtimeSha:b.candidateRuntimeSha,metrics:B},candidate:{runId:c.id,runtimeSha:c.candidateRuntimeSha,metrics:C},deltas:{casePassRateDropPct:dropPct(B.casePassRatePct,C.casePassRatePct),assertionPassRateDropPct:dropPct(B.assertionPassRatePct,C.assertionPassRatePct),structuredOutputPassRateDropPct:dropPct(B.structuredOutput.passRatePct,C.structuredOutput.passRatePct),evidencePassRateDropPct:dropPct(B.evidence.passRatePct,C.evidence.passRatePct),routerPassRateDropPct:dropPct(B.router.passRatePct,C.router.passRatePct),p95DurationIncreasePct:li,costByCurrency,newFailureCodes:nf},blockers,warnings};
+  const comparisonSha256=sha256({baselineResultSha256:b.resultSha256,candidateResultSha256:c.resultSha256,suiteVersionId:bm.suiteVersionId,fixtureSha256:bm.fixtureSha256,policyVersion:POLICY_VERSION,policySha256,status,summary,cases:cases.map(x=>({caseKey:x.caseKey,comparisonSha256:x.comparisonSha256}))});
+  const caseRegressions=cases.filter(x=>x.metrics.baselineStatus==='PASS'&&x.metrics.candidateStatus!=='PASS').length,caseImprovements=cases.filter(x=>x.metrics.baselineStatus!=='PASS'&&x.metrics.candidateStatus==='PASS').length,assertionRegressions=Math.max(0,C.failedAssertions-B.failedAssertions),assertionImprovements=Math.max(0,B.failedAssertions-C.failedAssertions),evidenceRegressions=cases.filter(x=>x.blockers.includes('EVIDENCE_PASS_RATE_REGRESSION')).length,routerRegressions=cases.filter(x=>x.blockers.includes('ROUTER_PASS_RATE_REGRESSION')||x.blockers.includes('ROUTE_DRIFT')).length,latencyRegressions=cases.filter(x=>x.blockers.includes('LATENCY_REGRESSION')||x.blockers.includes('LATENCY_FROM_ZERO_BASELINE')).length,costRegressions=cases.filter(x=>x.blockers.includes('COST_REGRESSION')||x.blockers.includes('COST_FROM_ZERO_BASELINE')||x.blockers.includes('COST_CURRENCY_CHANGED')).length;
+  const w=await db.getConnection();try{await w.beginTransaction();const id=randomUUID();await w.execute(`INSERT INTO eval_regression_comparisons (id,baseline_eval_run_id,candidate_eval_run_id,suite_version_id,fixture_sha256,baseline_runtime_sha,candidate_runtime_sha,policy_version,policy_sha256,policy_json,status,blocker_count,warning_count,case_regressions,case_improvements,assertion_regressions,assertion_improvements,evidence_regressions,router_regressions,latency_regressions,cost_regressions,summary_json,comparison_sha256,idempotency_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[id,b.id,c.id,bm.suiteVersionId,bm.fixtureSha256,b.candidateRuntimeSha,c.candidateRuntimeSha,POLICY_VERSION,policySha256,JSON.stringify(p),status,blockers.length,warnings.length,caseRegressions,caseImprovements,assertionRegressions,assertionImprovements,evidenceRegressions,routerRegressions,latencyRegressions,costRegressions,JSON.stringify(summary),comparisonSha256,idempotencyKey]);for(const row of cases)await w.execute(`INSERT INTO eval_case_regressions (id,comparison_id,case_key,sequence_no,baseline_status,candidate_status,transition,status,blocker_count,warning_count,blockers_json,warnings_json,metrics_json,comparison_sha256) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[randomUUID(),id,row.caseKey,row.sequenceNo,row.metrics.baselineStatus,row.metrics.candidateStatus,row.transition,row.status,row.blockers.length,row.warnings.length,JSON.stringify(row.blockers),JSON.stringify(row.warnings),JSON.stringify(row.metrics),row.comparisonSha256]);await w.commit();return{...await getEvalRegressionComparison(id),idempotent:false};}catch(e){await w.rollback();throw e;}finally{w.release();}
 };
-
-export const EVAL_REGRESSION_POLICY_VERSION=POLICY_VERSION;
+export const createEvalReleaseGate=async(comparisonId,{gateKey='PRODUCTION_PROMOTION',idempotencyKey}={})=>{
+  if(!comparisonId||!gateKey||!idempotencyKey)throw errorOf('comparisonId, gateKey and idempotencyKey are required','INVALID_EVAL_RELEASE_GATE');
+  const cmp=await getEvalRegressionComparison(comparisonId),decision=cmp.blockerCount>0?'BLOCKED':'PASS',blockers=cmp.summary?.blockers||[],warnings=cmp.summary?.warnings||[],gateSha256=sha256({comparisonSha256:cmp.comparisonSha256,gateKey,decision,blockerCount:cmp.blockerCount,warningCount:cmp.warningCount,blockers,warnings,policySha256:cmp.policySha256}),db=getRuntimePool(),cn=await db.getConnection();
+  try{await cn.beginTransaction();const [x]=await cn.execute('SELECT * FROM eval_release_gates WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);if(x.length){if(x[0].comparison_id!==comparisonId||x[0].gate_key!==gateKey)throw errorOf('Idempotency key already used','EVAL_RELEASE_GATE_IDEMPOTENCY_CONFLICT',409);await cn.commit();return{...normalizeGate(x[0]),idempotent:true};}const [y]=await cn.execute('SELECT * FROM eval_release_gates WHERE comparison_id=? AND gate_key=? LIMIT 1 FOR UPDATE',[comparisonId,gateKey]);if(y.length){await cn.commit();return{...normalizeGate(y[0]),idempotent:true};}const id=randomUUID();await cn.execute(`INSERT INTO eval_release_gates (id,comparison_id,gate_key,decision,blocker_count,warning_count,blockers_json,warnings_json,policy_sha256,gate_sha256,idempotency_key) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,[id,comparisonId,gateKey,decision,cmp.blockerCount,cmp.warningCount,JSON.stringify(blockers),JSON.stringify(warnings),cmp.policySha256,gateSha256,idempotencyKey]);const [rows]=await cn.execute('SELECT * FROM eval_release_gates WHERE id=?',[id]);await cn.commit();return{...normalizeGate(rows[0]),idempotent:false};}catch(e){await cn.rollback();throw e;}finally{cn.release();}
+};
+export const getEvalReleaseGate=async id=>{const db=getRuntimePool();const [rows]=await db.execute('SELECT * FROM eval_release_gates WHERE id=?',[id]);if(!rows.length)throw errorOf('Eval release gate not found','EVAL_RELEASE_GATE_NOT_FOUND',404);const row=rows[0],cmp=await getEvalRegressionComparison(row.comparison_id),expected=sha256({comparisonSha256:cmp.comparisonSha256,gateKey:row.gate_key,decision:row.decision,blockerCount:Number(row.blocker_count),warningCount:Number(row.warning_count),blockers:row.blockers_json||[],warnings:row.warnings_json||[],policySha256:row.policy_sha256});if(expected!==row.gate_sha256)throw errorOf('Eval release gate integrity check failed','EVAL_RELEASE_GATE_INTEGRITY_MISMATCH',500);return normalizeGate(row);};
+export const REGRESSION_GATE_POLICY_VERSION=POLICY_VERSION;
+export const REGRESSION_GATE_DEFAULT_POLICY=DEFAULT_POLICY;
