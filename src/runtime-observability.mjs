@@ -76,7 +76,8 @@ export const getRunObservability = async runId => {
     ),
     db.execute(
       `SELECT id, task_id, route_execution_id, correlation_id, tool_type, tool_key,
-              provider_key, model_key, status, token_input, token_output,
+              provider_key, model_key, pricing_version_id, cost_status,
+              status, token_input, token_output,
               cost_amount, cost_currency, duration_ms, error_code, error_category,
               started_at, finished_at, created_at
        FROM tool_executions WHERE run_id = ? ORDER BY created_at, id`,
@@ -84,7 +85,8 @@ export const getRunObservability = async runId => {
     ),
     db.execute(
       `SELECT id, task_id, route_execution_id, tool_execution_id, correlation_id,
-              provider_key, model_key, status, token_input, token_output,
+              provider_key, model_key, pricing_version_id, cost_status,
+              estimated_cost, cost_currency, status, token_input, token_output,
               duration_ms, error_category, recorded_at
        FROM usage_ledger WHERE run_id = ? ORDER BY recorded_at, id`,
       [runId]
@@ -158,11 +160,13 @@ export const getRunObservability = async runId => {
     toolKey: row.tool_key,
     providerKey: row.provider_key || null,
     modelKey: row.model_key || null,
+    pricingVersionId: row.pricing_version_id || null,
+    costStatus: row.cost_status || 'UNKNOWN',
     status: row.status,
     tokenInput: n(row.token_input) || 0,
     tokenOutput: n(row.token_output) || 0,
-    costAmount: Number(row.cost_amount || 0),
-    costCurrency: row.cost_currency,
+    costAmount: row.cost_amount == null ? null : Number(row.cost_amount),
+    costCurrency: row.cost_currency || null,
     durationMs: n(row.duration_ms),
     errorCode: row.error_code,
     errorCategory: row.error_category || null,
@@ -178,6 +182,10 @@ export const getRunObservability = async runId => {
     correlationId: row.correlation_id || null,
     providerKey: row.provider_key || null,
     modelKey: row.model_key || null,
+    pricingVersionId: row.pricing_version_id || null,
+    costStatus: row.cost_status || 'UNKNOWN',
+    estimatedCost: row.estimated_cost == null ? null : Number(row.estimated_cost),
+    costCurrency: row.cost_currency || null,
     status: row.status,
     tokenInput: n(row.token_input) || 0,
     tokenOutput: n(row.token_output) || 0,
@@ -263,6 +271,9 @@ export const getRunObservability = async runId => {
       checkpointCount:checkpoints.length,
       tokenInput:usage.reduce((sum,x) => sum + x.tokenInput,0),
       tokenOutput:usage.reduce((sum,x) => sum + x.tokenOutput,0),
+      estimatedCost:usage.reduce((sum,x) => sum + (x.estimatedCost || 0),0),
+      unknownCostCount:usage.filter(x => x.costStatus === 'UNKNOWN').length,
+      costStatus:usage.some(x => x.costStatus === 'UNKNOWN') ? 'UNKNOWN' : 'CALCULATED',
       toolDurationMs:tools.reduce((sum,x) => sum + (x.durationMs || 0),0),
       correlationConsistent:Boolean(run.correlationId) &&
         allCorrelations.length > 0 &&
