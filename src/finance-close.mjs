@@ -197,18 +197,30 @@ const buildSnapshots=async(db,start,end)=>{
   });
 };
 
+export const lockFinanceCloseBarrier=async db=>{
+  await db.execute('SELECT id FROM finance_close_lock WHERE id=1 FOR UPDATE');
+};
+
 export const getClosedThrough=async(db=getRuntimePool())=>{
   const [[row]]=await db.execute("SELECT MAX(period_end) AS closed_through FROM finance_close_periods WHERE status='CLOSED'");
   return row.closed_through?new Date(row.closed_through):null;
 };
+
 export const assertFinancePeriodOpen=async(db,eventAt)=>{
-  const at=parseDate(eventAt),closedThrough=await getClosedThrough(db);
-  if(closedThrough&&at.getTime()<closedThrough.getTime()){
+  const at=parseDate(eventAt);
+  const [rows]=await db.execute(
+    `SELECT id,period_start,period_end FROM finance_close_periods
+     WHERE status='CLOSED' AND period_start<=? AND period_end>? LIMIT 1`,
+    [at,at]
+  );
+  if(rows.length){
     throw errorOf('Financial event falls inside a closed accounting period','FINANCE_PERIOD_CLOSED',409,{
-      eventAt:at.toISOString(),closedThrough:closedThrough.toISOString()
+      closeId:rows[0].id,eventAt:at.toISOString(),
+      periodStart:new Date(rows[0].period_start).toISOString(),
+      periodEnd:new Date(rows[0].period_end).toISOString()
     });
   }
-  return {eventAt:at,closedThrough};
+  return {eventAt:at,closedPeriod:null};
 };
 
 export const closeFinancePeriod=async({
@@ -224,6 +236,7 @@ export const closeFinancePeriod=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await lockFinanceCloseBarrier(connection);
     const [idempotentRows]=await connection.execute(
       'SELECT * FROM finance_close_periods WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]
     );
