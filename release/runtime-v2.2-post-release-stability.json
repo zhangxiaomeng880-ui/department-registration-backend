@@ -1,0 +1,78 @@
+{
+  "gate": "V2.2 Post-Release Stability",
+  "status": "PASS",
+  "production": {
+    "branch": "hotfix/v2.2-mysql2-security",
+    "runtimeCommitSha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "runtimeReplicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "mysqlOnline": true,
+    "mysqlReplicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0
+  },
+  "migrations": {
+    "result": "RUNTIME_MIGRATIONS_PASS",
+    "applied": 6,
+    "skipped": 7,
+    "total": 13,
+    "appliedFiles": [
+      "007_commercial_pricing_catalog.sql",
+      "008_tenant_workspace_quota_meter.sql",
+      "009_commercial_control.sql",
+      "010_tenant_identity_rbac.sql",
+      "011_subscription_billing_ledger.sql",
+      "012_v21_rollback_compatibility.sql"
+    ]
+  },
+  "security": {
+    "mysql2": "3.24.5",
+    "productionImageAudit": "0 vulnerabilities",
+    "promotionGateRun": 37204500956,
+    "promotionGate": "PASS"
+  },
+  "http": {
+    "requestsObserved": 8,
+    "status2xx": 2,
+    "status4xx": 6,
+    "status5xx": 0,
+    "fiveXxErrorRate": 0,
+    "slowestP95Ms": 29,
+    "readyHttp": 200,
+    "unauthenticatedBillingTermsHttp": 401,
+    "unauthenticatedSubscriptionHttp": 401,
+    "unauthenticatedInvoiceHttp": 401
+  },
+  "resources": {
+    "cpuVcpu": {
+      "current": 0.000004416666666666667,
+      "average": 0.0005162387978142076,
+      "max": 0.011280866666666667
+    },
+    "memoryGb": {
+      "current": 0.041181184,
+      "average": 0.04465395409836065,
+      "max": 0.07876608
+    }
+  },
+  "deployLogReview": {
+    "postCutoverDeployErrors": 0,
+    "note": "A SIGTERM entry at 13:09:38Z coincided with predecessor deployment removal during cutover. No deploy errors were observed after 13:09:40Z; current runtime remains 1/1 with zero crashes and zero recent failures."
+  },
+  "stagedState": {
+    "materialStagedChanges": 0,
+    "note": "Railway reported no staged resources or shared-variable changes. An empty historical EnvironmentPatch record remains visible but contains no changes."
+  },
+  "conclusion": "V2.2 commercial runtime and mysql2 security hotfix passed immediate post-release stability acceptance."
+}
