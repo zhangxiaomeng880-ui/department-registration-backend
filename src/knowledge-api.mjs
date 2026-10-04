@@ -3,6 +3,10 @@ import {
   syncKnowledgeMetadata,
   listKnowledgeDocuments,
 } from './knowledge-source.mjs';
+import {
+  recordKnowledgeRetrieval,
+  getKnowledgeRetrieval,
+} from './knowledge-retrieval.mjs';
 
 export const handleKnowledgeRoute = async (req, res, url, helpers) => {
   const { json, readBody } = helpers;
@@ -16,6 +20,19 @@ export const handleKnowledgeRoute = async (req, res, url, helpers) => {
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/knowledge/sync-metadata') {
     const result = await syncKnowledgeMetadata(await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/knowledge/retrievals') {
+    const result = await recordKnowledgeRetrieval(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  const retrievalMatch = url.pathname.match(/^\/api\/runtime\/knowledge\/retrievals\/([^/]+)$/);
+  if (req.method === 'GET' && retrievalMatch) {
+    const result = await getKnowledgeRetrieval(retrievalMatch[1]);
     json(res, 200, { data: result });
     return true;
   }
