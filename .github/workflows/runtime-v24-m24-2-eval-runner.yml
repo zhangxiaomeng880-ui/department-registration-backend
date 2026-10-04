@@ -61,21 +61,10 @@ jobs:
           RUNTIME_REQUIRE_AUTH: "true"
           RUNTIME_API_TOKEN: m242-platform-token
           RUNTIME_COMMIT_SHA: ${{ github.sha }}
-          OPENAI_API_KEY: test
-          OPENAI_MODEL: test-model
-          OPENAI_BASE_URL: http://127.0.0.1:4010/v1
-          OPENAI_TIMEOUT_MS: 10000
         run: |
-          node test/mock-openai-responses-server.mjs > /tmp/m242-mock-openai.log 2>&1 &
-          MOCK_PID=$!
           node src/server.mjs > /tmp/runtime-v24-m242.log 2>&1 &
           PID=$!
-          trap 'kill $PID $MOCK_PID 2>/dev/null || true' EXIT
-          for i in $(seq 1 30); do
-            grep -q 'MOCK_OPENAI_READY' /tmp/m242-mock-openai.log && break
-            sleep 1
-          done
-          grep -q 'MOCK_OPENAI_READY' /tmp/m242-mock-openai.log
+          trap 'kill $PID 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
             curl --fail --silent http://127.0.0.1:4700/ready >/dev/null && break
             sleep 1
@@ -90,11 +79,9 @@ jobs:
           npm run validate:eval-replay-contract
           npm run validate:eval-runner
           node test/railway-compatibility.test.mjs
-          kill $PID $MOCK_PID
+          kill $PID
           trap - EXIT
 
       - name: Print Runtime logs on failure
         if: failure()
-        run: |
-          cat /tmp/runtime-v24-m242.log || true
-          cat /tmp/m242-mock-openai.log || true
+        run: cat /tmp/runtime-v24-m242.log || true
