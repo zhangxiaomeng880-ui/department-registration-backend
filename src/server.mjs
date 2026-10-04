@@ -21,6 +21,18 @@ const route = async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {});
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { status: 'ok', service: 'department-registration-backend' });
+  if (req.method === 'GET' && url.pathname === '/ready') {
+    const database = await checkRuntimeDbReady();
+    const modelReady = modelProviderConfigured();
+    return json(res, database.ready ? 200 : 503, {
+      status: database.ready ? (modelReady ? 'ready' : 'degraded') : 'not_ready',
+      components: {
+        database,
+        modelProvider: { configured: modelReady, requiredForIngressReadiness: false },
+        contextBridge: { mode: 'EPHEMERAL_MEMORY_ONLY', persisted: false }
+      }
+    });
+  }
   if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
   if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
   if (req.method === 'GET' && url.pathname === '/api/cities') return json(res, 200, { data: data.cities });
