@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "releaseCandidate": "ai-native-runtime-v2.1-rc1",
+  "generatedAt": "2026-10-04T08:45:00.000Z",
+  "candidate": {
+    "commitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+    "branch": "feat/ai-native-runtime-v2.1-productization"
+  },
+  "rollback": {
+    "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+    "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18"
+  },
+  "production": {
+    "currentStatus": "SUCCESS",
+    "projectId": "34abdc88-da14-4ada-b2a2-bdf1b61240a4",
+    "environmentId": "e8afc1ed-80e4-42d3-85d9-3e3ec193c5f7",
+    "runtimeServiceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+    "databaseServiceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31"
+  },
+  "staging": {
+    "verified": false,
+    "reason": "No isolated Railway staging environment has been validated for the v2.1 candidate."
+  },
+  "milestoneEvidence": [
+    {
+      "milestone": "M21.1",
+      "status": "PASS",
+      "evidence": "release/runtime-v2.1-m21.1-observability.json"
+    },
+    {
+      "milestone": "M21.2",
+      "status": "PASS",
+      "evidence": "release/runtime-v2.1-m21.2-policy-router.json"
+    },
+    {
+      "milestone": "M21.3",
+      "status": "PASS",
+      "evidence": "release/runtime-v2.1-m21.3-cost-ledger.json"
+    }
+  ],
+  "ciEvidence": [
+    {"name":"Backend Validation","runId":37189856760,"conclusion":"success"},
+    {"name":"Railway Runtime Compatibility","runId":37189856770,"conclusion":"success"},
+    {"name":"Runtime Orchestrator Validation","runId":37189856791,"conclusion":"success"},
+    {"name":"Runtime v2.1 Observability Gate","runId":37189856764,"conclusion":"success"},
+    {"name":"Runtime v2.1 Policy Router Gate","runId":37189856785,"conclusion":"success"},
+    {"name":"Runtime v2.1 Cost Ledger Gate","runId":37189856768,"conclusion":"success"},
+    {"name":"Runtime v2.1 Release Promotion Gate","runId":37189856771,"conclusion":"success"}
+  ],
+  "manualApproval": {
+    "required": true,
+    "approved": false,
+    "approvedBy": null,
+    "approvedAt": null
+  },
+  "productionPromotion": {
+    "automated": false,
+    "performed": false
+  },
+  "checks": {
+    "passes": [
+      {"code":"MILESTONE_GATE_PASS","detail":"M21.1"},
+      {"code":"MILESTONE_GATE_PASS","detail":"M21.2"},
+      {"code":"MILESTONE_GATE_PASS","detail":"M21.3"},
+      {"code":"CI_SUCCESS","detail":"Backend Validation"},
+      {"code":"CI_SUCCESS","detail":"Railway Runtime Compatibility"},
+      {"code":"CI_SUCCESS","detail":"Runtime Orchestrator Validation"},
+      {"code":"CI_SUCCESS","detail":"Runtime v2.1 Observability Gate"},
+      {"code":"CI_SUCCESS","detail":"Runtime v2.1 Policy Router Gate"},
+      {"code":"CI_SUCCESS","detail":"Runtime v2.1 Cost Ledger Gate"},
+      {"code":"CI_SUCCESS","detail":"Runtime v2.1 Release Promotion Gate"},
+      {"code":"CANDIDATE_SHA_VALID","detail":"7b0d0f152395e39f4bdc5ea48217c4a24b7a284f"},
+      {"code":"ROLLBACK_TARGET_PRESENT","detail":"ca159922a609639b72656dbf7424777db1d6d00a:31e58eab-78a3-467b-b994-f73d873d5f18"},
+      {"code":"CURRENT_PRODUCTION_HEALTHY"}
+    ],
+    "holds": [
+      {"code":"STAGING_NOT_VERIFIED"},
+      {"code":"MANUAL_APPROVAL_REQUIRED"}
+    ]
+  },
+  "verdict": "HOLD",
+  "readyForManualApproval": false,
+  "approvedForPromotion": false
+}
