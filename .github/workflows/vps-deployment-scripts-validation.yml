@@ -1,0 +1,60 @@
+name: VPS Deployment Scripts Validation
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-persistence
+  workflow_dispatch:
+
+jobs:
+  vps-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate shell syntax
+        run: |
+          bash -n scripts/preflight-runtime-vps.sh
+          bash -n scripts/deploy-runtime-vps.sh
+          bash -n scripts/verify-runtime-vps.sh
+          bash -n scripts/rollback-runtime-vps.sh
+
+      - name: Build test environment
+        run: |
+          cat > .env.runtime.ci <<'EOF'
+          MYSQL_DATABASE=ai_native_runtime
+          MYSQL_USER=ai_native_runtime
+          MYSQL_PASSWORD=runtime_ci_password
+          MYSQL_ROOT_PASSWORD=runtime_ci_root_password
+          RUNTIME_HOST_PORT=3100
+          RUNTIME_API_TOKEN=runtime-ci-token
+          OPENAI_MODEL=test-model
+          EOF
+
+      - name: Run VPS preflight
+        env:
+          ENV_FILE: ${{ github.workspace }}/.env.runtime.ci
+        run: bash scripts/preflight-runtime-vps.sh
+
+      - name: Run guarded VPS deploy script
+        env:
+          ENV_FILE: ${{ github.workspace }}/.env.runtime.ci
+          TARGET_REF: ${{ github.sha }}
+          DEPLOY_TIMEOUT_SECONDS: 180
+        run: bash scripts/deploy-runtime-vps.sh
+
+      - name: Run VPS verification script
+        env:
+          ENV_FILE: ${{ github.workspace }}/.env.runtime.ci
+        run: bash scripts/verify-runtime-vps.sh
+
+      - name: Run rollback script
+        env:
+          ENV_FILE: ${{ github.workspace }}/.env.runtime.ci
+        run: bash scripts/rollback-runtime-vps.sh
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.runtime.ci -f docker-compose.runtime.yml down -v
