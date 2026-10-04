@@ -235,15 +235,21 @@ const costSummaryQuery = async (db, whereSql, values) => {
     `SELECT
        COUNT(*) AS usage_count,
        SUM(CASE WHEN cost_status='UNKNOWN' THEN 1 ELSE 0 END) AS unknown_count,
-       COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) AS estimated_cost
+       COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) AS estimated_cost,
+       GROUP_CONCAT(DISTINCT CASE WHEN cost_status='CALCULATED' THEN cost_currency END ORDER BY cost_currency) AS currencies
      FROM usage_ledger
      ${whereSql}`,
     values
   );
+  const currencies = totals.currencies
+    ? String(totals.currencies).split(',').filter(Boolean)
+    : [];
   return {
     usageCount:Number(totals.usage_count || 0),
     unknownCount:Number(totals.unknown_count || 0),
     estimatedCost:Number(totals.estimated_cost || 0),
+    currencies,
+    currency:currencies.length === 1 ? currencies[0] : null,
   };
 };
 
@@ -280,7 +286,11 @@ export const getRunCostSummary = async runId => {
   return {
     runId,
     projectId:run.project_id,
-    costStatus:totals.unknownCount > 0 ? 'UNKNOWN' : 'CALCULATED',
+    costStatus:totals.unknownCount > 0
+      ? 'UNKNOWN'
+      : totals.currencies.length > 1
+        ? 'MIXED_CURRENCY'
+        : 'CALCULATED',
     ...totals,
     byTask:byTaskRows.map(row => ({
       taskId:row.task_id,
@@ -319,7 +329,11 @@ export const getProjectCostSummary = async projectId => {
   );
   return {
     projectId,
-    costStatus:totals.unknownCount > 0 ? 'UNKNOWN' : 'CALCULATED',
+    costStatus:totals.unknownCount > 0
+      ? 'UNKNOWN'
+      : totals.currencies.length > 1
+        ? 'MIXED_CURRENCY'
+        : 'CALCULATED',
     ...totals,
     byRun:byRunRows.map(row => ({
       runId:row.run_id,
@@ -354,7 +368,29 @@ export const evaluateBudgetPolicy = async ({ projectId, runId }) => {
     };
   }
 
+  if (projectSummary.costStatus === 'MIXED_CURRENCY' || runSummary?.costStatus === 'MIXED_CURRENCY') {
+    return {
+      decision:'HOLD',
+      reason:'COST_MIXED_CURRENCY',
+      projectSummary,
+      runSummary,
+      policies:policies.map(row => row.policy_key),
+    };
+  }
+
   for (const policy of policies) {
+    const activeCurrency = runSummary?.currency || projectSummary.currency;
+    if (activeCurrency && policy.currency !== activeCurrency) {
+      return {
+        decision:'HOLD',
+        reason:'BUDGET_CURRENCY_MISMATCH',
+        policyKey:policy.policy_key,
+        policyCurrency:policy.currency,
+        costCurrency:activeCurrency,
+        projectSummary,
+        runSummary,
+      };
+    }
     const runLimit = money(policy.run_limit_amount);
     const projectLimit = money(policy.project_limit_amount);
     const runExceeded = runSummary && runLimit != null && runSummary.estimatedCost > runLimit;
