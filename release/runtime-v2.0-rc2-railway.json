@@ -1,0 +1,57 @@
+{
+  "releaseCandidate": "ai-native-runtime-v2.0-rc2-railway",
+  "releaseBranch": "release/ai-native-runtime-v2.0-rc2-railway",
+  "commitSha": "17dd8482b64cb6c503adcea6135afb1535c11bdf",
+  "routerVersion": "router-p86-v1",
+  "workflowVersion": "context-orchestrator-v1",
+  "deploymentTarget": "Railway",
+  "railway": {
+    "configFile": "railway.json",
+    "builder": "DOCKERFILE",
+    "healthcheckPath": "/ready",
+    "preDeployCommand": "npm run migrate:runtime",
+    "databaseVariable": "MYSQL_URL",
+    "productionAuthDefault": true
+  },
+  "validation": {
+    "backendValidation": {
+      "runId": 37184013554,
+      "runNumber": 132,
+      "conclusion": "success"
+    },
+    "runtimeOrchestratorValidation": {
+      "runId": 37184013540,
+      "runNumber": 40,
+      "conclusion": "success"
+    },
+    "runtimeDeploymentValidation": {
+      "runId": 37184013527,
+      "runNumber": 26,
+      "conclusion": "success"
+    },
+    "railwayRuntimeCompatibility": {
+      "runId": 37184013612,
+      "runNumber": 1,
+      "conclusion": "success"
+    }
+  },
+  "knowledgeBodyPolicy": {
+    "chatgptLibraryIsCanonicalBodySource": true,
+    "gitStoresProjectBody": false,
+    "mysqlStoresProjectBody": false,
+    "contextBridge": "EPHEMERAL_MEMORY_ONLY"
+  },
+  "knownExternalBlockers": [
+    {
+      "code": "RAILWAY_ACTION_TOOLS_NOT_EXPOSED_IN_CURRENT_CHAT",
+      "scope": "actual Railway project/service creation from ChatGPT",
+      "userReconnectionRequired": false
+    },
+    {
+      "code": "OPENAI_LIVE_PROVIDER_NOT_CONFIGURED_ON_RAILWAY",
+      "scope": "real OpenAI provider execution inside Railway Runtime",
+      "affectsRuntimeCoreDeployment": false,
+      "runtimeReadiness": "degraded_not_failed"
+    }
+  ]
+}
