@@ -44,6 +44,18 @@ r=await request('POST','/api/runtime/pricing-versions',{
   providerKey,
   modelKey:'cost-model',
   currency:'USD',
+  inputRatePerMillion:1,
+  outputRatePerMillion:1,
+  effectiveFrom:'2019-01-01T00:00:00.000Z',
+  sourceLabel:'SECRET_REJECTION_TEST',
+  metadata:{apiKey:'must-not-persist'}
+});
+assert.equal(r.status,400);
+
+r=await request('POST','/api/runtime/pricing-versions',{
+  providerKey,
+  modelKey:'cost-model',
+  currency:'USD',
   inputRatePerMillion:2,
   outputRatePerMillion:6,
   effectiveFrom:'2020-01-01T00:00:00.000Z',
@@ -303,6 +315,11 @@ assert.equal(r.status,200);
 assert.equal(r.body.data.costStatus,'CALCULATED');
 assert.equal(r.body.data.estimatedCost,20);
 assert.equal(r.body.data.byRun[0].runId,runB);
+assert.equal(r.body.data.byProviderModel.length,1);
+assert.equal(r.body.data.byProviderModel[0].providerKey,providerKey);
+assert.equal(r.body.data.byProviderModel[0].modelKey,'cost-model');
+assert.equal(r.body.data.byProviderModel[0].estimatedCost,20);
+assert.ok(Array.isArray(r.body.data.byStage));
 
 const db=await mysql.createConnection({
   host:process.env.DB_HOST,
