@@ -94,7 +94,7 @@ export const openCollectionCase=async({
     await connection.execute(
       `INSERT INTO collection_cases (
         id,invoice_id,tenant_id,status,priority,assigned_identity_id,opened_at,metadata_json
-      ) VALUES (?,?,?,'OPEN',?,?,?,?,?)`,
+      ) VALUES (?,?,?,'OPEN',?,?,?,?)`,
       [id,invoiceId,invoice.tenant_id,normalizedPriority,assignedIdentityId||null,opened,asJson(metadata)]
     );
     const [rows]=await connection.execute('SELECT * FROM collection_cases WHERE id=?',[id]);
