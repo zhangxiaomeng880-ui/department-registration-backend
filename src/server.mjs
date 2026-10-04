@@ -34,6 +34,7 @@ const route = async (req, res) => {
       }
     });
   }
+  if (url.pathname.startsWith('/api/runtime/')) authorizeRuntimeRequest(req);
   if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
   if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
   if (req.method === 'GET' && url.pathname === '/api/cities') return json(res, 200, { data: data.cities });
