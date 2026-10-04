@@ -1,0 +1,52 @@
+{
+  "version": "2.1",
+  "phase": "PRODUCTIZATION",
+  "baseRelease": "v2.0.0",
+  "baseCommitSha": "52fd6795e876091b8266d8b583ec7507c0a4df22",
+  "branch": "feat/ai-native-runtime-v2.1-productization",
+  "status": "PLANNED",
+  "p0": [
+    {
+      "key": "P0-OBSERVABILITY",
+      "title": "Runtime Observability",
+      "order": 1,
+      "gate": "Every slow/failed execution is explainable from persisted runtime evidence without chat history."
+    },
+    {
+      "key": "P0-EVAL-REPLAY",
+      "title": "Eval + Replay",
+      "order": 2,
+      "gate": "Every release candidate passes reproducible evaluation tied to its exact SHA."
+    },
+    {
+      "key": "P0-PROVIDER-ROUTER",
+      "title": "Provider Router + Policy",
+      "order": 3,
+      "gate": "Every model call records route decision and provider/model provenance; no silent fallback."
+    },
+    {
+      "key": "P0-RELEASE-PROMOTION",
+      "title": "Evidence-based Release Promotion",
+      "order": 4,
+      "gate": "PASS/VERIFIED/RELEASE READY are emitted only from recorded deployment and validation evidence."
+    }
+  ],
+  "p1": [
+    "Operator Inspection Surface",
+    "Knowledge Retrieval Quality",
+    "Internal Cost Accounting Foundation"
+  ],
+  "deferredTo3_0": [
+    "customer billing",
+    "subscription/package design",
+    "public SaaS onboarding",
+    "commercial charging rules"
+  ],
+  "invariants": [
+    "private source body is not persisted to public Git",
+    "private source body is not persisted to Runtime MySQL",
+    "Context Bridge source text is ephemeral",
+    "Gate status is evidence-backed",
+    "checkpoint/resume uses persisted Runtime state"
+  ]
+}
