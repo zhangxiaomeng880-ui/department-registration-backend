@@ -2,13 +2,56 @@
   "milestone": "M22.4",
   "title": "Tenant Identity / Membership / RBAC + Scoped API Credentials",
   "version": "V2.2",
-  "status": "IMPLEMENTED_PENDING_GATE",
-  "branch": "feat/ai-native-runtime-v2.2-m22.4-tenant-rbac",
-  "baseCommit": "238992f2701e0ee28d25376cd8fe6f4ec75f4e0b",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionPromotion": "NOT_STARTED",
   "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.2-m22.4-tenant-rbac",
+    "stagingCodeSha": "656405d588ed4bfa6b6d4b85889234b87fa3a6fb",
+    "baseM223EvidenceCommit": "238992f2701e0ee28d25376cd8fe6f4ec75f4e0b"
+  },
+  "gates": {
+    "githubActions": {
+      "workflow": "Runtime v2.2 M22.4 Tenant RBAC Gate",
+      "runId": 37199516467,
+      "status": "PASS",
+      "migrationIdempotency": true,
+      "regressionThroughM223": true,
+      "authenticatedTenantIsolation": true,
+      "acceptance": "G22_4_TENANT_RBAC_PASS"
+    },
+    "staging": {
+      "deploymentId": "6fe1b031-e482-444c-aa0c-f00144a4ea71",
+      "status": "SUCCESS",
+      "runtime": "ONLINE",
+      "mysql": "ONLINE",
+      "readyHttp": 200,
+      "unauthenticatedRbacRolesHttp": 401,
+      "unauthenticatedIdentitiesHttp": 401,
+      "unauthenticatedApiCredentialsHttp": 401,
+      "warnings": 0,
+      "criticals": 0
+    },
+    "migrations": {
+      "total": 11,
+      "latest": "010_tenant_identity_rbac.sql",
+      "appliedOnStaging": true,
+      "partialRetrySafe": true,
+      "status": "PASS"
+    },
+    "pricingRegression": {
+      "model": "gpt-6-luna",
+      "targets": 1,
+      "inserted": 0,
+      "skipped": 4,
+      "conclusion": "M22.1 immutable pricing catalog preserved"
+    }
+  },
   "scope": {
     "platformToken": "BREAK_GLASS_ADMIN_COMPATIBILITY",
     "credentialStorage": "SHA256_HASH_ONLY",
+    "rawCredentialPersistence": false,
     "roles": [
       "TENANT_OWNER",
       "TENANT_ADMIN",
@@ -16,13 +59,57 @@
       "OPERATOR",
       "VIEWER"
     ],
-    "scopes": [
+    "membershipScopes": [
       "TENANT",
       "WORKSPACE"
     ],
+    "tenantAdminCanManageMemberships": false,
+    "scopedCredentialSelfIssuanceOnly": true,
     "crossTenantDefault": "DENY",
-    "unknownScopedRouteDefault": "DENY_BY_ROUTE_COVERAGE_GATE",
+    "crossWorkspaceDefault": "DENY_FOR_WORKSPACE_SCOPED_CREDENTIAL",
+    "platformOnlyManagement": [
+      "plan assignment",
+      "provider/model/pricing management",
+      "legacy budget policy management",
+      "context packet bridge/orchestrator",
+      "RBAC role catalog",
+      "identity creation"
+    ],
     "authorizationAudit": true
   },
-  "acceptanceGate": "G22_4_TENANT_RBAC_PASS"
+  "invariants": {
+    "platformBreakGlassPreserved": true,
+    "revokedCredentialRejected": true,
+    "expiredCredentialRejected": true,
+    "inactiveIdentityTenantWorkspaceRejected": true,
+    "permissionEscalationPrevented": true,
+    "credentialIdentityEscalationPrevented": true,
+    "planSelfUpgradePrevented": true,
+    "crossTenantAccessTested": true,
+    "crossWorkspaceAccessTested": true,
+    "viewerWriteDenied": true,
+    "routeResourceScopeResolved": true,
+    "rawSecretsNotPersisted": true,
+    "failClosedAuth": true,
+    "privateBodyPersistence": false
+  },
+  "knownNonBlockingState": {
+    "historicalM224FailedDeployment": {
+      "deploymentId": "a78879cf-790f-45cd-ac28-bae8498116da",
+      "cause": "MySQL schema-global foreign key name collision during first 010 attempt",
+      "fix": "All M22.4 foreign key names namespaced with fk_m224_* and migration safely resumed from partial DDL",
+      "currentImpact": "NONE"
+    },
+    "historicalM221Failure": {
+      "deploymentId": "d630ab7c-5ae4-4846-bb49-2767900ada4c",
+      "cause": "Historical Docker image omitted pricing catalog directory",
+      "currentImpact": "NONE"
+    },
+    "emptyStagedPatch": {
+      "status": "STAGED",
+      "changes": [],
+      "currentImpact": "NONE"
+    }
+  },
+  "conclusion": "M22.4 STAGING PASS / FROZEN. Production promotion requires separate human approval."
 }
