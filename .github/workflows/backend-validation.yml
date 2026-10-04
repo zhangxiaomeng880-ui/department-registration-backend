@@ -88,3 +88,4 @@ jobs:
           curl --fail http://127.0.0.1:3100/health
           npm run validate:runtime-api
           npm run validate:knowledge-source
+          npm run validate:knowledge-retrieval
