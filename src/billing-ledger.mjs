@@ -572,10 +572,9 @@ export const listInvoicePayments=async invoiceId=>{
 export const getBillingOperationsSummary=async({tenantId=null,asOf=new Date()}={})=>{
   const db=getRuntimePool();
   const at=parseDate(asOf);
-  const params=[at];
+  const params=[at,at];
   let where='';
   if(tenantId){where='WHERE tenant_id=?';params.push(tenantId);}
-  params.push(at);
   const [rows]=await db.execute(
     `SELECT
        currency,
