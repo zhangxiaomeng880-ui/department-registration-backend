@@ -1,0 +1,109 @@
+{
+  "milestone": "M23.3",
+  "release": "AI Native Runtime V2.3",
+  "title": "Revenue / Billing Operations Analytics",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.3-m23.3-revenue-analytics",
+    "stagingRuntimeSha": "74d5c854becb1bee3a722b798f858c7197b4a48c"
+  },
+  "design": {
+    "schemaDelta": false,
+    "analyticsMode": "read-only derived analytics over existing billing, payment, subscription, cost and collections ledgers",
+    "totalMigrations": 15,
+    "latestMigration": "014_collections.sql",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=15 total=15"
+  },
+  "capabilities": [
+    "Accounts Receivable Balance",
+    "Overdue Outstanding Balance",
+    "Collection Rate",
+    "Receivables Aging Buckets",
+    "Promise-to-Pay Fulfillment Rate",
+    "Tenant Revenue Performance",
+    "Plan Revenue Performance",
+    "Provider Cost and Gross Margin View",
+    "Historical As-Of Analytics",
+    "Tenant-scoped billing:read authorization",
+    "Platform-admin cross-tenant analytics"
+  ],
+  "metricSemantics": {
+    "collectionRate": "payments received at or before asOf / invoice billed amount",
+    "agingBuckets": [
+      "current",
+      "1-30 days",
+      "31-60 days",
+      "61-90 days",
+      "90+ days"
+    ],
+    "historicalAsOf": "invoices issued after asOf are excluded; payments received after asOf are excluded",
+    "promiseToPay": "fulfilled when payments on the promised invoice between promise creation and promise due time meet or exceed promised amount",
+    "revenuePerformanceGrain": "tenant + plan + currency",
+    "costRevenueSeparation": true
+  },
+  "api": {
+    "analytics": "GET /api/runtime/billing-ops/analytics",
+    "revenuePerformance": "GET /api/runtime/billing-ops/revenue-performance",
+    "filters": [
+      "tenantId",
+      "planKey",
+      "asOf",
+      "limit (revenue performance only)"
+    ],
+    "permission": "billing:read"
+  },
+  "ci": {
+    "workflow": "Runtime v2.3 M23.3 Revenue Analytics Gate",
+    "runId": 37207896736,
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "m225BillingRegression": "PASS",
+    "m231BillingOperationsRegression": "PASS",
+    "m232CollectionsRegression": "PASS",
+    "m233RevenueAnalytics": "PASS",
+    "historicalAsOfSemantics": "PASS",
+    "crossTenantIsolation": "PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "a50700dd-c721-456c-aece-e26fe2417299",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "http": {
+      "ready": 200,
+      "analyticsUnauthenticated": 401,
+      "revenuePerformanceUnauthenticated": 401,
+      "observedRequestsLastHour": 15,
+      "http2xx": 4,
+      "http4xx": 11,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95Ms": 28
+    }
+  },
+  "cutover": {
+    "predecessorDeployment": "2917d277-3683-4683-bb3b-430f9616f864",
+    "predecessorExit": "Railway sent SIGTERM during normal replacement after M23.3 became healthy; current M23.3 runtime is 1/1 with zero crashes and zero recent failures."
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "hotfix/v2.2-mysql2-security",
+    "sha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247"
+  },
+  "conclusion": "M23.3 Revenue / Billing Operations Analytics is STAGING PASS / FROZEN. Revenue, collections, aging, promise-to-pay, tenant/plan performance, historical as-of semantics, authorization boundaries, CI regression, and staging runtime acceptance all passed. Production remains on V2.2."
+}
