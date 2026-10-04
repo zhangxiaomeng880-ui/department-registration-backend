@@ -1,0 +1,21 @@
+{
+  "milestone": "M22.4",
+  "title": "Tenant Identity / Membership / RBAC + Scoped API Credentials",
+  "version": "V2.2",
+  "status": "IMPLEMENTED_PENDING_GATE",
+  "branch": "feat/ai-native-runtime-v2.2-m22.4-iam-rbac",
+  "baseCommit": "238992f2701e0ee28d25376cd8fe6f4ec75f4e0b",
+  "productionTouched": false,
+  "securityModel": {
+    "platformToken": "PLATFORM_ADMIN_COMPATIBILITY",
+    "scopedCredentialDefault": "DENY",
+    "unknownScopedRoute": "403_SCOPED_ROUTE_NOT_ALLOWLISTED",
+    "secretStorage": "SHA256_ONLY",
+    "rawCredentialReturned": "CREATE_ONCE_ONLY",
+    "credentialPermissionModel": "membership role permissions intersect credential scopes",
+    "tenantIsolation": true,
+    "workspaceIsolation": true,
+    "authzAudit": true
+  },
+  "acceptanceGate": "G22_4_IAM_RBAC_SCOPED_CREDENTIAL_PASS"
+}

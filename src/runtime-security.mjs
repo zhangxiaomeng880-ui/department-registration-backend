@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { authenticateScopedToken } from './runtime-iam.mjs';
 
 const errorOf = (message, code, statusCode) => {
   const error = new Error(message);
@@ -31,15 +32,22 @@ export const assertRuntimeSecurityConfig = () => {
   }
 };
 
-export const authorizeRuntimeRequest = req => {
-  if (!runtimeAuthRequired()) return;
+export const authorizeRuntimeRequest = async req => {
+  if (!runtimeAuthRequired()) {
+    return {authType:'AUTH_DISABLED',platformAdmin:true,permissions:['*']};
+  }
   assertRuntimeSecurityConfig();
 
   const header = String(req.headers.authorization || '');
   const prefix = 'Bearer ';
   const token = header.startsWith(prefix) ? header.slice(prefix.length) : '';
+  if (!token) throw errorOf('Runtime API authentication failed', 'RUNTIME_UNAUTHORIZED', 401);
 
-  if (!safeEqual(token, process.env.RUNTIME_API_TOKEN)) {
-    throw errorOf('Runtime API authentication failed', 'RUNTIME_UNAUTHORIZED', 401);
+  if (safeEqual(token, process.env.RUNTIME_API_TOKEN)) {
+    return {authType:'PLATFORM_TOKEN',platformAdmin:true,permissions:['*']};
   }
+
+  const scoped=await authenticateScopedToken(token);
+  if(!scoped) throw errorOf('Runtime API authentication failed', 'RUNTIME_UNAUTHORIZED', 401);
+  return scoped;
 };

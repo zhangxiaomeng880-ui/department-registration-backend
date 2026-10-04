@@ -42,6 +42,11 @@ import {
   authorizeCommercialExecution,commitUsageReservation,releaseUsageReservation,listUsageReservations
 } from './commercial-control.mjs';
 import {
+  createIdentity,upsertTenantMembership,upsertWorkspaceMembership,
+  createApiCredential,revokeApiCredential,listApiCredentials,getAuthSelf
+} from './runtime-iam.mjs';
+import { authorizeRuntimeApiAccess } from './runtime-authorization.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -55,6 +60,47 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+  await authorizeRuntimeApiAccess({ req, url, readBody, auth:helpers.authContext || {platformAdmin:true,authType:'AUTH_DISABLED'} });
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/iam/me') {
+    json(res, 200, { data:getAuthSelf(helpers.authContext || {platformAdmin:true,authType:'AUTH_DISABLED'}) });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/identities') {
+    json(res, 201, { data:await createIdentity(await readBody(req)) });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/tenant-memberships') {
+    json(res, 201, { data:await upsertTenantMembership(await readBody(req)) });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/workspace-memberships') {
+    json(res, 201, { data:await upsertWorkspaceMembership(await readBody(req)) });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/api-credentials') {
+    json(res, 201, { data:await createApiCredential(await readBody(req)) });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/api-credentials') {
+    json(res, 200, { data:await listApiCredentials({
+      identityId:url.searchParams.get('identityId')||null,
+      tenantId:url.searchParams.get('tenantId')||null
+    }) });
+    return true;
+  }
+
+  const credentialRevokeMatch=match(url.pathname,/^\/api\/runtime\/api-credentials\/([^/]+)\/revoke$/);
+  if (req.method === 'POST' && credentialRevokeMatch) {
+    json(res, 200, { data:await revokeApiCredential(credentialRevokeMatch[1]) });
     return true;
   }
 
