@@ -1,0 +1,57 @@
+{
+  "release": "v2.0.0",
+  "releaseName": "AI Native Runtime 2.0",
+  "status": "PRODUCTION_LIVE_PASS",
+  "finalBranch": "release/ai-native-runtime-v2.0-final",
+  "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+  "rc4EvidenceCommitSha": "db88b491e7aaa83c57ba5656d95242344fff4cd7",
+  "production": {
+    "platform": "Railway",
+    "project": "ai-native-runtime-v2",
+    "environment": "production",
+    "runtimeService": {
+      "name": "runtime",
+      "serviceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+      "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+      "status": "SUCCESS",
+      "healthcheckPath": "/ready",
+      "readinessHttpStatusObserved": 200
+    },
+    "databaseService": {
+      "name": "mysql-runtime",
+      "serviceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31",
+      "deploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+      "status": "SUCCESS",
+      "persistentVolume": "mysql-runtime-data",
+      "publicTcpProxy": false
+    }
+  },
+  "provider": {
+    "type": "openai-responses",
+    "model": "gpt-6-luna",
+    "liveSmokeTestHttpStatus": 200,
+    "providerInvoked": true,
+    "structuredContractPass": true
+  },
+  "securityAndPersistence": {
+    "runtimeAuthRequired": true,
+    "unauthorizedRuntimeApiHttpStatus": 401,
+    "sourceBodyPersisted": false,
+    "contextBridgeMode": "EPHEMERAL_MEMORY_ONLY"
+  },
+  "gates": {
+    "coreRuntime": "PASS",
+    "databasePersistence": "PASS",
+    "authFailClosed": "PASS",
+    "railwayDeployment": "PASS",
+    "openAiProviderLive": "PASS",
+    "structuredOutput": "PASS",
+    "provenanceAndCheckpoint": "PASS",
+    "finalStatus": "PASS"
+  },
+  "releasePolicy": {
+    "privateCreativeBodyInPublicGit": false,
+    "rc1Rc2Rc3Rc4HistoryPreserved": true,
+    "runtimeCodeFrozenAtProductionSha": true
+  }
+}
