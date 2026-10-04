@@ -7,6 +7,9 @@ import {
   saveCheckpoint,
   getLatestCheckpoint,
   resumeRun,
+  addKnowledgeContexts,
+  listKnowledgeContexts,
+  getKnowledgeContextFingerprint,
 } from './runtime-db.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
@@ -42,6 +45,19 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'PATCH' && taskMatch) {
     const result = await updateTask(taskMatch[1], await readBody(req));
     json(res, 200, { data: result });
+    return true;
+  }
+
+  const knowledgeMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/knowledge-contexts$/);
+  if (req.method === 'POST' && knowledgeMatch) {
+    const result = await addKnowledgeContexts(knowledgeMatch[1], await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+  if (req.method === 'GET' && knowledgeMatch) {
+    const items = await listKnowledgeContexts(knowledgeMatch[1]);
+    const fingerprint = await getKnowledgeContextFingerprint(knowledgeMatch[1]);
+    json(res, 200, { data: { runId: knowledgeMatch[1], fingerprint, items } });
     return true;
   }
 
