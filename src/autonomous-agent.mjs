@@ -97,6 +97,36 @@ export const executeScriptContinuityAgent = async input => {
     sourceBodyPersisted: false,
   };
 
+  const selectedProviderKey = input.selectedProviderKey || 'openai-responses';
+  const selectedAdapterKey = input.selectedAdapterKey || 'openai-responses';
+  const selectedModelKey = input.selectedModelKey || null;
+
+  if (selectedAdapterKey !== 'openai-responses') {
+    const error = new Error(`Provider adapter is not implemented: ${selectedAdapterKey}`);
+    error.code = 'PROVIDER_ADAPTER_NOT_IMPLEMENTED';
+    error.statusCode = 503;
+    error.errorCategory = 'CONFIGURATION';
+    await recordToolExecution({
+      runId: input.runId,
+      taskId: input.taskId,
+      routeExecutionId: input.routeExecutionId,
+      correlationId: input.correlationId || null,
+      toolType: 'MODEL_PROVIDER',
+      toolKey: selectedAdapterKey,
+      providerKey: selectedProviderKey,
+      modelKey: selectedModelKey,
+      status: 'FAIL',
+      input: evidenceInput,
+      output: null,
+      tokenInput: 0,
+      tokenOutput: 0,
+      errorCode: error.code,
+      errorCategory: error.errorCategory,
+      errorMessage: error.message,
+    });
+    throw error;
+  }
+
   let providerResult;
   try {
     providerResult = await invokeOpenAiResponses({
@@ -115,6 +145,7 @@ export const executeScriptContinuityAgent = async input => {
         route_rule: input.routeRuleKey || 'P86',
         correlation_id: input.correlationId || '',
       },
+      modelKey: selectedModelKey || undefined,
     });
   } catch (error) {
     await recordToolExecution({
@@ -124,8 +155,8 @@ export const executeScriptContinuityAgent = async input => {
       correlationId: input.correlationId || null,
       toolType: 'MODEL_PROVIDER',
       toolKey: 'openai.responses',
-      providerKey: 'openai-responses',
-      modelKey: process.env.OPENAI_MODEL || null,
+      providerKey: selectedProviderKey,
+      modelKey: selectedModelKey || process.env.OPENAI_MODEL || null,
       status: 'FAIL',
       input: evidenceInput,
       output: null,
@@ -146,7 +177,7 @@ export const executeScriptContinuityAgent = async input => {
     correlationId: input.correlationId || null,
     toolType: 'MODEL_PROVIDER',
     toolKey: 'openai.responses',
-    providerKey: providerResult.provider,
+    providerKey: selectedProviderKey,
     modelKey: providerResult.model,
     status: providerResult.status === 'completed' ? 'PASS' : 'HOLD',
     input: evidenceInput,
@@ -162,7 +193,8 @@ export const executeScriptContinuityAgent = async input => {
 
   return {
     executionMode: 'AUTONOMOUS_MODEL_PROVIDER',
-    provider: providerResult.provider,
+    provider: selectedProviderKey,
+    providerAdapter: providerResult.provider,
     providerResponseId: providerResult.providerResponseId,
     model: providerResult.model,
     contextHash,
