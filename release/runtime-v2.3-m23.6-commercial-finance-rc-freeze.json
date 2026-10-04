@@ -1,0 +1,139 @@
+{
+  "milestone": "M23.6",
+  "release": "AI Native Runtime V2.3",
+  "title": "Commercial Finance RC Freeze",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "rcRuntimeSha": "58fc7a7f479d63e55e0b6691550e08f881bcd841",
+    "m235RuntimeSha": "25b1608649874661bc526acb56514ca15ac2b192",
+    "runtimeCodeEquivalentToM235": true,
+    "runtimeBusinessCodeDelta": false,
+    "migrationDelta": false,
+    "rcOnlyFiles": [
+      ".github/workflows/runtime-v23-m23-6-finance-rc-freeze.yml",
+      "test/runtime-v23-commercial-finance-rc-e2e.test.mjs"
+    ]
+  },
+  "frozenPrerequisites": [
+    "M23.1 Billing Operations / Accounts Receivable",
+    "M23.2 Dunning / Collections",
+    "M23.3 Revenue / Billing Operations Analytics",
+    "M23.4 Financial Adjustments / Revenue Assurance",
+    "M23.5 Finance Close / Reconciliation Export"
+  ],
+  "ci": {
+    "workflow": "Runtime v2.3 M23.6 Commercial Finance RC Freeze Gate",
+    "runId": 37212523939,
+    "headSha": "58fc7a7f479d63e55e0b6691550e08f881bcd841",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "frozenEvidenceM231ToM235": "PASS",
+    "migrationDoubleApply": "PASS",
+    "m21CostLedgerRegression": "PASS",
+    "m221CommercialBillingRegression": "PASS",
+    "m222TenantQuotaRegression": "PASS",
+    "m223CommercialControlRegression": "PASS",
+    "m224TenantRbacRegression": "PASS",
+    "m225BillingLedgerRegression": "PASS",
+    "m231BillingOperationsRegression": "PASS",
+    "m232CollectionsRegression": "PASS",
+    "m233RevenueAnalyticsRegression": "PASS",
+    "m234FinancialAdjustmentsRegression": "PASS",
+    "m235FinanceCloseRegression": "PASS",
+    "m236CommercialFinanceRcE2e": "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "historicalNonBlocking": {
+    "failedRunId": 37212425250,
+    "cause": "RC-only test used collection promise field amount instead of the existing API contract promisedAmount.",
+    "remediation": "Corrected the RC test field only; no Runtime business code or migration changed.",
+    "impact": "NONE"
+  },
+  "migrations": {
+    "total": 17,
+    "latest": "016_finance_close.sql",
+    "rcDelta": false,
+    "stagingResult": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=17 total=17"
+  },
+  "rcE2E": {
+    "isolatedCurrency": "CHF",
+    "chain": [
+      "Plan / Billing Term",
+      "Tenant / Subscription",
+      "Invoice Finalization",
+      "Collection Case",
+      "Promise-to-Pay",
+      "Partial Payment",
+      "Credit Note",
+      "Payment Refund",
+      "Billing Dispute",
+      "Accepted Dispute to Credit Note",
+      "Historical Financial Position",
+      "Revenue Analytics",
+      "Revenue Performance",
+      "Final Settlement",
+      "Collection Resolution",
+      "Finance Close",
+      "JSON Export SHA256",
+      "CSV Export SHA256",
+      "Closed-period backfill rejection",
+      "Tenant read / platform-admin close boundary"
+    ],
+    "invariants": [
+      "cost and revenue remain separated",
+      "net collected equals gross payments minus refunds",
+      "adjusted billed revenue includes debit adjustments and excludes credit notes",
+      "collections use adjustment-aware outstanding balance",
+      "finance close reconciliation delta equals zero",
+      "finance close exports are deterministic and hash-verifiable",
+      "closed accounting periods reject backdated financial writes",
+      "finance close remains platform-admin-only"
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "3020a387-1971-45bc-a6d7-0645b6278847",
+    "deploymentStatus": "SUCCESS",
+    "imageDigest": "sha256:12ec64408c9ac07b40144bd11a1e1547dbbd3426482786e0cacce37058a447df",
+    "imageEquivalentToM235": true,
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "http": {
+      "ready": "2xx",
+      "financeClosesUnauthenticated": 401,
+      "analyticsUnauthenticated": 401,
+      "billingDisputesUnauthenticated": 401,
+      "observedRequestsLastHour": 13,
+      "http2xx": 3,
+      "http4xx": 10,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 29
+    }
+  },
+  "cutover": {
+    "predecessorDeployment": "5fbdf445-230e-404a-b21a-8b5cd62a6617",
+    "predecessorFinalState": "REMOVED",
+    "predecessorExit": "Railway sent SIGTERM during normal replacement after the M23.6 RC became healthy; the active RC remains 1/1 with zero crashes and zero recent failures."
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "hotfix/v2.2-mysql2-security",
+    "sha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "deploymentStatus": "SUCCESS"
+  },
+  "conclusion": "M23.6 V2.3 Commercial Finance RC Freeze is STAGING PASS / FROZEN. M23.1 through M23.5 frozen evidence, all commercial platform regressions, the full V2.3 finance chain, migration idempotency, authorization boundaries, Railway compatibility and live Staging acceptance passed. M23.6 adds no Runtime business-code or migration changes and is runtime-code-equivalent to M23.5. Production remains on V2.2."
+}
