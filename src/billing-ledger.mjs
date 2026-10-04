@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 import { getInvoiceFinancialPosition } from './financial-adjustments.mjs';
+import { assertFinancePeriodOpen } from './finance-close.mjs';
 
 const SCALE=10000000000n;
 const TERM_INTERVALS=new Set(['MONTHLY','ANNUAL']);
@@ -343,6 +344,7 @@ export const finalizeBillingCycle=async({cycleId,finalizedAt=new Date()}={})=>{
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await assertFinancePeriodOpen(connection,now);
     const [cycles]=await connection.execute('SELECT * FROM billing_cycles WHERE id=? FOR UPDATE',[cycleId]);
     if(!cycles.length) throw errorOf('Billing cycle not found','BILLING_CYCLE_NOT_FOUND',404);
     const cycle=cycles[0];
@@ -534,6 +536,7 @@ export const recordInvoicePayment=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await assertFinancePeriodOpen(connection,received);
 
     const [existing]=await connection.execute(
       'SELECT * FROM invoice_payments WHERE idempotency_key=? LIMIT 1 FOR UPDATE',
