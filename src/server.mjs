@@ -4,7 +4,7 @@ import { handleRuntimeRoute } from './runtime-api.mjs';
 import { handleKnowledgeRoute } from './knowledge-api.mjs';
 import { checkRuntimeDbReady } from './runtime-db.mjs';
 import { modelProviderConfigured } from './openai-responses-provider.mjs';
-import { authorizeRuntimeRequest } from './runtime-security.mjs';
+import { authorizeRuntimeRequest, assertRuntimeSecurityConfig, runtimeAuthRequired } from './runtime-security.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
@@ -25,10 +25,24 @@ const route = async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/ready') {
     const database = await checkRuntimeDbReady();
     const modelReady = modelProviderConfigured();
-    return json(res, database.ready ? 200 : 503, {
-      status: database.ready ? (modelReady ? 'ready' : 'degraded') : 'not_ready',
+    let authReady = true;
+    let authReason = null;
+    try {
+      assertRuntimeSecurityConfig();
+    } catch (error) {
+      authReady = false;
+      authReason = error.code || 'RUNTIME_SECURITY_NOT_CONFIGURED';
+    }
+    const ready = database.ready && authReady;
+    return json(res, ready ? 200 : 503, {
+      status: ready ? (modelReady ? 'ready' : 'degraded') : 'not_ready',
       components: {
         database,
+        runtimeAuth: {
+          required: runtimeAuthRequired(),
+          ready: authReady,
+          ...(authReason ? { reason: authReason } : {})
+        },
         modelProvider: { configured: modelReady, requiredForIngressReadiness: false },
         contextBridge: { mode: 'EPHEMERAL_MEMORY_ONLY', persisted: false }
       }
