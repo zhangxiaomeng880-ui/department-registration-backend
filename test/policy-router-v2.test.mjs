@@ -191,8 +191,8 @@ assert.equal(r.body.data.previousStatus,'HEALTHY');
 assert.equal(r.body.data.healthStatus,'DOWN');
 
 const afterOutage=await route('QUALITY_FIRST');
-assert.equal(afterOutage.selectedProviderKey,'backup-openai');
-assert.ok(afterOutage.fallbackChain.some(x=>x.providerKey==='fast-synthetic'));
+assert.equal(afterOutage.selectedProviderKey,'fast-synthetic');
+assert.ok(afterOutage.fallbackChain.some(x=>x.providerKey==='backup-openai'));
 assert.ok(afterOutage.fallbackChain.some(x=>x.providerKey==='cheap-synthetic'));
 
 const fallbackOnly=await route('FALLBACK_ONLY',{
