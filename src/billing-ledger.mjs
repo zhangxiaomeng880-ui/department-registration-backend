@@ -4,6 +4,19 @@ import { getRuntimePool } from './runtime-db.mjs';
 const SCALE=10000000000n;
 const TERM_INTERVALS=new Set(['MONTHLY','ANNUAL']);
 const OVERAGE_MODES=new Set(['PAYG','BLOCK']);
+const CREDIT_ENTRY_TYPES=new Set(['GRANT','ADJUSTMENT','REFUND']);
+const secretPattern=/(api[_-]?key|secret|password|credential|authorization|access[_-]?token|refresh[_-]?token)/i;
+const rejectSecrets=value=>{
+  const visit=(node,path='')=>{
+    if(!node||typeof node!=='object') return;
+    for(const [key,child] of Object.entries(node)){
+      const next=path?`${path}.${key}`:key;
+      if(secretPattern.test(key)) throw errorOf('Billing metadata must not persist credentials or secrets','BILLING_METADATA_SECRET_NOT_ALLOWED',400,{field:next});
+      visit(child,next);
+    }
+  };
+  visit(value);
+};
 const errorOf=(message,code,statusCode=400,details)=>{
   const error=new Error(message);error.code=code;error.statusCode=statusCode;if(details) error.details=details;return error;
 };
@@ -103,6 +116,7 @@ export const createPlanBillingTerm=async input=>{
   if(!Number.isInteger(markup)||markup<0||markup>100000) throw errorOf('overageMarkupBps must be an integer from 0 to 100000','INVALID_OVERAGE_MARKUP');
   if(!Number.isInteger(dueDays)||dueDays<0||dueDays>365) throw errorOf('paymentDueDays must be an integer from 0 to 365','INVALID_PAYMENT_DUE_DAYS');
   const effectiveFrom=parseDate(input.effectiveFrom||new Date());
+  rejectSecrets(input.metadata||null);
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
@@ -154,7 +168,7 @@ export const createSubscription=async input=>{
     if(existing.length) throw errorOf('Tenant already has an active subscription','ACTIVE_SUBSCRIPTION_EXISTS',409);
     let terms;
     if(input.billingTermId){
-      [terms]=await connection.execute('SELECT * FROM plan_billing_terms WHERE id=? AND plan_key=? AND status=\'ACTIVE\'',[input.billingTermId,planKey]);
+      [terms]=await connection.execute('SELECT * FROM plan_billing_terms WHERE id=? AND plan_key=? AND status=\'ACTIVE\' AND effective_from<=?',[input.billingTermId,planKey,start]);
     }else{
       [terms]=await connection.execute(
         `SELECT * FROM plan_billing_terms
@@ -205,22 +219,31 @@ export const issueCredit=async input=>{
   if(amount<=0n) throw errorOf('Credit amount must be positive','INVALID_CREDIT_AMOUNT');
   const currency=String(input.currency||'USD').toUpperCase();
   if(!/^[A-Z]{3}$/.test(currency)) throw errorOf('currency must be a 3-letter code','INVALID_BILLING_CURRENCY');
+  const entryType=String(input.entryType||'GRANT').toUpperCase();
+  if(!CREDIT_ENTRY_TYPES.has(entryType)) throw errorOf('entryType must be GRANT, ADJUSTMENT or REFUND','INVALID_CREDIT_ENTRY_TYPE');
   const db=getRuntimePool(),id=randomUUID();
+  const [tenants]=await db.execute('SELECT id FROM tenants WHERE id=?',[input.tenantId]);
+  if(!tenants.length) throw errorOf('Tenant not found','TENANT_NOT_FOUND',404);
+  if(input.subscriptionId){
+    const [subscriptions]=await db.execute('SELECT id,tenant_id FROM subscriptions WHERE id=?',[input.subscriptionId]);
+    if(!subscriptions.length) throw errorOf('Subscription not found','SUBSCRIPTION_NOT_FOUND',404);
+    if(subscriptions[0].tenant_id!==input.tenantId) throw errorOf('Subscription does not belong to tenant','SUBSCRIPTION_TENANT_MISMATCH',409);
+  }
   try{
     await db.execute(
       `INSERT INTO credit_ledger (
         id,tenant_id,subscription_id,entry_type,amount,currency,idempotency_key,note
-      ) VALUES (?,?,?,'GRANT',?,?,?,?)`,
-      [id,input.tenantId,input.subscriptionId||null,unitsToString(amount),currency,input.idempotencyKey,input.note||null]
+      ) VALUES (?,?,?,?,?,?,?,?)`,
+      [id,input.tenantId,input.subscriptionId||null,entryType,unitsToString(amount),currency,input.idempotencyKey,input.note||null]
     );
   }catch(error){
     if(error?.code==='ER_DUP_ENTRY'){
       const [rows]=await db.execute('SELECT * FROM credit_ledger WHERE idempotency_key=?',[input.idempotencyKey]);
-      return {id:rows[0].id,tenantId:rows[0].tenant_id,amount:Number(rows[0].amount),currency:rows[0].currency,idempotent:true};
+      return {id:rows[0].id,tenantId:rows[0].tenant_id,entryType:rows[0].entry_type,amount:Number(rows[0].amount),currency:rows[0].currency,idempotent:true};
     }
     throw error;
   }
-  return {id,tenantId:input.tenantId,amount:unitsToNumber(amount),currency,idempotent:false};
+  return {id,tenantId:input.tenantId,entryType,amount:unitsToNumber(amount),currency,idempotent:false};
 };
 
 export const getCreditBalance=async({tenantId,currency='USD'}={})=>{
@@ -336,11 +359,11 @@ export const finalizeBillingCycle=async({cycleId,finalizedAt=new Date()}={})=>{
 
     const recurring=toUnits(cycle.recurring_fee_snapshot);
     const subtotal=recurring+usageRevenue;
-    const [[creditRow]]=await connection.execute(
-      'SELECT COALESCE(SUM(amount),0) AS balance FROM credit_ledger WHERE tenant_id=? AND currency=? FOR UPDATE',
+    const [creditRows]=await connection.execute(
+      'SELECT amount FROM credit_ledger WHERE tenant_id=? AND currency=? ORDER BY created_at,id FOR UPDATE',
       [cycle.tenant_id,cycle.currency]
     );
-    const availableCredit=toUnits(creditRow.balance||0);
+    const availableCredit=creditRows.reduce((sum,row)=>sum+toUnits(row.amount),0n);
     const creditApplied=availableCredit>0n?minUnits(availableCredit,subtotal):0n;
     const totalDue=subtotal-creditApplied;
 
