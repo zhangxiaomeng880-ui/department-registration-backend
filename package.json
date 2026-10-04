@@ -15,6 +15,7 @@
     "validate:autonomous-agent-provider": "node test/autonomous-agent-provider.test.mjs",
     "validate:context-bridge": "node test/context-bridge.test.mjs",
     "validate:runtime-orchestrator": "node test/runtime-orchestrator.test.mjs",
+    "preflight:v22-production": "node scripts/preflight-v22-production.mjs",
     "migrate:runtime": "node scripts/migrate-runtime.mjs",
     "validate:commercial-billing": "node test/commercial-billing.test.mjs",
     "import:pricing-catalog": "node scripts/import-pricing-catalog.mjs",
