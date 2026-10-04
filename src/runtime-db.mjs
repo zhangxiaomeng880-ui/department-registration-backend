@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 let pool;
 
@@ -313,4 +313,135 @@ export const resumeRun = async (runId, expected = {}) => {
     resumeFromTaskKey: checkpoint.resumeFromTaskKey,
     checkpoint,
   };
+};
+
+
+const stableJson = value => JSON.stringify(value ?? null);
+
+const normalizeKnowledgeRow = row => ({
+  id: row.id,
+  runId: row.run_id,
+  taskId: row.task_id,
+  sourceProvider: row.source_provider,
+  sourceFileId: row.source_file_id,
+  sourceLibraryFileId: row.source_library_file_id,
+  sourceVersion: row.source_version,
+  sourcePath: row.source_path,
+  sourceName: row.source_name,
+  sourceModifiedAt: row.source_modified_at,
+  sourceStatus: row.source_status,
+  precedenceRank: row.precedence_rank == null ? null : Number(row.precedence_rank),
+  retrievalQuery: row.retrieval_query,
+  retrievalMode: row.retrieval_mode,
+  contextRole: row.context_role,
+  content: row.content_json,
+  contentSha256: row.content_sha256,
+  retrievedAt: row.retrieved_at,
+});
+
+export const addKnowledgeContexts = async (runId, input) => {
+  const db = getRuntimePool();
+  const items = Array.isArray(input?.items) ? input.items : [];
+  if (!items.length) {
+    const error = new Error('items must contain at least one knowledge context');
+    error.code = 'INVALID_KNOWLEDGE_CONTEXT';
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const [runRows] = await db.execute('SELECT id FROM runs WHERE id = ?', [runId]);
+  if (!runRows.length) {
+    const error = new Error('Run not found');
+    error.code = 'RUN_NOT_FOUND';
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const stored = [];
+  for (const item of items) {
+    if (!item.sourceFileId || !item.contextRole || item.content === undefined) {
+      const error = new Error('sourceFileId, contextRole and content are required');
+      error.code = 'INVALID_KNOWLEDGE_CONTEXT_ITEM';
+      error.statusCode = 400;
+      throw error;
+    }
+    const sourceProvider = item.sourceProvider || 'CHATGPT_LIBRARY';
+    if (sourceProvider !== 'CHATGPT_LIBRARY') {
+      const error = new Error('Only CHATGPT_LIBRARY is allowed in Step 2.1');
+      error.code = 'UNSUPPORTED_KNOWLEDGE_PROVIDER';
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const id = item.id || randomUUID();
+    const contentJson = stableJson(item.content);
+    const contentSha256 = createHash('sha256').update(contentJson, 'utf8').digest('hex');
+
+    await db.execute(
+      `INSERT INTO knowledge_contexts (
+        id, run_id, task_id, source_provider, source_file_id,
+        source_library_file_id, source_version, source_path, source_name,
+        source_modified_at, source_status, precedence_rank,
+        retrieval_query, retrieval_mode, context_role,
+        content_json, content_sha256
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        runId,
+        item.taskId || null,
+        sourceProvider,
+        item.sourceFileId,
+        item.sourceLibraryFileId || null,
+        item.sourceVersion || null,
+        item.sourcePath || null,
+        item.sourceName || null,
+        item.sourceModifiedAt ? new Date(item.sourceModifiedAt) : null,
+        item.sourceStatus || null,
+        item.precedenceRank == null ? null : Number(item.precedenceRank),
+        item.retrievalQuery || null,
+        item.retrievalMode || null,
+        item.contextRole,
+        contentJson,
+        contentSha256,
+      ]
+    );
+
+    stored.push({
+      id,
+      sourceProvider,
+      sourceFileId: item.sourceFileId,
+      sourceVersion: item.sourceVersion || null,
+      contextRole: item.contextRole,
+      contentSha256,
+    });
+  }
+
+  return { runId, count: stored.length, items: stored };
+};
+
+export const listKnowledgeContexts = async runId => {
+  const db = getRuntimePool();
+  const [rows] = await db.execute(
+    `SELECT *
+     FROM knowledge_contexts
+     WHERE run_id = ?
+     ORDER BY precedence_rank ASC, retrieved_at ASC, id ASC`,
+    [runId]
+  );
+  return rows.map(normalizeKnowledgeRow);
+};
+
+export const getKnowledgeContextFingerprint = async runId => {
+  const contexts = await listKnowledgeContexts(runId);
+  const material = contexts
+    .map(item => [
+      item.sourceProvider,
+      item.sourceFileId,
+      item.sourceVersion || '',
+      item.contentSha256,
+      item.contextRole,
+      item.precedenceRank ?? '',
+    ].join(':'))
+    .join('|');
+  return createHash('sha256').update(material, 'utf8').digest('hex');
 };
