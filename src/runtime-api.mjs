@@ -63,7 +63,7 @@ import {
   freezeEvalSuiteVersion,createEvalReplayManifest,getEvalReplayManifest
 } from './eval-replay.mjs';
 import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
-import { compareEvalRuns,getEvalRegressionComparison,getEvalReleaseGate } from './eval-regression.mjs';
+import { compareEvalRuns,getEvalRegressionComparison,createEvalReleaseGate,getEvalReleaseGate } from './eval-regression.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
