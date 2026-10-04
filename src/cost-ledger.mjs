@@ -4,6 +4,26 @@ import { getRuntimePool } from './runtime-db.mjs';
 const PRICE_STATUS = new Set(['ACTIVE','HISTORICAL','REVOKED']);
 const BUDGET_ACTION = new Set(['HOLD','BLOCK']);
 const asJson = value => value == null ? null : JSON.stringify(value);
+const secretPattern = /(api[_-]?key|secret|token|password|credential|authorization)/i;
+
+const rejectSecrets = value => {
+  const visit = (node, path = '') => {
+    if (!node || typeof node !== 'object') return;
+    for (const [key, child] of Object.entries(node)) {
+      const next = path ? `${path}.${key}` : key;
+      if (secretPattern.test(key)) {
+        throw errorOf(
+          'Cost metadata must not persist credentials or secrets',
+          'COST_METADATA_SECRET_NOT_ALLOWED',
+          400,
+          { field:next }
+        );
+      }
+      visit(child,next);
+    }
+  };
+  visit(value);
+};
 
 const errorOf = (message, code, statusCode = 400, details) => {
   const error = new Error(message);
@@ -44,6 +64,8 @@ export const createPricingVersion = async input => {
       'INVALID_PRICING_VERSION'
     );
   }
+
+  rejectSecrets(input);
 
   const inputRate = Number(input.inputRatePerMillion);
   const outputRate = Number(input.outputRatePerMillion);
@@ -174,6 +196,8 @@ export const upsertProjectBudgetPolicy = async input => {
   if (!input?.projectId || !input?.policyKey) {
     throw errorOf('projectId and policyKey are required', 'INVALID_BUDGET_POLICY');
   }
+  rejectSecrets(input);
+
   const action = String(input.actionOnExceed || 'HOLD').toUpperCase();
   if (!BUDGET_ACTION.has(action)) {
     throw errorOf('actionOnExceed must be HOLD or BLOCK', 'INVALID_BUDGET_ACTION');
@@ -327,6 +351,29 @@ export const getProjectCostSummary = async projectId => {
      ORDER BY run_id`,
     [projectId]
   );
+  const [byStageRows] = await db.execute(
+    `SELECT t.stage_key,
+            COUNT(*) AS usage_count,
+            SUM(CASE WHEN u.cost_status='UNKNOWN' THEN 1 ELSE 0 END) AS unknown_count,
+            COALESCE(SUM(CASE WHEN u.cost_status='CALCULATED' THEN u.estimated_cost ELSE 0 END),0) AS estimated_cost
+     FROM usage_ledger u
+     LEFT JOIN tasks t ON t.id = u.task_id
+     WHERE u.project_id = ?
+     GROUP BY t.stage_key
+     ORDER BY t.stage_key`,
+    [projectId]
+  );
+  const [byProviderRows] = await db.execute(
+    `SELECT provider_key, model_key, cost_currency,
+            COUNT(*) AS usage_count,
+            SUM(CASE WHEN cost_status='UNKNOWN' THEN 1 ELSE 0 END) AS unknown_count,
+            COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) AS estimated_cost
+     FROM usage_ledger
+     WHERE project_id = ?
+     GROUP BY provider_key, model_key, cost_currency
+     ORDER BY provider_key, model_key`,
+    [projectId]
+  );
   return {
     projectId,
     costStatus:totals.unknownCount > 0
@@ -337,6 +384,20 @@ export const getProjectCostSummary = async projectId => {
     ...totals,
     byRun:byRunRows.map(row => ({
       runId:row.run_id,
+      usageCount:Number(row.usage_count || 0),
+      unknownCount:Number(row.unknown_count || 0),
+      estimatedCost:Number(row.estimated_cost || 0),
+    })),
+    byStage:byStageRows.map(row => ({
+      stageKey:row.stage_key,
+      usageCount:Number(row.usage_count || 0),
+      unknownCount:Number(row.unknown_count || 0),
+      estimatedCost:Number(row.estimated_cost || 0),
+    })),
+    byProviderModel:byProviderRows.map(row => ({
+      providerKey:row.provider_key,
+      modelKey:row.model_key,
+      currency:row.cost_currency,
       usageCount:Number(row.usage_count || 0),
       unknownCount:Number(row.unknown_count || 0),
       estimatedCost:Number(row.estimated_cost || 0),
