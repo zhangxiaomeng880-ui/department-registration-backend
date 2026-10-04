@@ -1,0 +1,177 @@
+{
+  "milestone": "M24.2",
+  "release": "AI Native Runtime V2.4",
+  "title": "Eval Runner + Assertion Engine",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "base": {
+    "milestone": "M24.1 Eval Dataset + Replay Contract",
+    "evidenceCommit": "64039fd13428f05fb7b54d8e0a0cbce344237b04",
+    "productionBaselineSha": "34578464f5d19e87978ccb81719fb23a4b79d6f1"
+  },
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.2-runtime-eval-runner",
+    "stagingRuntimeSha": "68b94ca0c56ca5969154a01b045f9099c19d1e7e",
+    "abandonedDraftBranch": "feat/ai-native-runtime-v2.4-m24.2-eval-runner",
+    "abandonedDraftStagingSha": "43f0121cbeab383c3571d3f24d0cdfd04e0d2ad8",
+    "abandonedDraftIsCandidate": false
+  },
+  "architecture": {
+    "executionMode": "RUNTIME_REPLAY",
+    "providerExecutionInGate": true,
+    "gateProvider": "local Responses-compatible mock only",
+    "liveProviderQuotaConsumed": false,
+    "runtimePath": [
+      "Frozen Replay Manifest",
+      "Candidate Runtime SHA verification",
+      "Transient Context SHA verification",
+      "Runtime createRun / createTask",
+      "Policy Router",
+      "OpenAI Responses-compatible adapter",
+      "Agent execution",
+      "Tool Execution / Usage Ledger / Cost Ledger",
+      "Observability",
+      "Assertion Engine",
+      "Eval Case Result",
+      "Eval Run Result SHA256"
+    ]
+  },
+  "assertions": {
+    "structuredOutput": [
+      "required keys",
+      "exact-output hash comparison",
+      "JSON schema SHA256"
+    ],
+    "evidence": [
+      "required / minimum count",
+      "allowed source file IDs",
+      "frozen source content SHA256",
+      "source version match",
+      "line-range containment"
+    ],
+    "router": [
+      "matched",
+      "policyResult",
+      "routeRuleKey",
+      "selectedProviderKey",
+      "selectedModelKey",
+      "providerHealthStatus"
+    ],
+    "execution": [
+      "status",
+      "maxDurationMs",
+      "maxEstimatedCost",
+      "costCurrency"
+    ],
+    "privacy": [
+      "sourceBodyExposed=false"
+    ]
+  },
+  "privacy": {
+    "transientSourceTextPersistedToEvalTables": false,
+    "transientContextMustMatchFrozenSha256": true,
+    "sanitizedObservedOutputOnly": true,
+    "storedEvidenceContainsReferencesAndHashesOnly": true
+  },
+  "schema": {
+    "canonicalMigration": "018_eval_runner.sql",
+    "compatibilityMigration": "019_eval_runner_runtime_replay_compatibility.sql",
+    "canonicalMigrationFileCount": 20,
+    "tables": [
+      "eval_runs",
+      "eval_case_results",
+      "eval_assertion_results"
+    ],
+    "freshInstallDoubleApply": "PASS",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=2 skipped=18 total=20"
+  },
+  "stagingHistory": {
+    "issue": "A short-lived M24.2 synthetic draft was deployed to Staging before the real Runtime runner branch was finalized.",
+    "historicalMigration": "018_eval_runner_assertions.sql",
+    "historicalDeploymentId": "1849582e-d8d4-4403-a75b-8e4c80852454",
+    "historicalSha": "43f0121cbeab383c3571d3f24d0cdfd04e0d2ad8",
+    "remediation": "The database history was preserved. Canonical 018_eval_runner.sql was applied as a create-if-missing migration and 019_eval_runner_runtime_replay_compatibility.sql converged the existing draft tables to the final Runtime Replay schema.",
+    "compatibilityGate": "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "destructiveCleanup": false,
+    "dataHistoryRewritten": false,
+    "finalImpact": "NONE"
+  },
+  "api": {
+    "run": "POST /api/runtime/eval-replay-manifests/:manifestId/run",
+    "detail": "GET /api/runtime/eval-runs/:evalRunId",
+    "authorization": "platform administrator only",
+    "runtimeShaMismatch": "409 EVAL_RUNTIME_SHA_MISMATCH",
+    "transientContextHashMismatch": "Eval case FAIL / EVAL_CONTEXT_HASH_MISMATCH"
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.2 Eval Runner Gate",
+    "initialRealRuntimeRunId": 37216529261,
+    "initialRealRuntimeRunStatus": "SUCCESS",
+    "provenanceHardenedRunId": 37216590936,
+    "provenanceHardenedRunStatus": "SUCCESS",
+    "finalCompatibilityRunId": 37217000996,
+    "finalCompatibilityRunStatus": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "v23CommercialFinanceRegression": "PASS",
+    "m241EvalReplayContract": "PASS",
+    "m242RealRuntimeReplay": "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+    "m242LegacyStagingCompatibility": "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "testedBehavior": {
+    "actualRouteExecutionRecorded": true,
+    "actualToolExecutionRecorded": true,
+    "actualUsageLedgerRecorded": true,
+    "calculatedCostAssertion": true,
+    "expectedAssertionFailureProducesEvalFail": true,
+    "replayIdempotency": true,
+    "candidateShaFailClosed": true,
+    "tamperedTransientContextRejected": true,
+    "unauthenticatedRunAndReadRejected": true,
+    "privateSourceTextAbsentFromEvalPersistence": true
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "168fe295-9b7a-4658-8d9a-91e812ae9118",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "authorization": {
+      "evalReplayRunUnauthenticated": 401,
+      "evalSuitesUnauthenticated": 401,
+      "evalRunReadUnauthenticated": "PASS in CI"
+    },
+    "http": {
+      "observedRequestsLastHour": 4,
+      "http4xx": 4,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 26
+    },
+    "predecessorCutover": {
+      "deploymentId": "1849582e-d8d4-4403-a75b-8e4c80852454",
+      "finalState": "REMOVED",
+      "termination": "Railway SIGTERM during normal replacement after the clean M24.2 deployment became healthy"
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "next": "M24.3 Regression Comparator + Release Gate",
+  "conclusion": "M24.2 Eval Runner + Assertion Engine is STAGING PASS / FROZEN. Frozen replay manifests now execute through the real Runtime route/agent/tool/cost/observability path, while CI uses a local mock provider to avoid live-model quota. Structured output, evidence provenance, router decisions, execution budget and privacy are machine-asserted. A short-lived Staging draft schema was safely converged through migration 019 without rewriting migration history. Production remains on V2.3."
+}
