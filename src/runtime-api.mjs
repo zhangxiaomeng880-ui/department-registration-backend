@@ -21,6 +21,12 @@ import { executeScriptContinuityAgent } from './autonomous-agent.mjs';
 import { orchestrateContextPacket } from './runtime-orchestrator.mjs';
 import { getRunObservability } from './runtime-observability.mjs';
 import {
+  upsertProvider,
+  upsertModel,
+  setProviderHealth,
+  listProviderRegistry,
+} from './provider-registry.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -58,6 +64,31 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && url.pathname === '/api/runtime/routes') {
     const result = await routeAndRecord(await readBody(req));
     json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/providers') {
+    const result = await upsertProvider(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/models') {
+    const result = await upsertModel(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/provider-registry') {
+    const result = await listProviderRegistry();
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const providerHealthMatch = match(url.pathname, /^\/api\/runtime\/providers\/([^/]+)\/health$/);
+  if (req.method === 'PATCH' && providerHealthMatch) {
+    const result = await setProviderHealth(providerHealthMatch[1], await readBody(req));
+    json(res, 200, { data: result });
     return true;
   }
 
