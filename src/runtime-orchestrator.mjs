@@ -103,6 +103,7 @@ export const orchestrateContextPacket = async input => {
   let runId = null;
   let taskId = null;
   let routeExecutionId = null;
+  let correlationId = input.correlationId || null;
 
   try {
     const run = await createRun({
@@ -121,9 +122,11 @@ export const orchestrateContextPacket = async input => {
       status:'RUNNING',
     });
     runId = run.id;
+    correlationId = run.correlationId;
 
     const task = await createTask({
       runId,
+      correlationId,
       stageKey:input.stageKey || 'SCRIPT',
       taskKey,
       taskType:input.taskType || 'SCRIPT_CONTINUITY',
@@ -136,6 +139,7 @@ export const orchestrateContextPacket = async input => {
     const route = await routeAndRecord({
       runId,
       taskId,
+      correlationId,
       projectType:input.projectType || 'AIGC_CONTENT',
       taskType:input.taskType || 'SCRIPT_CONTINUITY',
       query,
@@ -156,6 +160,7 @@ export const orchestrateContextPacket = async input => {
       runId,
       taskId,
       routeExecutionId,
+      correlationId,
       routeRuleKey:route.routeRuleKey,
       query,
       scope,
@@ -182,6 +187,7 @@ export const orchestrateContextPacket = async input => {
       const gate = await recordGateResult({
         runId,
         taskId,
+        correlationId,
         stageKey:input.stageKey || 'SCRIPT',
         gateKey:'G-RUNTIME-AUTONOMOUS-EVIDENCE',
         status:'FAIL',
@@ -203,6 +209,7 @@ export const orchestrateContextPacket = async input => {
       const qa = await recordQaEvidence({
         runId,
         taskId,
+        correlationId,
         gateResultId:gate.id,
         qaCaseKey:'QA-AUTONOMOUS-EVIDENCE-PROVENANCE',
         status:'FAIL',
@@ -215,6 +222,7 @@ export const orchestrateContextPacket = async input => {
 
       const checkpoint = await saveCheckpoint(runId,{
         taskId,
+        correlationId,
         stageKey:input.stageKey || 'SCRIPT',
         stepKey:'agent-evidence-validation-failed',
         state:{
@@ -258,6 +266,7 @@ export const orchestrateContextPacket = async input => {
     const gate = await recordGateResult({
       runId,
       taskId,
+      correlationId,
       stageKey:input.stageKey || 'SCRIPT',
       gateKey:'G-RUNTIME-AUTONOMOUS-CONTEXT',
       status:'PASS',
@@ -283,6 +292,7 @@ export const orchestrateContextPacket = async input => {
     const qa = await recordQaEvidence({
       runId,
       taskId,
+      correlationId,
       gateResultId:gate.id,
       qaCaseKey:'QA-AUTONOMOUS-CONTEXT-PROVENANCE',
       status:'PASS',
@@ -302,6 +312,7 @@ export const orchestrateContextPacket = async input => {
 
     const checkpoint = await saveCheckpoint(runId,{
       taskId,
+      correlationId,
       stageKey:input.stageKey || 'SCRIPT',
       stepKey:'autonomous-context-analysis-complete',
       state:{
@@ -326,6 +337,7 @@ export const orchestrateContextPacket = async input => {
       executionMode:'AUTONOMOUS_CONTEXT_ORCHESTRATOR',
       runId,
       taskId,
+      correlationId,
       routeExecutionId,
       routeRuleKey:route.routeRuleKey,
       contextPacketId:packet.id,
@@ -349,6 +361,7 @@ export const orchestrateContextPacket = async input => {
         await updateTask(taskId,{
           status:'FAIL',
           errorCode:error.code || 'ORCHESTRATION_ERROR',
+          errorCategory:error.errorCategory || 'ORCHESTRATION',
           errorMessage:error.message,
           finished:true,
         });
