@@ -29,6 +29,7 @@ export const assertRuntimeSecurityConfig = () => {
 
 export const authorizeRuntimeRequest = req => {
   if (!runtimeAuthRequired()) return;
+  assertRuntimeSecurityConfig();
 
   const header = String(req.headers.authorization || '');
   const prefix = 'Bearer ';
