@@ -189,6 +189,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     }
     json(res,200,{data:await getRevenueAnalytics({
       tenantId:requestedTenant,
+      planKey:url.searchParams.get('planKey')||null,
       asOf:url.searchParams.get('asOf')||new Date()
     })});
     return true;
