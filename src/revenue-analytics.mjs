@@ -81,7 +81,7 @@ export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date
     if(!byCurrency.has(currency)){
       byCurrency.set(currency,{
         currency,invoiceCount:0,paidInvoiceCount:0,openInvoiceCount:0,overdueInvoiceCount:0,
-        originalBilled:0,creditNotes:0,writeOffs:0,debitAdjustments:0,refunds:0,
+        originalBilled:0,grossPaid:0,creditNotes:0,writeOffs:0,debitAdjustments:0,refunds:0,
         adjustedBilledRevenue:0,collectibleAmount:0,netCollected:0,outstanding:0,overpaid:0,
         overdueOutstanding:0,aging:{current:0,days1To30:0,days31To60:0,days61To90:0,days90Plus:0}
       });
@@ -89,6 +89,7 @@ export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date
     const x=byCurrency.get(currency),m=calculateRow(row);
     x.invoiceCount+=1;
     x.originalBilled+=m.originalBilled;
+    x.grossPaid+=m.grossPaid;
     x.creditNotes+=m.creditNotes;
     x.writeOffs+=m.writeOffs;
     x.debitAdjustments+=m.debitAdjustments;
@@ -114,6 +115,7 @@ export const getRevenueAnalytics=async({tenantId=null,planKey=null,asOf=new Date
   const currencies=[...byCurrency.values()].map(x=>({
     ...x,
     originalBilled:round(x.originalBilled),
+    grossPaid:round(x.grossPaid),
     creditNotes:round(x.creditNotes),
     writeOffs:round(x.writeOffs),
     debitAdjustments:round(x.debitAdjustments),
