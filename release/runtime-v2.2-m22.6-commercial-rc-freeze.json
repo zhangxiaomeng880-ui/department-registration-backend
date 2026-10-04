@@ -1,0 +1,150 @@
+{
+  "milestone": "M22.6",
+  "title": "V2.2 Commercial Runtime RC Freeze",
+  "version": "V2.2",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionPromotion": "NOT_STARTED",
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.2-m22.6-rc-freeze",
+    "rcCommitSha": "71861d07edc8fe1fd9b17a954dc4d270418646df",
+    "previousRuntimeSha": "766f45c1ddf14c2fa25aa70cf26a6fffbd16e37a",
+    "previousM225EvidenceCommit": "2c23c5497141aea07eb3d45f644bc95d12c9885d",
+    "runtimeCodeEquivalentToM225": true,
+    "diffFromM225": {
+      "aheadBy": 3,
+      "runtimeBusinessCodeChanges": 0,
+      "migrationChanges": 0,
+      "files": [
+        ".github/workflows/runtime-v22-m22-6-rc-freeze.yml",
+        "test/runtime-v22-commercial-rc-e2e.test.mjs",
+        "release/runtime-v2.2-m22.5-billing-ledger.json"
+      ]
+    }
+  },
+  "gates": {
+    "githubActions": {
+      "workflow": "Runtime v2.2 M22.6 Commercial RC Freeze Gate",
+      "initialRunId": 37201190460,
+      "initialStatus": "PASS",
+      "frozenEvidenceM221ThroughM225": true,
+      "migrationIdempotency": true,
+      "m21CostLedgerRegression": true,
+      "m221PricingBillingRegression": true,
+      "m222TenantQuotaRegression": true,
+      "m223CommercialControlRegression": true,
+      "m224TenantRbacRegression": true,
+      "m225BillingLedgerRegression": true,
+      "rcCommercialE2E": true,
+      "railwayCompatibility": true,
+      "acceptance": "G22_6_COMMERCIAL_RUNTIME_RC_E2E_PASS"
+    },
+    "staging": {
+      "project": "ai-native-runtime-v2-staging",
+      "service": "runtime-staging-rc1",
+      "sourceBranch": "feat/ai-native-runtime-v2.2-m22.6-rc-freeze",
+      "sourcePinnedCommit": "71861d07edc8fe1fd9b17a954dc4d270418646df",
+      "settledRuntimeDeploymentId": "7a1f5e66-a7e5-4d4b-a170-dfb578ddee96",
+      "settledRuntimeCodeSha": "766f45c1ddf14c2fa25aa70cf26a6fffbd16e37a",
+      "rcSourceDeploymentAttemptId": "12b7b9f9-539c-49de-9335-01d25850e308",
+      "rcSourceDeploymentAttemptStatus": "SKIPPED",
+      "rcSkipReason": "M22.6 changes only tests/evidence/workflow; no Runtime or migration delta from M22.5",
+      "runtime": "ONLINE",
+      "mysql": "ONLINE",
+      "readyHttp": 200,
+      "warnings": 0,
+      "criticals": 0,
+      "httpWindowHours": 1,
+      "httpRequests": 19,
+      "http2xx": 5,
+      "http4xx": 14,
+      "http5xx": 0,
+      "http5xxErrorRate": 0,
+      "slowestP95Ms": 29,
+      "cpuUsageMax": 0.017719016666666667,
+      "memoryUsageGbMax": 0.080130048
+    },
+    "auth": {
+      "runtimeAuthRequired": true,
+      "currentRuntimeM225SpecificEvidence": {
+        "unauthenticatedBillingTermsHttp": 401,
+        "unauthenticatedSubscriptionHttp": 401,
+        "unauthenticatedInvoicesHttp": 401
+      },
+      "m226AuthCodeChanged": false,
+      "authenticatedRbacRegression": "PASS",
+      "crossTenantBillingReadDenied": true,
+      "scopedCredentialCannotChangeBillingTerms": true
+    },
+    "migrations": {
+      "total": 12,
+      "latest": "011_subscription_billing_ledger.sql",
+      "m226MigrationDelta": 0,
+      "doubleApplyInRcGate": "PASS"
+    },
+    "production": {
+      "project": "ai-native-runtime-v2",
+      "environment": "production",
+      "runtimeDeploymentId": "ebb07381-56c5-4bab-85ef-59de1a13358f",
+      "runtimeDeploymentStatus": "SUCCESS",
+      "mysqlDeploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+      "mysqlDeploymentStatus": "SUCCESS",
+      "m226Touched": false
+    }
+  },
+  "commercialRuntimeChain": [
+    "Pricing Catalog",
+    "Plan Billing Terms",
+    "Subscription",
+    "Billing Cycle",
+    "Usage Settlement",
+    "Credit Ledger",
+    "Invoice",
+    "Reconciliation"
+  ],
+  "rcE2EInvariants": {
+    "tenantWorkspaceIsolation": true,
+    "entitlementEvaluation": true,
+    "quotaReservationCommit": true,
+    "providerCostCalculated": true,
+    "usageMeterAggregates": true,
+    "signedCreditLedger": true,
+    "creditIdempotency": true,
+    "billingCycleFinalization": true,
+    "invoiceItems": true,
+    "invoiceReconciliation": true,
+    "providerCostAndRevenueSeparated": true,
+    "crossTenantBillingReadDenied": true,
+    "platformOnlyBillingMutation": true
+  },
+  "testedExample": {
+    "providerCost": 0.004,
+    "includedUsageCredit": 0.001,
+    "overageCostBasis": 0.003,
+    "overageMarkupBps": 5000,
+    "usageRevenue": 0.0045,
+    "recurringFee": 10,
+    "serviceCreditApplied": 2,
+    "totalDue": 8.0045,
+    "reconciliation": "PASS"
+  },
+  "knownNonBlockingState": {
+    "historicalFailedDeployments": [
+      {
+        "deploymentId": "a78879cf-790f-45cd-ac28-bae8498116da",
+        "milestone": "M22.4",
+        "currentImpact": "NONE"
+      },
+      {
+        "deploymentId": "d630ab7c-5ae4-4846-bb49-2767900ada4c",
+        "milestone": "M22.1",
+        "currentImpact": "NONE"
+      }
+    ],
+    "emptyStagedPatch": {
+      "currentImpact": "NONE"
+    }
+  },
+  "conclusion": "M22.6 STAGING PASS / RC FROZEN. V2.2 commercial runtime is ready for a separate human-approved production promotion. Production has not been modified."
+}
