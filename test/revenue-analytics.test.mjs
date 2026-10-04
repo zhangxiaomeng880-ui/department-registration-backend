@@ -77,6 +77,15 @@ r=await request('POST',`/api/runtime/invoices/${a.invoiceId}/payments`,{
 assert.equal(r.status,201,JSON.stringify(r.body));
 assert.equal(r.body.data.invoice.status,'PAID');
 
+r=await request('GET',`/api/runtime/billing-ops/analytics?tenantId=${a.tenantId}&asOf=2026-09-21T13:00:00.000Z`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+let historicalUsd=r.body.data.currencies[0];
+assert.equal(historicalUsd.totalBilled,12);
+assert.equal(historicalUsd.amountPaid,5);
+assert.equal(historicalUsd.outstanding,7);
+assert.equal(historicalUsd.collectionRatePct,41.6667);
+assert.equal(r.body.data.promiseToPay.duePromises,0);
+
 r=await request('GET',`/api/runtime/billing-ops/analytics?tenantId=${a.tenantId}&asOf=2026-09-26T00:00:00.000Z`);
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.currencies.length,1);
