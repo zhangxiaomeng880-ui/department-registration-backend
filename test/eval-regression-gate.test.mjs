@@ -19,15 +19,15 @@ const req=async(method,path,body,auth=token)=>{
 
 const suffix=randomUUID().slice(0,8);
 const providerKey=`m243-provider-${suffix}`;
-const factText='M24.3 fact source: synthetic continuity baseline.';
-const currentText='M24.3 current source: synthetic continuity candidate.';
+const factText='LIBRARY_SENTINEL_SOURCE_TEXT SC049 hard lock: call mother first, then Lin.';
+const currentText='SC049 current movie text: returns to 62㎡ and calls Lin directly.';
 const refs=[
-  {sourceFileId:'fact-file',sourceVersion:'1',lineStart:1,lineEnd:1,contentSha256:sha256(factText),contextRole:'AUTHORITATIVE',sourceProvider:'SYNTHETIC_FIXTURE'},
-  {sourceFileId:'current-file',sourceVersion:'1',lineStart:1,lineEnd:1,contentSha256:sha256(currentText),contextRole:'CURRENT',sourceProvider:'SYNTHETIC_FIXTURE'}
+  {sourceFileId:'fact-file',sourceVersion:'53',lineStart:331,lineEnd:343,contentSha256:sha256(factText),contextRole:'AUTHORITATIVE',sourceProvider:'SYNTHETIC_FIXTURE'},
+  {sourceFileId:'movie-file',sourceVersion:null,lineStart:7528,lineEnd:7556,contentSha256:sha256(currentText),contextRole:'CURRENT',sourceProvider:'SYNTHETIC_FIXTURE'}
 ];
 const contexts=[
-  {sourceFileId:'fact-file',sourceText:factText,sourceStatus:'CURRENT',sourcePath:'/synthetic/fact'},
-  {sourceFileId:'current-file',sourceText:currentText,sourceStatus:'CURRENT',sourcePath:'/synthetic/current'}
+  {sourceFileId:'fact-file',sourceText:factText,sourceStatus:'CURRENT',sourcePath:'/synthetic/facts'},
+  {sourceFileId:'movie-file',sourceText:currentText,sourceStatus:'CURRENT',sourcePath:'/synthetic/movie'}
 ];
 
 let r=await req('POST','/api/runtime/providers',{
@@ -69,10 +69,10 @@ r=await req('POST',`/api/runtime/eval-suite-versions/${versionId}/cases`,{
   caseKey:'regression-case',sequenceNo:1,
   replayInput:{
     projectType:'AIGC_CONTENT',taskType:'SCRIPT_CONTINUITY',
-    query:'检查合成连续性，只返回结构化结果。',scope:'M24.3',
+    query:'检查SC049连续性，只输出真实问题和证据。',scope:'SC049',
     policyMode:'QUALITY_FIRST',requiredStructuredOutput:true,
     allowedProviderKeys:[providerKey],preferredProviderKey:providerKey,
-    preferredModelKey:'test-model',precedence:['FACT','CURRENT']
+    preferredModelKey:'test-model',precedence:['STORY_FACTS','MOVIE_CURRENT']
   },
   sourceRefs:refs,
   assertions:{
@@ -80,7 +80,7 @@ r=await req('POST',`/api/runtime/eval-suite-versions/${versionId}/cases`,{
       requiredKeys:['scope','findingCount','findings','noOtherHardConflicts'],
       jsonSchemaSha256:EVAL_ASSERTION_SCHEMA_SHA256
     },
-    evidence:{required:true,minCount:2,allowedSourceFileIds:['fact-file','current-file'],requireContentHash:true},
+    evidence:{required:true,minCount:2,allowedSourceFileIds:['fact-file','movie-file'],requireContentHash:true},
     router:{matched:true,policyResult:'ALLOW',routeRuleKey:'P86',selectedProviderKey:providerKey,selectedModelKey:'test-model',providerHealthStatus:'HEALTHY'},
     execution:{status:'PASS',maxDurationMs:30000,maxEstimatedCost:0.01,costCurrency:'USD'}
   }
