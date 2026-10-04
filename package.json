@@ -8,7 +8,8 @@
     "test": "node test/backend.test.mjs",
     "validate": "node validation/backend-validation.mjs && node test/backend.test.mjs",
     "validate:runtime-api": "node test/runtime-api.test.mjs",
-    "validate:knowledge-source": "node test/knowledge-source.test.mjs"
+    "validate:knowledge-source": "node test/knowledge-source.test.mjs",
+    "validate:knowledge-retrieval": "node test/knowledge-retrieval.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.15.1"
