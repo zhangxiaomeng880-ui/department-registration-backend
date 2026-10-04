@@ -2,7 +2,7 @@
 
 Status: IMPLEMENTATION BASELINE  
 Primary source: ChatGPT Library  
-Scope: 《你好，那年夏天》 first real validation project
+Scope: project knowledge retrieval and runtime provenance
 
 ## 1. Single-source rule
 
@@ -19,7 +19,7 @@ Do not copy or manually maintain screenplay, character, timeline, visual, diary,
 
 The Library CURRENT index and project execution entry act as the project manifest.
 
-For 《你好，那年夏天》, retrieval starts from the CURRENT project entry / CURRENT baseline index, then follows only the assets selected by the task.
+For each project, retrieval starts from that project's CURRENT project entry / CURRENT baseline index, then follows only the assets selected by the task.
 
 The manifest itself remains in Library. The runtime does not maintain a duplicate manifest.
 
