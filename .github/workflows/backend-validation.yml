@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Install dependencies
+        run: npm install
       - name: Validate business flow
         run: npm run validate
       - name: Runtime health smoke test
@@ -47,6 +49,11 @@ jobs:
           --health-retries=10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install application dependencies
+        run: npm install
       - name: Install MySQL client
         run: |
           sudo apt-get update
@@ -59,3 +66,24 @@ jobs:
           DB_USER: ai_native_runtime
           DB_PASSWORD: runtime_ci_password
         run: bash scripts/validate-runtime-persistence.sh
+      - name: Validate Runtime API against MySQL
+        env:
+          PORT: 3100
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3100
+        run: |
+          node src/server.mjs > /tmp/runtime-api.log 2>&1 &
+          PID=$!
+          trap 'kill $PID' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:3100/health
+          npm run validate:runtime-api
