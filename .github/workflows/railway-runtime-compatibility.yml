@@ -1,0 +1,80 @@
+name: Railway Runtime Compatibility
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-persistence
+  workflow_dispatch:
+
+jobs:
+  railway-compat:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: runtime_ci_password
+          MYSQL_ROOT_PASSWORD: runtime_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pruntime_ci_root_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MYSQL_URL: mysql://ai_native_runtime:runtime_ci_password@127.0.0.1:3306/ai_native_runtime
+      PORT: 3200
+      NODE_ENV: production
+      RUNTIME_API_TOKEN: railway-ci-token
+      RUNTIME_API_BASE_URL: http://127.0.0.1:3200
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate railway.json
+        run: |
+          node -e "const c=require('./railway.json'); if(c.build.builder!=='DOCKERFILE') process.exit(1); if(c.deploy.healthcheckPath!=='/ready') process.exit(2); if(!c.deploy.preDeployCommand.includes('npm run migrate:runtime')) process.exit(3); console.log('RAILWAY_CONFIG_PASS')"
+
+      - name: Run production migration twice
+        run: |
+          npm run migrate:runtime | tee /tmp/migrate-first.log
+          grep -q 'RUNTIME_MIGRATIONS_PASS applied=4 skipped=0 total=4' /tmp/migrate-first.log
+
+          npm run migrate:runtime | tee /tmp/migrate-second.log
+          grep -q 'RUNTIME_MIGRATIONS_PASS applied=0 skipped=4 total=4' /tmp/migrate-second.log
+
+      - name: Start Runtime with Railway-style environment
+        run: |
+          npm run start > /tmp/railway-runtime.log 2>&1 &
+          PID=$!
+          echo "$PID" > /tmp/railway-runtime.pid
+
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3200/ready >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl --fail http://127.0.0.1:3200/ready
+
+      - name: Validate Railway runtime behavior
+        run: node test/railway-compatibility.test.mjs
+
+      - name: Stop Runtime
+        if: always()
+        run: |
+          if [ -f /tmp/railway-runtime.pid ]; then
+            kill "$(cat /tmp/railway-runtime.pid)" 2>/dev/null || true
+          fi
