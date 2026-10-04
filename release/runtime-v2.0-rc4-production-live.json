@@ -1,0 +1,111 @@
+{
+  "manifestVersion": 1,
+  "releaseCandidate": "ai-native-runtime-v2.0-rc4-production-live",
+  "releaseBranch": "release/ai-native-runtime-v2.0-rc4-production-live",
+  "evidenceBaseSha": "3ebec0f9d23dc56ee2fbf3f800ea56b0a34e251e",
+  "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+  "recordedAt": "2026-10-04T07:36:00Z",
+  "platform": "Railway",
+  "railway": {
+    "projectName": "ai-native-runtime-v2",
+    "projectId": "34abdc88-da14-4ada-b2a2-bdf1b61240a4",
+    "environment": "production",
+    "environmentId": "e8afc1ed-80e4-42d3-85d9-3e3ec193c5f7",
+    "runtimeService": {
+      "serviceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+      "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+      "status": "SUCCESS",
+      "domain": "runtime-production-9c39.up.railway.app",
+      "healthcheckPath": "/ready",
+      "readinessHttpStatusObserved": 200,
+      "runtimePortObserved": 8080
+    },
+    "databaseService": {
+      "serviceName": "mysql-runtime",
+      "serviceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31",
+      "deploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+      "status": "SUCCESS",
+      "publicTcpProxy": false,
+      "persistentVolume": "mysql-runtime-data"
+    },
+    "cleanup": {
+      "oldMysqlServiceDeleted": true,
+      "oldMysqlVolumePreservedDetached": true,
+      "effectiveStagedChanges": null
+    }
+  },
+  "providerLive": {
+    "provider": "openai-responses",
+    "model": "gpt-6-luna",
+    "apiKeyVariableName": "OPENAI_API_KEY",
+    "apiKeyVariablePresent": true,
+    "modelVariableName": "OPENAI_MODEL",
+    "smokeTest": {
+      "syntheticDataOnly": true,
+      "httpStatus": 200,
+      "providerInvoked": true,
+      "structuredContractPass": true,
+      "findingCount": 0,
+      "gateResultCreated": true,
+      "qaEvidenceCreated": true,
+      "checkpointCreated": true,
+      "sourceBodyPersisted": false
+    }
+  },
+  "runtimeEvidence": {
+    "migrationsInitial": "RUNTIME_MIGRATIONS_PASS applied=4 skipped=0 total=4",
+    "migrationsLatest": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=4 total=4",
+    "runtimeListen": "department-registration-backend listening on 8080",
+    "unauthorizedRuntimeApiHttpStatus": 401,
+    "runtimeAuthRequired": true,
+    "contextBridgeMode": "EPHEMERAL_MEMORY_ONLY",
+    "sourceBodyPersisted": false
+  },
+  "ci": {
+    "commitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+    "allRequiredRunsSucceeded": true,
+    "runs": [
+      {
+        "name": "Release Candidate Validation",
+        "runId": 37184262477,
+        "conclusion": "success"
+      },
+      {
+        "name": "Railway Runtime Compatibility",
+        "runId": 37184262225,
+        "conclusion": "success"
+      },
+      {
+        "name": "Backend Validation",
+        "runId": 37184262215,
+        "conclusion": "success"
+      },
+      {
+        "name": "Runtime Deployment Validation",
+        "runId": 37184262287,
+        "conclusion": "success"
+      },
+      {
+        "name": "VPS Deployment Scripts Validation",
+        "runId": 37184262353,
+        "conclusion": "success"
+      },
+      {
+        "name": "Runtime Orchestrator Validation",
+        "runId": 37184262263,
+        "conclusion": "success"
+      }
+    ]
+  },
+  "gate": {
+    "coreRuntime": "PASS",
+    "databasePersistence": "PASS",
+    "authFailClosed": "PASS",
+    "railwayDeployment": "PASS",
+    "openAiProviderLive": "PASS",
+    "structuredOutput": "PASS",
+    "provenanceAndCheckpoint": "PASS",
+    "privateStoryBodyInPublicGit": false,
+    "finalStatus": "PASS"
+  }
+}
