@@ -1,7 +1,7 @@
--- AI Native 2.0 Knowledge Context Snapshot
+-- AI Native 2.0 Knowledge Context Fingerprint
 -- Migration: 002_knowledge_contexts.sql
--- Purpose: persist only the knowledge actually retrieved for a Run.
--- The authoritative knowledge body remains in ChatGPT Library.
+-- Purpose: persist only provenance/fingerprint for knowledge actually selected for a Run.
+-- The authoritative knowledge body remains in ChatGPT Library and is never copied here.
 
 CREATE TABLE IF NOT EXISTS knowledge_contexts (
   id CHAR(36) PRIMARY KEY,
@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS knowledge_contexts (
   retrieval_query TEXT NULL,
   retrieval_mode VARCHAR(64) NULL,
   context_role VARCHAR(64) NOT NULL,
-  content_json JSON NOT NULL,
+  source_line_start INT NULL,
+  source_line_end INT NULL,
   content_sha256 CHAR(64) NOT NULL,
   retrieved_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
