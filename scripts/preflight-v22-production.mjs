@@ -187,13 +187,19 @@ export async function runV22ProductionPreflight({ config = resolveDbConfig() } =
   };
 
   try {
-    assert(await tableExists(db, config.database, 'schema_migrations'),
-      'PREFLIGHT_SCHEMA_MIGRATIONS_MISSING',
-      'schema_migrations table is missing');
-
-    const [migrationRows] = await db.query(
-      'SELECT file_name FROM schema_migrations ORDER BY file_name'
-    );
+    let migrationRows;
+    try {
+      [migrationRows] = await db.query(
+        'SELECT file_name FROM schema_migrations ORDER BY file_name'
+      );
+    } catch (error) {
+      if (error.code === 'ER_NO_SUCH_TABLE') {
+        const missing = new Error('schema_migrations table is missing');
+        missing.code = 'PREFLIGHT_SCHEMA_MIGRATIONS_MISSING';
+        throw missing;
+      }
+      throw error;
+    }
     const applied = new Set(migrationRows.map(x => x.file_name));
 
     const missingBase = BASE_MIGRATIONS.filter(x => !applied.has(x));
