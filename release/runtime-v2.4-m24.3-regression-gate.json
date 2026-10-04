@@ -1,0 +1,148 @@
+{
+  "milestone": "M24.3",
+  "release": "AI Native Runtime V2.4",
+  "title": "Regression Comparator + Release Gate",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.3-regression-gate-runtime-compatible",
+    "sha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2",
+    "baseStagingSha": "68b94ca0c56ca5969154a01b045f9099c19d1e7e",
+    "baseBranch": "feat/ai-native-runtime-v2.4-m24.2-runtime-eval-runner",
+    "relationToBase": "ahead by 6 commits, behind by 0"
+  },
+  "scope": {
+    "executionMode": "RUNTIME_REPLAY",
+    "comparatorOnly": true,
+    "runnerModified": false,
+    "compares": "terminal hashed baseline and candidate eval runs from the same frozen suite/fixture",
+    "releaseGateGeneratedAutomatically": true,
+    "access": "platform administrator only"
+  },
+  "integrity": {
+    "sameSuiteVersionRequired": true,
+    "sameFixtureSha256Required": true,
+    "sameExecutionModeRequired": true,
+    "candidateManifestBaselineRuntimeShaMustMatchBaselineRun": true,
+    "candidateAndBaselineRuntimeShaMustDiffer": true,
+    "terminalRunHashRequired": true,
+    "runIntegrityRevalidation": true,
+    "comparisonSha256": true,
+    "caseDiffSha256": true,
+    "gateSha256": true,
+    "idempotencyConflictDetection": true
+  },
+  "policy": {
+    "version": "eval-regression-strict-v1",
+    "callerOverrideAllowed": false,
+    "hardBlockers": [
+      "candidate eval failure",
+      "case set drift",
+      "new case failure",
+      "new assertion failure",
+      "assertion set drift",
+      "router drift",
+      "evidence drift",
+      "cost currency mismatch"
+    ],
+    "latency": {
+      "maxIncreasePct": 25,
+      "absoluteIncreaseFloorMs": 100
+    },
+    "cost": {
+      "maxIncreasePct": 15,
+      "absoluteIncreaseFloor": 0.001
+    },
+    "rationale": "Runtime Replay uses real execution-path timing/cost observations, so strict-v1 blocks material regression while ignoring small measurement noise."
+  },
+  "schema": {
+    "migration": "020_eval_regression_gate.sql",
+    "migrationsTotal": 21,
+    "predecessorMigrations": [
+      "018_eval_runner.sql",
+      "019_eval_runner_runtime_replay_compatibility.sql"
+    ],
+    "tables": [
+      "eval_regression_comparisons",
+      "eval_case_regressions",
+      "eval_release_gates"
+    ],
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=20 total=21",
+    "freshDbDoubleApply": "PASS"
+  },
+  "api": {
+    "compare": "POST /api/runtime/eval-regression-comparisons",
+    "comparisonDetail": "GET /api/runtime/eval-regression-comparisons/:comparisonId",
+    "releaseGateDetail": "GET /api/runtime/eval-release-gates/:gateId",
+    "authorization": "platform administrator"
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.3 Regression Gate",
+    "runId": 37217922561,
+    "headSha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "v23BillingLedgerRegression": "PASS",
+    "v23BillingOperationsRegression": "PASS",
+    "v23CollectionsRegression": "PASS",
+    "v23RevenueAnalyticsRegression": "PASS",
+    "v23FinancialAdjustmentsRegression": "PASS",
+    "v23FinanceCloseRegression": "PASS",
+    "v23CommercialFinanceRcE2E": "PASS",
+    "m241EvalReplayContract": "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+    "m242EvalRunnerAssertionEngine": "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+    "m242StagingSchemaCompatibility": "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "m243RegressionGate": "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "35faae12-b7fb-43f6-a028-cbdae62428c4",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "authorization": {
+      "comparisonDetailUnauthenticated": 401,
+      "releaseGateDetailUnauthenticated": 401
+    },
+    "http": {
+      "observedRequestsLastHour": 6,
+      "http4xx": 6,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 26
+    },
+    "predecessor": {
+      "deploymentId": "168fe295-9b7a-4658-8d9a-91e812ae9118",
+      "runtimeSha": "68b94ca0c56ca5969154a01b045f9099c19d1e7e",
+      "finalState": "REMOVED"
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true
+  },
+  "evidenceStrategy": {
+    "evidenceBranch": "release/ai-native-runtime-v2.4-m24.3-evidence",
+    "reason": "Keep evidence-only commits separate from the Railway-linked runtime candidate branch to avoid an unnecessary redeploy."
+  },
+  "nextMilestone": "M24.4 Production-safe Replay / Shadow Eval",
+  "conclusion": "M24.3 Regression Comparator + Release Gate is STAGING PASS / FROZEN on the deployed Runtime Replay baseline. It compares compatible baseline/candidate Eval Runs, detects case/assertion/router/evidence/latency/cost regressions, creates hash-verifiable release-gate evidence, and blocks incompatible or materially regressed candidates. Production remains on V2.3."
+}
