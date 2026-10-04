@@ -2,31 +2,79 @@
   "milestone": "M22.1",
   "title": "Pricing Catalog + Usage Billing Model",
   "version": "V2.2",
-  "status": "IMPLEMENTED_PENDING_GATE",
-  "branch": "feat/ai-native-runtime-v2.2-m22.1-pricing-billing",
-  "baseCommit": "44a33d4c851a1434333fd5d84600736b3b490b47",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionPromotion": "NOT_STARTED",
   "productionTouched": false,
-  "designGates": {
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.2-m22.1-pricing-billing",
+    "stagingCodeSha": "d6cfc00ff48c676adfdf214a6b4eb4abe2ac4678",
+    "baseV21Commit": "44a33d4c851a1434333fd5d84600736b3b490b47"
+  },
+  "gates": {
+    "githubActions": {
+      "workflow": "Runtime v2.2 M22.1 Commercial Billing Gate",
+      "runId": 37196403197,
+      "status": "PASS",
+      "productionImageContainsPricingCatalog": true,
+      "migrationIdempotency": true,
+      "v21CostLedgerRegression": true,
+      "acceptance": "G22_1_COMMERCIAL_BILLING_PASS"
+    },
+    "staging": {
+      "deploymentId": "7e578777-daad-4c7a-b7e6-9fd98793c3f5",
+      "status": "SUCCESS",
+      "runtime": "ONLINE",
+      "mysql": "ONLINE",
+      "readyHttp": 200,
+      "unauthenticatedPricingHttp": 401,
+      "warnings": 0,
+      "criticals": 0
+    },
+    "migrations": {
+      "total": 8,
+      "latest": "007_commercial_pricing_catalog.sql",
+      "status": "PASS"
+    },
+    "pricingCatalog": {
+      "model": "gpt-6-luna",
+      "targets": 1,
+      "inserted": 4,
+      "skipped": 0,
+      "tiers": [
+        "STANDARD",
+        "FLEX",
+        "BATCH",
+        "FAST"
+      ],
+      "source": "https://developers.openai.com/api/docs/pricing",
+      "observedOn": "2026-10-04",
+      "importStatus": "PASS"
+    }
+  },
+  "invariants": {
     "missingPrice": "UNKNOWN_NULL",
     "immutablePriceHistory": true,
     "executionPricingVersionFrozen": true,
     "cachedInputBilling": true,
     "cacheWriteBilling": true,
     "longContextBilling": true,
-    "serviceTierBilling": [
-      "STANDARD",
-      "FLEX",
-      "BATCH",
-      "FAST"
-    ],
     "regionalUpliftSupported": true,
-    "privateBodyPersistence": false
+    "privateBodyPersistence": false,
+    "failClosedAuth": true
   },
-  "officialCatalog": {
-    "model": "gpt-6-luna",
-    "observedOn": "2026-10-04",
-    "source": "https://developers.openai.com/api/docs/pricing",
-    "automaticImport": "pre-deploy for matching enabled openai-responses provider/model registry entries"
+  "knownNonBlockingState": {
+    "priorFailedStagingDeployment": {
+      "deploymentId": "d630ab7c-5ae4-4846-bb49-2767900ada4c",
+      "cause": "Docker image omitted pricing catalog directory",
+      "fixedBySha": "d6cfc00ff48c676adfdf214a6b4eb4abe2ac4678",
+      "currentImpact": "NONE"
+    },
+    "emptyStagedPatch": {
+      "status": "STAGED",
+      "changes": [],
+      "currentImpact": "NONE"
+    }
   },
-  "acceptanceGate": "G22_1_COMMERCIAL_BILLING_PASS"
+  "conclusion": "M22.1 STAGING PASS / FROZEN. Production promotion requires a separate human approval."
 }
