@@ -79,11 +79,22 @@ const normalizeSubscription=row=>({
   status:row.status,startedAt:row.started_at,cancelAtPeriodEnd:Boolean(row.cancel_at_period_end),
   canceledAt:row.canceled_at,metadata:row.metadata_json,createdAt:row.created_at,updatedAt:row.updated_at
 });
-const normalizeInvoice=row=>({
-  id:row.id,invoiceNumber:row.invoice_number,tenantId:row.tenant_id,subscriptionId:row.subscription_id,
-  billingCycleId:row.billing_cycle_id,currency:row.currency,subtotal:Number(row.subtotal),
-  creditApplied:Number(row.credit_applied),totalDue:Number(row.total_due),status:row.status,
-  issuedAt:row.issued_at,dueAt:row.due_at,metadata:row.metadata_json,createdAt:row.created_at
+const normalizeInvoice=row=>{
+  const totalDue=Number(row.total_due);
+  const amountPaid=Number(row.amount_paid||0);
+  return {
+    id:row.id,invoiceNumber:row.invoice_number,tenantId:row.tenant_id,subscriptionId:row.subscription_id,
+    billingCycleId:row.billing_cycle_id,currency:row.currency,subtotal:Number(row.subtotal),
+    creditApplied:Number(row.credit_applied),totalDue,amountPaid,
+    outstandingAmount:Math.max(0,totalDue-amountPaid),status:row.status,
+    issuedAt:row.issued_at,dueAt:row.due_at,paidAt:row.paid_at||null,
+    metadata:row.metadata_json,createdAt:row.created_at
+  };
+};
+const normalizePayment=row=>({
+  id:row.id,invoiceId:row.invoice_id,tenantId:row.tenant_id,amount:Number(row.amount),
+  currency:row.currency,paymentReference:row.payment_reference,idempotencyKey:row.idempotency_key,
+  receivedAt:row.received_at,metadata:row.metadata_json,createdAt:row.created_at
 });
 const createCycleRow=async(connection,{subscription,term,cycleNo,periodStart})=>{
   const periodEnd=addInterval(periodStart,term.billing_interval);
@@ -478,4 +489,142 @@ export const reconcileBillingCycle=async cycleId=>{
     {key:'INVOICE_TOTAL',pass:toUnits(invoice.subtotal)-toUnits(invoice.credit_applied)===toUnits(invoice.total_due)}
   ];
   return {cycleId,invoiceId:invoice.id,status:checks.every(x=>x.pass)?'PASS':'FAIL',reconciled:checks.every(x=>x.pass),checks};
+};
+
+
+export const recordInvoicePayment=async({
+  invoiceId,amount,currency=null,idempotencyKey,paymentReference=null,receivedAt=new Date(),metadata=null
+}={})=>{
+  if(!invoiceId||!idempotencyKey) throw errorOf('invoiceId and idempotencyKey are required','INVALID_INVOICE_PAYMENT');
+  const amountUnits=toUnits(amount);
+  if(amountUnits<=0n) throw errorOf('Payment amount must be positive','INVALID_PAYMENT_AMOUNT');
+  rejectSecrets(metadata);
+  const received=parseDate(receivedAt);
+  const db=getRuntimePool(),connection=await db.getConnection();
+  try{
+    await connection.beginTransaction();
+
+    const [existing]=await connection.execute(
+      'SELECT * FROM invoice_payments WHERE idempotency_key=? LIMIT 1 FOR UPDATE',
+      [idempotencyKey]
+    );
+    if(existing.length){
+      const row=existing[0];
+      if(row.invoice_id!==invoiceId||toUnits(row.amount)!==amountUnits){
+        throw errorOf('Idempotency key was already used for a different payment','PAYMENT_IDEMPOTENCY_CONFLICT',409);
+      }
+      const [invoiceRows]=await connection.execute('SELECT * FROM invoices WHERE id=?',[invoiceId]);
+      await connection.commit();
+      return {payment:normalizePayment(row),invoice:normalizeInvoice(invoiceRows[0]),idempotent:true};
+    }
+
+    const [invoiceRows]=await connection.execute('SELECT * FROM invoices WHERE id=? FOR UPDATE',[invoiceId]);
+    if(!invoiceRows.length) throw errorOf('Invoice not found','INVOICE_NOT_FOUND',404);
+    const invoice=invoiceRows[0];
+    const paymentCurrency=String(currency||invoice.currency).toUpperCase();
+    if(paymentCurrency!==invoice.currency) throw errorOf('Payment currency does not match invoice','PAYMENT_CURRENCY_MISMATCH',409);
+
+    const totalDue=toUnits(invoice.total_due);
+    const alreadyPaid=toUnits(invoice.amount_paid||0);
+    const outstanding=totalDue-alreadyPaid;
+    if(outstanding<=0n) throw errorOf('Invoice is already fully paid','INVOICE_ALREADY_PAID',409);
+    if(amountUnits>outstanding) throw errorOf('Payment exceeds invoice outstanding amount','PAYMENT_EXCEEDS_OUTSTANDING',409,{
+      outstandingAmount:unitsToNumber(outstanding)
+    });
+
+    const paymentId=randomUUID();
+    await connection.execute(
+      `INSERT INTO invoice_payments (
+        id,invoice_id,tenant_id,amount,currency,payment_reference,idempotency_key,received_at,metadata_json
+      ) VALUES (?,?,?,?,?,?,?,?,?)`,
+      [paymentId,invoice.id,invoice.tenant_id,unitsToString(amountUnits),paymentCurrency,
+       paymentReference||null,idempotencyKey,received,asJson(metadata)]
+    );
+
+    const newPaid=alreadyPaid+amountUnits;
+    const fullyPaid=newPaid===totalDue;
+    await connection.execute(
+      'UPDATE invoices SET amount_paid=?, status=?, paid_at=? WHERE id=?',
+      [unitsToString(newPaid),fullyPaid?'PAID':'PARTIALLY_PAID',fullyPaid?received:null,invoiceId]
+    );
+
+    const [paymentRows]=await connection.execute('SELECT * FROM invoice_payments WHERE id=?',[paymentId]);
+    const [updatedInvoices]=await connection.execute('SELECT * FROM invoices WHERE id=?',[invoiceId]);
+    await connection.commit();
+    return {payment:normalizePayment(paymentRows[0]),invoice:normalizeInvoice(updatedInvoices[0]),idempotent:false};
+  }catch(error){
+    await connection.rollback();
+    throw error;
+  }finally{connection.release();}
+};
+
+export const listInvoicePayments=async invoiceId=>{
+  const db=getRuntimePool();
+  const [invoiceRows]=await db.execute('SELECT id FROM invoices WHERE id=?',[invoiceId]);
+  if(!invoiceRows.length) throw errorOf('Invoice not found','INVOICE_NOT_FOUND',404);
+  const [rows]=await db.execute(
+    'SELECT * FROM invoice_payments WHERE invoice_id=? ORDER BY received_at,id',
+    [invoiceId]
+  );
+  return rows.map(normalizePayment);
+};
+
+export const getBillingOperationsSummary=async({tenantId=null,asOf=new Date()}={})=>{
+  const db=getRuntimePool();
+  const at=parseDate(asOf);
+  const params=[];
+  let where='';
+  if(tenantId){where='WHERE tenant_id=?';params.push(tenantId);}
+  params.push(at,at);
+  const [rows]=await db.execute(
+    `SELECT
+       currency,
+       COUNT(*) AS invoice_count,
+       SUM(CASE WHEN total_due>amount_paid THEN 1 ELSE 0 END) AS open_invoice_count,
+       SUM(CASE WHEN total_due<=amount_paid THEN 1 ELSE 0 END) AS paid_invoice_count,
+       SUM(CASE WHEN due_at<? AND total_due>amount_paid THEN 1 ELSE 0 END) AS overdue_invoice_count,
+       COALESCE(SUM(total_due),0) AS total_billed,
+       COALESCE(SUM(amount_paid),0) AS amount_paid,
+       COALESCE(SUM(GREATEST(total_due-amount_paid,0)),0) AS outstanding,
+       COALESCE(SUM(CASE WHEN due_at<? THEN GREATEST(total_due-amount_paid,0) ELSE 0 END),0) AS overdue_outstanding
+     FROM invoices
+     ${where}
+     GROUP BY currency
+     ORDER BY currency`,
+    params
+  );
+  return {
+    tenantId,
+    asOf:at,
+    currencies:rows.map(row=>({
+      currency:row.currency,
+      invoiceCount:Number(row.invoice_count),
+      openInvoiceCount:Number(row.open_invoice_count),
+      paidInvoiceCount:Number(row.paid_invoice_count),
+      overdueInvoiceCount:Number(row.overdue_invoice_count),
+      totalBilled:Number(row.total_billed),
+      amountPaid:Number(row.amount_paid),
+      outstanding:Number(row.outstanding),
+      overdueOutstanding:Number(row.overdue_outstanding)
+    }))
+  };
+};
+
+export const listReceivables=async({tenantId=null,status='OPEN',asOf=new Date(),limit=100}={})=>{
+  const normalizedStatus=String(status||'OPEN').toUpperCase();
+  if(!['OPEN','OVERDUE','ALL'].includes(normalizedStatus)) throw errorOf('status must be OPEN, OVERDUE, or ALL','INVALID_RECEIVABLE_STATUS');
+  const parsedLimit=Number(limit);
+  if(!Number.isInteger(parsedLimit)||parsedLimit<1||parsedLimit>500) throw errorOf('limit must be an integer from 1 to 500','INVALID_RECEIVABLE_LIMIT');
+  const at=parseDate(asOf);
+  const clauses=[],params=[];
+  if(tenantId){clauses.push('tenant_id=?');params.push(tenantId);}
+  if(normalizedStatus==='OPEN') clauses.push('total_due>amount_paid');
+  if(normalizedStatus==='OVERDUE'){clauses.push('total_due>amount_paid');clauses.push('due_at<?');params.push(at);}
+  const sql=`SELECT * FROM invoices ${clauses.length?'WHERE '+clauses.join(' AND '):''}
+    ORDER BY due_at ASC,issued_at ASC,id ASC LIMIT ${parsedLimit}`;
+  const [rows]=await db.execute(sql,params);
+  return rows.map(row=>{
+    const invoice=normalizeInvoice(row);
+    return {...invoice,overdue:invoice.outstandingAmount>0&&new Date(invoice.dueAt).getTime()<at.getTime()};
+  });
 };
