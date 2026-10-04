@@ -41,11 +41,11 @@ assert.equal(r.body.data.projectKey,projectKey);
 
 const db = await mysql.createConnection(process.env.MYSQL_URL);
 const [[migrationCount]] = await db.query('SELECT COUNT(*) AS count FROM schema_migrations');
-assert.equal(Number(migrationCount.count),4);
+assert.equal(Number(migrationCount.count),5);
 
 const required = [
   'projects','runs','tasks','checkpoints','stage_snapshots',
-  'route_executions','tool_executions','gate_results','qa_evidence','audit_logs',
+  'route_executions','tool_executions','usage_ledger','gate_results','qa_evidence','audit_logs',
   'knowledge_contexts','knowledge_sources','knowledge_documents','knowledge_sync_runs',
   'knowledge_retrievals','knowledge_retrieval_items'
 ];
