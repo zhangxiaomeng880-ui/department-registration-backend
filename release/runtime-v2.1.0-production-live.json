@@ -68,16 +68,29 @@
     "productionReadinessAndAuth": "PASS"
   },
   "productionValidationTruth": {
-    "productionAuthorizedSyntheticProviderSmokeRepeated": false,
-    "reason": "Railway resource provisioning limit prevented creating an additional temporary smoke service after promotion.",
-    "releaseGateStillSatisfied": true,
-    "basis": [
-      "exact RC1 SHA passed isolated Railway staging live provider smoke",
-      "production deploy is pinned to the exact same RC1 SHA",
-      "production migrations completed successfully",
-      "production /ready returned 200 ready with model provider configured",
-      "production runtime auth fail-closed returned 401 without authorization"
-    ]
+    "productionAuthorizedSyntheticProviderSmokeRepeated": true,
+    "productionSmokePass": true,
+    "orchestrationHttpStatus": 200,
+    "provider": "openai-responses",
+    "model": "gpt-6-luna",
+    "providerInvoked": true,
+    "structuredContractPass": true,
+    "gateQaCheckpointPass": true,
+    "sourceBodyPersisted": false,
+    "observabilityHttpStatus": 200,
+    "correlationConsistent": true,
+    "sourceBodyExposed": false,
+    "policyMode": "LEGACY_SINGLE_PROVIDER",
+    "selectedProviderKey": "openai-responses",
+    "selectedModelKey": "gpt-6-luna",
+    "costSummaryHttpStatus": 200,
+    "costStatus": "UNKNOWN",
+    "unknownCostCount": 1,
+    "budgetHttpStatus": 200,
+    "budgetDecision": "ALLOW",
+    "budgetReason": "NO_BUDGET_POLICY",
+    "providerRegistryReadable": true,
+    "note": "Production pricing metadata is intentionally not hardcoded; missing production price versions remain UNKNOWN/null until explicitly imported."
   },
   "rollback": {
     "previousRelease": "v2.0.0",
@@ -93,5 +106,8 @@
     "m21_4": "release/runtime-v2.1-m21.4-release-promotion.json",
     "staging": "release/runtime-v2.1-rc1-staging.json"
   },
-  "finalDecision": "V2.1 APPROVED AND LIVE IN PRODUCTION"
+  "finalDecision": "V2.1 APPROVED AND LIVE IN PRODUCTION",
+  "cleanup": {
+    "temporaryProductionSmokeServiceDeleted": true
+  }
 }
