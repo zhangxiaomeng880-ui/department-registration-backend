@@ -49,6 +49,7 @@ const V22_MIGRATIONS = [
   '009_commercial_control.sql',
   '010_tenant_identity_rbac.sql',
   '011_subscription_billing_ledger.sql',
+  '012_v21_rollback_compatibility.sql',
 ];
 
 const TARGET_TABLES = {
