@@ -7,6 +7,24 @@ const PERIODS=new Set(['DAY','MONTH']);
 const ACTIONS=new Set(['HOLD','BLOCK']);
 const decisionRank={ALLOW:0,HOLD:1,BLOCK:2};
 const asJson=value=>value==null?null:JSON.stringify(value);
+const secretPattern=/(api[_-]?key|secret|password|credential|authorization)/i;
+const rejectSecrets=value=>{
+  const visit=(node,path='')=>{
+    if(!node||typeof node!=='object') return;
+    for(const [key,child] of Object.entries(node)){
+      const next=path?`${path}.${key}`:key;
+      if(secretPattern.test(key)){
+        const error=new Error('Quota metadata must not persist credentials or secrets');
+        error.code='QUOTA_METADATA_SECRET_NOT_ALLOWED';
+        error.statusCode=400;
+        error.details={field:next};
+        throw error;
+      }
+      visit(child,next);
+    }
+  };
+  visit(value);
+};
 const errorOf=(message,code,statusCode=400,details)=>{
   const error=new Error(message);error.code=code;error.statusCode=statusCode;if(details) error.details=details;return error;
 };
@@ -74,12 +92,19 @@ export const getUsageMeter=async({tenantId=null,workspaceId=null,periodType='MON
      WHERE ${clauses.join(' AND ')}`,
     values
   );
+  const runClauses=['tenant_id=?','created_at>=?','created_at<?'];
+  const runValues=[scope.tenantId,bounds.start,bounds.end];
+  if(scope.workspaceId){runClauses.push('workspace_id=?');runValues.push(scope.workspaceId);}
+  const [[runRow]]=await db.execute(
+    `SELECT COUNT(*) AS run_count FROM runs WHERE ${runClauses.join(' AND ')}`,
+    runValues
+  );
   const currencies=row.currencies?String(row.currencies).split(',').filter(Boolean):[];
   const unknownCostCount=Number(row.unknown_cost_count||0);
   return {
     tenantId:scope.tenantId,workspaceId:scope.workspaceId,periodType:bounds.periodType,
     periodStart:bounds.start,periodEnd:bounds.end,
-    usageCount:Number(row.usage_count||0),runCount:Number(row.run_count||0),
+    usageCount:Number(row.usage_count||0),runCount:Number(runRow.run_count||0),
     tokenInput:Number(row.token_input||0),cachedInputTokens:Number(row.cached_input_tokens||0),
     cacheWriteTokens:Number(row.cache_write_tokens||0),tokenOutput:Number(row.token_output||0),
     tokenTotal:Number(row.token_total||0),unknownCostCount,
@@ -120,6 +145,7 @@ export const upsertQuotaPolicy=async input=>{
   const currency=String(input.currency||'USD').toUpperCase();
   if(!/^[A-Z]{3}$/.test(currency)) throw errorOf('currency must be a 3-letter code','INVALID_QUOTA_CURRENCY');
 
+  rejectSecrets(input.metadata||null);
   const db=getRuntimePool();
   const subject=await resolvePolicySubject(db,input);
   const id=input.id||randomUUID();
