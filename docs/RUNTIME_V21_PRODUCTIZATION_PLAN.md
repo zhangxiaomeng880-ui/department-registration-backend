@@ -10,7 +10,7 @@ Working branch: `feat/ai-native-runtime-v2.1-productization`
 | M21.1 Observable Runtime | G21-OBSERVABILITY | PASS / FROZEN | `release/runtime-v2.1-m21.1-observability.json` |
 | M21.2 Policy Router v2 | G21-MULTI-PROVIDER | PASS / FROZEN | `release/runtime-v2.1-m21.2-policy-router.json` |
 | M21.3 Cost Ledger | G21-COST-ACCOUNTING | PASS / FROZEN | `release/runtime-v2.1-m21.3-cost-ledger.json` |
-| M21.4 Release Promotion | G21-RELEASE-PROMOTION | NEXT | — |
+| M21.4 Release Promotion | G21-RELEASE-PROMOTION | PASS / FROZEN | `release/runtime-v2.1-m21.4-release-promotion.json` |
 
 ## M21.1 — Observable Runtime
 
@@ -68,13 +68,32 @@ Exit Gate: `G21-COST-ACCOUNTING = PASS`
 
 ## M21.4 — Release Promotion
 
-After M21.3 only:
+Status: **PASS / EVIDENCE FROZEN** (`release/runtime-v2.1-m21.4-release-promotion.json`)
 
-- automated RC evidence manifest
-- CI + Railway + provider evidence collection
-- release-readiness verdict
-- manual production approval boundary
-- rollback target captured before promotion
+Completed:
+
+- automated RC readiness manifest
+- M21.1–M21.3 evidence requirements
+- required CI evidence checks
+- exact candidate SHA validation
+- production rollback target capture
+- staging deployment/commit/readiness/provider-smoke requirements
+- secret leakage detection
+- explicit manual production approval boundary
+- automatic production promotion forbidden by Gate
+
+Current RC:
+
+- candidate: `ai-native-runtime-v2.1-rc1`
+- candidate code SHA: `7b0d0f152395e39f4bdc5ea48217c4a24b7a284f`
+- readiness: **HOLD**
+- blockers: `STAGING_NOT_VERIFIED`, `MANUAL_APPROVAL_REQUIRED`
+- current production remains v2.0 and SUCCESS
+- rollback target is captured in the RC readiness manifest
+
+Next release action:
+
+Run the exact RC candidate in an isolated Railway staging environment/project, verify `/ready`, migrations, auth, provider smoke, observability, policy routing and cost ledger, then regenerate the readiness manifest. Only after staging is verified may the verdict become `AWAITING_MANUAL_APPROVAL`.
 
 ## Release rule
 
