@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 import { routeRuntimeTask } from './runtime-router.mjs';
 import { selectProviderModel } from './policy-router-v2.mjs';
+import {
+  resolvePricingVersion,
+  calculateEstimatedCost,
+} from './cost-ledger.mjs';
 
 const asJson = value => value == null ? null : JSON.stringify(value);
 
@@ -111,7 +115,6 @@ export const recordToolExecution = async input => {
   const tokenInput = Number(input.tokenInput || 0);
   const tokenOutput = Number(input.tokenOutput || 0);
   const durationMs = input.durationMs == null ? null : Number(input.durationMs);
-  const costAmount = Number(input.costAmount || 0);
   let correlationId = input.correlationId || null;
   const providerKey = input.providerKey || null;
   const errorCategory = input.errorCategory || null;
@@ -130,13 +133,25 @@ export const recordToolExecution = async input => {
     }
     correlationId = correlationId || runRows[0].correlation_id || null;
 
+    const pricingVersion = await resolvePricingVersion(connection,{
+      providerKey,
+      modelKey:input.modelKey || null,
+      at:new Date(),
+    });
+    const calculatedCost = calculateEstimatedCost({
+      tokenInput,
+      tokenOutput,
+      pricingVersion,
+    });
+
     await connection.execute(
       `INSERT INTO tool_executions (
         id, run_id, task_id, route_execution_id, correlation_id,
-        tool_type, tool_key, provider_key, model_key, status, input_json, output_json,
+        tool_type, tool_key, provider_key, model_key, pricing_version_id, cost_status,
+        status, input_json, output_json,
         token_input, token_output, cost_amount, cost_currency,
         duration_ms, error_code, error_category, error_message, started_at, finished_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))`,
       [
         id,
         input.runId,
@@ -147,13 +162,15 @@ export const recordToolExecution = async input => {
         input.toolKey,
         providerKey,
         input.modelKey || null,
+        calculatedCost.pricingVersionId,
+        calculatedCost.costStatus,
         input.status,
         asJson(input.input || null),
         asJson(input.output || null),
         tokenInput,
         tokenOutput,
-        costAmount,
-        input.costCurrency || 'USD',
+        calculatedCost.estimatedCost,
+        calculatedCost.currency,
         durationMs,
         input.errorCode || null,
         errorCategory,
@@ -164,9 +181,10 @@ export const recordToolExecution = async input => {
     await connection.execute(
       `INSERT INTO usage_ledger (
         id, project_id, run_id, task_id, route_execution_id, tool_execution_id,
-        correlation_id, provider_key, model_key, status,
+        correlation_id, provider_key, model_key, pricing_version_id, cost_status,
+        estimated_cost, cost_currency, status,
         token_input, token_output, duration_ms, error_category
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         usageId,
         runRows[0].project_id,
@@ -177,6 +195,10 @@ export const recordToolExecution = async input => {
         correlationId,
         providerKey,
         input.modelKey || null,
+        calculatedCost.pricingVersionId,
+        calculatedCost.costStatus,
+        calculatedCost.estimatedCost,
+        calculatedCost.currency,
         input.status,
         tokenInput,
         tokenOutput,
@@ -191,7 +213,14 @@ export const recordToolExecution = async input => {
            token_output = token_output + ?,
            cost_amount = cost_amount + ?
        WHERE id = ?`,
-      [tokenInput, tokenOutput, costAmount, input.runId]
+      [
+        tokenInput,
+        tokenOutput,
+        calculatedCost.costStatus === 'CALCULATED'
+          ? calculatedCost.estimatedCost
+          : 0,
+        input.runId
+      ]
     );
 
     await connection.commit();
@@ -207,7 +236,11 @@ export const recordToolExecution = async input => {
     usageLedgerId: usageId,
     correlationId,
     status: input.status,
-    toolKey: input.toolKey
+    toolKey: input.toolKey,
+    costStatus: calculatedCost.costStatus,
+    pricingVersionId: calculatedCost.pricingVersionId,
+    estimatedCost: calculatedCost.estimatedCost,
+    costCurrency: calculatedCost.currency
   };
 };
 
