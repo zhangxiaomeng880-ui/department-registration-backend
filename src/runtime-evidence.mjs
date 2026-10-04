@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 import { routeRuntimeTask } from './runtime-router.mjs';
+import { selectProviderModel } from './policy-router-v2.mjs';
 
 const asJson = value => value == null ? null : JSON.stringify(value);
 
@@ -20,6 +21,18 @@ export const routeAndRecord = async input => {
 
   const startedAt = performance.now();
   const decision = routeRuntimeTask(input);
+  const providerPolicy = await selectProviderModel({
+    policyMode: input.policyMode,
+    taskType: input.taskType,
+    requiredStructuredOutput: input.requiredStructuredOutput,
+    allowedProviderKeys: input.allowedProviderKeys,
+    preferredProviderKey: input.preferredProviderKey,
+    preferredModelKey: input.preferredModelKey,
+    fallbackProviderKeys: input.fallbackProviderKeys,
+    modelKey: input.modelKey,
+  });
+  const finalPolicyResult =
+    decision.policyResult === 'ALLOW' && providerPolicy.allowed ? 'ALLOW' : 'BLOCK';
   const durationMs = input.durationMs == null
     ? Math.max(0, Math.round(performance.now() - startedAt))
     : Number(input.durationMs);
@@ -31,8 +44,10 @@ export const routeAndRecord = async input => {
     `INSERT INTO route_executions (
       id, run_id, task_id, correlation_id, route_rule_key, route_priority, matched,
       agent_key, skill_key, tool_key, policy_result,
+      policy_mode, selected_provider_key, selected_model_key, selected_adapter_key,
+      provider_health_status, fallback_chain_json,
       input_summary, decision_json, duration_ms, error_category
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       input.runId,
@@ -44,15 +59,41 @@ export const routeAndRecord = async input => {
       decision.agentKey,
       decision.skillKey,
       decision.toolKey,
-      decision.policyResult,
+      finalPolicyResult,
+      providerPolicy.policyMode,
+      providerPolicy.selectedProviderKey || null,
+      providerPolicy.selectedModelKey || null,
+      providerPolicy.selectedAdapterKey || null,
+      providerPolicy.providerHealthStatus || null,
+      asJson(providerPolicy.fallbackChain || []),
       input.query || null,
-      asJson({ ...decision, executionMode: input.executionMode || 'HYBRID_EXTERNAL_AGENT' }),
+      asJson({
+        ...decision,
+        policyResult: finalPolicyResult,
+        executionMode: input.executionMode || 'HYBRID_EXTERNAL_AGENT',
+        providerPolicy,
+      }),
       durationMs,
       input.errorCategory || null,
     ]
   );
 
-  return { id, durationMs, correlationId, ...decision };
+  return {
+    id,
+    durationMs,
+    correlationId,
+    ...decision,
+    policyResult: finalPolicyResult,
+    policyMode: providerPolicy.policyMode,
+    providerPolicyCode: providerPolicy.code,
+    selectedProviderKey: providerPolicy.selectedProviderKey || null,
+    selectedModelKey: providerPolicy.selectedModelKey || null,
+    selectedAdapterKey: providerPolicy.selectedAdapterKey || null,
+    providerHealthStatus: providerPolicy.providerHealthStatus || null,
+    fallbackChain: providerPolicy.fallbackChain || [],
+    providerPolicyReason: providerPolicy.reason,
+    policyRouterVersion: providerPolicy.routerVersion,
+  };
 };
 
 export const recordToolExecution = async input => {
