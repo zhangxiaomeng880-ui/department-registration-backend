@@ -90,6 +90,7 @@ jobs:
           node test/runtime-v23-commercial-finance-rc-e2e.test.mjs
           npm run validate:eval-replay-contract
           npm run validate:eval-runner
+          npm run validate:m242-staging-compat
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
           trap - EXIT
