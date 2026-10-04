@@ -103,6 +103,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     const result = await listPricingVersions({
       providerKey:url.searchParams.get('providerKey') || null,
       modelKey:url.searchParams.get('modelKey') || null,
+      serviceTier:url.searchParams.get('serviceTier') || null,
     });
     json(res, 200, { data: result });
     return true;

@@ -107,6 +107,7 @@ export const invokeOpenAiResponses = async ({
       providerResponseId: payload.id || null,
       model: payload.model || resolvedModel,
       status: payload.status || 'completed',
+      serviceTier: payload.service_tier || null,
       output,
       usage: payload.usage || null,
       durationMs: Math.max(0, Math.round(performance.now() - startedAt)),

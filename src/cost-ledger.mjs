@@ -34,14 +34,40 @@ const errorOf = (message, code, statusCode = 400, details) => {
 };
 
 const money = value => value == null ? null : Number(value);
+const nonNegativeRate = (value, field, { nullable = true } = {}) => {
+  if (value == null && nullable) return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    throw errorOf(`${field} must be a non-negative finite number`, 'INVALID_PRICING_RATE');
+  }
+  return number;
+};
+
+export const normalizePricingServiceTier = value => {
+  const tier = String(value || 'STANDARD').trim().toUpperCase();
+  if (tier === 'DEFAULT') return 'STANDARD';
+  if (tier === 'PRIORITY') return 'FAST';
+  return tier;
+};
 
 const normalizePrice = row => ({
   id: row.id,
   providerKey: row.provider_key,
   modelKey: row.model_key,
+  serviceTier: normalizePricingServiceTier(row.service_tier),
   currency: row.currency,
   inputRatePerMillion: money(row.input_rate_per_million),
+  cachedInputRatePerMillion: money(row.cached_input_rate_per_million),
+  cacheWriteRatePerMillion: money(row.cache_write_rate_per_million),
   outputRatePerMillion: money(row.output_rate_per_million),
+  longContextThresholdTokens: row.long_context_threshold_tokens == null
+    ? null
+    : Number(row.long_context_threshold_tokens),
+  longContextInputRatePerMillion: money(row.long_context_input_rate_per_million),
+  longContextCachedInputRatePerMillion: money(row.long_context_cached_input_rate_per_million),
+  longContextCacheWriteRatePerMillion: money(row.long_context_cache_write_rate_per_million),
+  longContextOutputRatePerMillion: money(row.long_context_output_rate_per_million),
+  formulaVersion: row.formula_version || 'TOKEN_COST_V1',
   effectiveFrom: row.effective_from,
   sourceLabel: row.source_label,
   sourceUri: row.source_uri,
@@ -67,10 +93,37 @@ export const createPricingVersion = async input => {
 
   rejectSecrets(input);
 
-  const inputRate = Number(input.inputRatePerMillion);
-  const outputRate = Number(input.outputRatePerMillion);
-  if (!Number.isFinite(inputRate) || inputRate < 0 || !Number.isFinite(outputRate) || outputRate < 0) {
-    throw errorOf('Pricing rates must be non-negative finite numbers', 'INVALID_PRICING_RATE');
+  const inputRate = nonNegativeRate(input.inputRatePerMillion, 'inputRatePerMillion', { nullable:false });
+  const cachedInputRate = nonNegativeRate(input.cachedInputRatePerMillion, 'cachedInputRatePerMillion');
+  const cacheWriteRate = nonNegativeRate(input.cacheWriteRatePerMillion, 'cacheWriteRatePerMillion');
+  const outputRate = nonNegativeRate(input.outputRatePerMillion, 'outputRatePerMillion', { nullable:false });
+  const longContextInputRate = nonNegativeRate(input.longContextInputRatePerMillion, 'longContextInputRatePerMillion');
+  const longContextCachedInputRate = nonNegativeRate(input.longContextCachedInputRatePerMillion, 'longContextCachedInputRatePerMillion');
+  const longContextCacheWriteRate = nonNegativeRate(input.longContextCacheWriteRatePerMillion, 'longContextCacheWriteRatePerMillion');
+  const longContextOutputRate = nonNegativeRate(input.longContextOutputRatePerMillion, 'longContextOutputRatePerMillion');
+
+  const longThreshold = input.longContextThresholdTokens == null
+    ? null
+    : Number(input.longContextThresholdTokens);
+  if (longThreshold != null && (!Number.isInteger(longThreshold) || longThreshold <= 0)) {
+    throw errorOf('longContextThresholdTokens must be a positive integer', 'INVALID_LONG_CONTEXT_THRESHOLD');
+  }
+  if (longThreshold != null && (longContextInputRate == null || longContextOutputRate == null)) {
+    throw errorOf(
+      'Long-context pricing requires longContextInputRatePerMillion and longContextOutputRatePerMillion',
+      'INVALID_LONG_CONTEXT_PRICING'
+    );
+  }
+  if (longThreshold == null && [
+    longContextInputRate,
+    longContextCachedInputRate,
+    longContextCacheWriteRate,
+    longContextOutputRate,
+  ].some(value => value != null)) {
+    throw errorOf(
+      'longContextThresholdTokens is required when long-context rates are supplied',
+      'INVALID_LONG_CONTEXT_PRICING'
+    );
   }
 
   const status = String(input.status || 'ACTIVE').toUpperCase();
@@ -82,6 +135,12 @@ export const createPricingVersion = async input => {
   if (!/^[A-Z]{3}$/.test(currency)) {
     throw errorOf('currency must be a 3-letter code', 'INVALID_PRICING_CURRENCY');
   }
+
+  const serviceTier = normalizePricingServiceTier(input.serviceTier);
+  if (!/^[A-Z0-9_-]{2,32}$/.test(serviceTier)) {
+    throw errorOf('serviceTier is invalid', 'INVALID_PRICING_SERVICE_TIER');
+  }
+  const formulaVersion = String(input.formulaVersion || 'TOKEN_COST_V2').toUpperCase();
 
   const db = getRuntimePool();
   const [models] = await db.execute(
@@ -96,17 +155,30 @@ export const createPricingVersion = async input => {
   try {
     await db.execute(
       `INSERT INTO pricing_versions (
-        id, provider_key, model_key, currency,
-        input_rate_per_million, output_rate_per_million,
+        id, provider_key, model_key, service_tier, currency,
+        input_rate_per_million, cached_input_rate_per_million,
+        cache_write_rate_per_million, output_rate_per_million,
+        long_context_threshold_tokens, long_context_input_rate_per_million,
+        long_context_cached_input_rate_per_million, long_context_cache_write_rate_per_million,
+        long_context_output_rate_per_million, formula_version,
         effective_from, source_label, source_uri, status, metadata_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.providerKey,
         input.modelKey,
+        serviceTier,
         currency,
         inputRate,
+        cachedInputRate,
+        cacheWriteRate,
         outputRate,
+        longThreshold,
+        longContextInputRate,
+        longContextCachedInputRate,
+        longContextCacheWriteRate,
+        longContextOutputRate,
+        formulaVersion,
         new Date(input.effectiveFrom),
         input.sourceLabel,
         input.sourceUri || null,
@@ -117,7 +189,7 @@ export const createPricingVersion = async input => {
   } catch (error) {
     if (error?.code === 'ER_DUP_ENTRY') {
       throw errorOf(
-        'A pricing version already exists for this provider/model/effectiveFrom',
+        'A pricing version already exists for this provider/model/serviceTier/effectiveFrom',
         'PRICING_VERSION_IMMUTABLE',
         409
       );
@@ -135,10 +207,14 @@ export const listPricingVersions = async input => {
   const values = [];
   if (input?.providerKey) { clauses.push('provider_key = ?'); values.push(input.providerKey); }
   if (input?.modelKey) { clauses.push('model_key = ?'); values.push(input.modelKey); }
+  if (input?.serviceTier) {
+    clauses.push('service_tier = ?');
+    values.push(normalizePricingServiceTier(input.serviceTier));
+  }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const [rows] = await db.execute(
     `SELECT * FROM pricing_versions ${where}
-     ORDER BY provider_key, model_key, effective_from, id`,
+     ORDER BY provider_key, model_key, service_tier, effective_from, id`,
     values
   );
   return rows.map(normalizePrice);
@@ -147,48 +223,135 @@ export const listPricingVersions = async input => {
 export const resolvePricingVersion = async (connection, {
   providerKey,
   modelKey,
+  serviceTier = 'STANDARD',
   at = new Date(),
 }) => {
   if (!providerKey || !modelKey) return null;
+  const normalizedServiceTier = normalizePricingServiceTier(serviceTier);
   const [rows] = await connection.execute(
     `SELECT *
      FROM pricing_versions
      WHERE provider_key = ?
        AND model_key = ?
+       AND service_tier = ?
        AND effective_from <= ?
        AND status <> 'REVOKED'
      ORDER BY effective_from DESC, created_at DESC
      LIMIT 1`,
-    [providerKey, modelKey, at]
+    [providerKey, modelKey, normalizedServiceTier, at]
   );
   return rows[0] ? normalizePrice(rows[0]) : null;
 };
 
+const unknownCost = ({
+  pricingVersion = null,
+  reason,
+  serviceTier = 'STANDARD',
+  contextBand = null,
+  regionalUpliftBps = 0,
+}) => ({
+  costStatus:'UNKNOWN',
+  pricingVersionId:pricingVersion?.id || null,
+  estimatedCost:null,
+  currency:pricingVersion?.currency || null,
+  serviceTier:normalizePricingServiceTier(serviceTier),
+  contextBand,
+  regionalUpliftBps:Number(regionalUpliftBps || 0),
+  formulaVersion:pricingVersion?.formulaVersion || null,
+  reason,
+});
+
 export const calculateEstimatedCost = ({
   tokenInput = 0,
+  cachedInputTokens = 0,
+  cacheWriteTokens = 0,
   tokenOutput = 0,
+  serviceTier = 'STANDARD',
+  regionalUpliftBps = 0,
   pricingVersion,
 }) => {
+  const normalizedServiceTier = normalizePricingServiceTier(serviceTier);
   if (!pricingVersion) {
-    return {
-      costStatus:'UNKNOWN',
-      pricingVersionId:null,
-      estimatedCost:null,
-      currency:null,
+    return unknownCost({
       reason:'PRICE_METADATA_NOT_FOUND',
-    };
+      serviceTier:normalizedServiceTier,
+      regionalUpliftBps,
+    });
   }
 
-  const inputCost = Number(tokenInput || 0) * pricingVersion.inputRatePerMillion / 1_000_000;
-  const outputCost = Number(tokenOutput || 0) * pricingVersion.outputRatePerMillion / 1_000_000;
-  const estimatedCost = Number((inputCost + outputCost).toFixed(10));
+  const inputTokens = Number(tokenInput || 0);
+  const cachedTokens = Number(cachedInputTokens || 0);
+  const writeTokens = Number(cacheWriteTokens || 0);
+  const outputTokens = Number(tokenOutput || 0);
+  const upliftBps = Number(regionalUpliftBps || 0);
+
+  if (
+    ![inputTokens,cachedTokens,writeTokens,outputTokens,upliftBps].every(Number.isFinite) ||
+    inputTokens < 0 || cachedTokens < 0 || writeTokens < 0 || outputTokens < 0 || upliftBps < 0
+  ) {
+    return unknownCost({
+      pricingVersion,
+      reason:'INVALID_BILLING_DIMENSIONS',
+      serviceTier:normalizedServiceTier,
+      regionalUpliftBps:upliftBps,
+    });
+  }
+
+  const ordinaryInputTokens = inputTokens - cachedTokens - writeTokens;
+  if (ordinaryInputTokens < 0) {
+    return unknownCost({
+      pricingVersion,
+      reason:'INVALID_TOKEN_BREAKDOWN',
+      serviceTier:normalizedServiceTier,
+      regionalUpliftBps:upliftBps,
+    });
+  }
+
+  const isLongContext = pricingVersion.longContextThresholdTokens != null &&
+    inputTokens > pricingVersion.longContextThresholdTokens;
+  const contextBand = isLongContext ? 'LONG' : 'SHORT';
+
+  const inputRate = isLongContext
+    ? pricingVersion.longContextInputRatePerMillion
+    : pricingVersion.inputRatePerMillion;
+  const cachedRate = isLongContext
+    ? pricingVersion.longContextCachedInputRatePerMillion
+    : pricingVersion.cachedInputRatePerMillion;
+  const writeRate = isLongContext
+    ? pricingVersion.longContextCacheWriteRatePerMillion
+    : pricingVersion.cacheWriteRatePerMillion;
+  const outputRate = isLongContext
+    ? pricingVersion.longContextOutputRatePerMillion
+    : pricingVersion.outputRatePerMillion;
+
+  if (inputRate == null || outputRate == null) {
+    return unknownCost({pricingVersion,reason:'CONTEXT_PRICE_NOT_FOUND',serviceTier:normalizedServiceTier,contextBand,regionalUpliftBps:upliftBps});
+  }
+  if (cachedTokens > 0 && cachedRate == null) {
+    return unknownCost({pricingVersion,reason:'CACHED_INPUT_PRICE_NOT_FOUND',serviceTier:normalizedServiceTier,contextBand,regionalUpliftBps:upliftBps});
+  }
+  if (writeTokens > 0 && writeRate == null) {
+    return unknownCost({pricingVersion,reason:'CACHE_WRITE_PRICE_NOT_FOUND',serviceTier:normalizedServiceTier,contextBand,regionalUpliftBps:upliftBps});
+  }
+
+  const inputCost = ordinaryInputTokens * inputRate / 1_000_000;
+  const cachedCost = cachedTokens * Number(cachedRate || 0) / 1_000_000;
+  const cacheWriteCost = writeTokens * Number(writeRate || 0) / 1_000_000;
+  const outputCost = outputTokens * outputRate / 1_000_000;
+  const baseCost = inputCost + cachedCost + cacheWriteCost + outputCost;
+  const estimatedCost = Number((baseCost * (1 + upliftBps / 10_000)).toFixed(10));
 
   return {
     costStatus:'CALCULATED',
     pricingVersionId:pricingVersion.id,
     estimatedCost,
     currency:pricingVersion.currency,
+    serviceTier:normalizedServiceTier,
+    contextBand,
+    regionalUpliftBps:upliftBps,
+    formulaVersion:pricingVersion.formulaVersion || 'TOKEN_COST_V2',
     reason:null,
+    breakdown:{ordinaryInputTokens,cachedInputTokens:cachedTokens,cacheWriteTokens:writeTokens,outputTokens},
   };
 };
 
@@ -296,13 +459,13 @@ export const getRunCostSummary = async runId => {
     [runId]
   );
   const [byProviderRows] = await db.execute(
-    `SELECT provider_key, model_key, cost_currency,
+    `SELECT provider_key, model_key, service_tier, cost_currency,
             COUNT(*) AS usage_count,
             SUM(CASE WHEN cost_status='UNKNOWN' THEN 1 ELSE 0 END) AS unknown_count,
             COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) AS estimated_cost
      FROM usage_ledger
      WHERE run_id = ?
-     GROUP BY provider_key, model_key, cost_currency
+     GROUP BY provider_key, model_key, service_tier, cost_currency
      ORDER BY provider_key, model_key`,
     [runId]
   );
@@ -326,6 +489,7 @@ export const getRunCostSummary = async runId => {
     byProviderModel:byProviderRows.map(row => ({
       providerKey:row.provider_key,
       modelKey:row.model_key,
+      serviceTier:row.service_tier || 'STANDARD',
       currency:row.cost_currency,
       usageCount:Number(row.usage_count || 0),
       unknownCount:Number(row.unknown_count || 0),
@@ -364,13 +528,13 @@ export const getProjectCostSummary = async projectId => {
     [projectId]
   );
   const [byProviderRows] = await db.execute(
-    `SELECT provider_key, model_key, cost_currency,
+    `SELECT provider_key, model_key, service_tier, cost_currency,
             COUNT(*) AS usage_count,
             SUM(CASE WHEN cost_status='UNKNOWN' THEN 1 ELSE 0 END) AS unknown_count,
             COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) AS estimated_cost
      FROM usage_ledger
      WHERE project_id = ?
-     GROUP BY provider_key, model_key, cost_currency
+     GROUP BY provider_key, model_key, service_tier, cost_currency
      ORDER BY provider_key, model_key`,
     [projectId]
   );
@@ -397,6 +561,7 @@ export const getProjectCostSummary = async projectId => {
     byProviderModel:byProviderRows.map(row => ({
       providerKey:row.provider_key,
       modelKey:row.model_key,
+      serviceTier:row.service_tier || 'STANDARD',
       currency:row.cost_currency,
       usageCount:Number(row.usage_count || 0),
       unknownCount:Number(row.unknown_count || 0),

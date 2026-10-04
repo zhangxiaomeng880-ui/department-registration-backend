@@ -1,0 +1,67 @@
+{
+  "catalogVersion": "openai-gpt-6-luna-observed-2026-10-04",
+  "providerAdapterKey": "openai-responses",
+  "modelKey": "gpt-6-luna",
+  "currency": "USD",
+  "effectiveFrom": "2026-10-04T00:00:00.000Z",
+  "sourceLabel": "OPENAI_OFFICIAL_PRICING_OBSERVED_2026-10-04",
+  "sourceUri": "https://developers.openai.com/api/docs/pricing",
+  "metadata": {
+    "observedOn": "2026-10-04",
+    "vendorEffectiveDateClaimed": false,
+    "unit": "USD_PER_1M_TOKENS",
+    "longContextRule": "input_tokens > 272000",
+    "regionalUpliftBps": 1000,
+    "notes": "Committed public rate card. EffectiveFrom is the runtime catalog validity boundary, not a claimed vendor price-change timestamp."
+  },
+  "tiers": [
+    {
+      "serviceTier": "STANDARD",
+      "inputRatePerMillion": 0.1,
+      "cachedInputRatePerMillion": 0.01,
+      "cacheWriteRatePerMillion": 0.125,
+      "outputRatePerMillion": 0.5,
+      "longContextThresholdTokens": 272000,
+      "longContextInputRatePerMillion": 0.2,
+      "longContextCachedInputRatePerMillion": 0.02,
+      "longContextCacheWriteRatePerMillion": 0.25,
+      "longContextOutputRatePerMillion": 0.75
+    },
+    {
+      "serviceTier": "FLEX",
+      "inputRatePerMillion": 0.05,
+      "cachedInputRatePerMillion": 0.005,
+      "cacheWriteRatePerMillion": 0.0625,
+      "outputRatePerMillion": 0.25,
+      "longContextThresholdTokens": 272000,
+      "longContextInputRatePerMillion": 0.1,
+      "longContextCachedInputRatePerMillion": 0.01,
+      "longContextCacheWriteRatePerMillion": 0.125,
+      "longContextOutputRatePerMillion": 0.375
+    },
+    {
+      "serviceTier": "BATCH",
+      "inputRatePerMillion": 0.05,
+      "cachedInputRatePerMillion": 0.005,
+      "cacheWriteRatePerMillion": 0.0625,
+      "outputRatePerMillion": 0.25,
+      "longContextThresholdTokens": 272000,
+      "longContextInputRatePerMillion": 0.1,
+      "longContextCachedInputRatePerMillion": 0.01,
+      "longContextCacheWriteRatePerMillion": 0.125,
+      "longContextOutputRatePerMillion": 0.375
+    },
+    {
+      "serviceTier": "FAST",
+      "inputRatePerMillion": 0.2,
+      "cachedInputRatePerMillion": 0.02,
+      "cacheWriteRatePerMillion": 0.25,
+      "outputRatePerMillion": 1,
+      "longContextThresholdTokens": 272000,
+      "longContextInputRatePerMillion": 0.4,
+      "longContextCachedInputRatePerMillion": 0.04,
+      "longContextCacheWriteRatePerMillion": 0.5,
+      "longContextOutputRatePerMillion": 1.5
+    }
+  ]
+}

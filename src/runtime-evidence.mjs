@@ -5,6 +5,7 @@ import { selectProviderModel } from './policy-router-v2.mjs';
 import {
   resolvePricingVersion,
   calculateEstimatedCost,
+  normalizePricingServiceTier,
 } from './cost-ledger.mjs';
 
 const asJson = value => value == null ? null : JSON.stringify(value);
@@ -113,16 +114,18 @@ export const recordToolExecution = async input => {
   const id = randomUUID();
   const usageId = randomUUID();
   const tokenInput = Number(input.tokenInput || 0);
+  const cachedInputTokens = Number(input.cachedInputTokens || 0);
+  const cacheWriteTokens = Number(input.cacheWriteTokens || 0);
   const tokenOutput = Number(input.tokenOutput || 0);
   const durationMs = input.durationMs == null ? null : Number(input.durationMs);
+  const serviceTier = normalizePricingServiceTier(input.serviceTier);
+  const regionalUpliftBps = Number(input.regionalUpliftBps || 0);
   let correlationId = input.correlationId || null;
   const providerKey = input.providerKey || null;
   const errorCategory = input.errorCategory || null;
   let calculatedCost = {
-    costStatus:'UNKNOWN',
-    pricingVersionId:null,
-    estimatedCost:null,
-    currency:null,
+    costStatus:'UNKNOWN',pricingVersionId:null,estimatedCost:null,currency:null,
+    serviceTier,contextBand:null,regionalUpliftBps,formulaVersion:null,
   };
 
   try {
@@ -140,14 +143,11 @@ export const recordToolExecution = async input => {
     correlationId = correlationId || runRows[0].correlation_id || null;
 
     const pricingVersion = await resolvePricingVersion(connection,{
-      providerKey,
-      modelKey:input.modelKey || null,
-      at:new Date(),
+      providerKey,modelKey:input.modelKey || null,serviceTier,at:new Date(),
     });
     calculatedCost = calculateEstimatedCost({
-      tokenInput,
-      tokenOutput,
-      pricingVersion,
+      tokenInput,cachedInputTokens,cacheWriteTokens,tokenOutput,
+      serviceTier,regionalUpliftBps,pricingVersion,
     });
 
     await connection.execute(
@@ -159,29 +159,22 @@ export const recordToolExecution = async input => {
         duration_ms, error_code, error_category, error_message, started_at, finished_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))`,
       [
-        id,
-        input.runId,
-        input.taskId || null,
-        input.routeExecutionId || null,
-        correlationId,
-        input.toolType || 'CHATGPT_CONNECTOR',
-        input.toolKey,
-        providerKey,
-        input.modelKey || null,
-        calculatedCost.pricingVersionId,
-        calculatedCost.costStatus,
-        input.status,
-        asJson(input.input || null),
-        asJson(input.output || null),
-        tokenInput,
-        tokenOutput,
-        calculatedCost.estimatedCost,
-        calculatedCost.currency,
-        durationMs,
-        input.errorCode || null,
-        errorCategory,
-        input.errorMessage || null,
+        id,input.runId,input.taskId || null,input.routeExecutionId || null,correlationId,
+        input.toolType || 'CHATGPT_CONNECTOR',input.toolKey,providerKey,input.modelKey || null,
+        calculatedCost.pricingVersionId,calculatedCost.costStatus,input.status,
+        asJson(input.input || null),asJson(input.output || null),tokenInput,tokenOutput,
+        calculatedCost.estimatedCost,calculatedCost.currency,durationMs,input.errorCode || null,
+        errorCategory,input.errorMessage || null,
       ]
+    );
+
+    await connection.execute(
+      `UPDATE tool_executions
+       SET cached_input_tokens=?, cache_write_tokens=?, service_tier=?, context_band=?,
+           regional_uplift_bps=?, cost_formula_version=?
+       WHERE id=?`,
+      [cachedInputTokens,cacheWriteTokens,calculatedCost.serviceTier,calculatedCost.contextBand,
+       calculatedCost.regionalUpliftBps,calculatedCost.formulaVersion,id]
     );
 
     await connection.execute(
@@ -192,25 +185,20 @@ export const recordToolExecution = async input => {
         token_input, token_output, duration_ms, error_category
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        usageId,
-        runRows[0].project_id,
-        input.runId,
-        input.taskId || null,
-        input.routeExecutionId || null,
-        id,
-        correlationId,
-        providerKey,
-        input.modelKey || null,
-        calculatedCost.pricingVersionId,
-        calculatedCost.costStatus,
-        calculatedCost.estimatedCost,
-        calculatedCost.currency,
-        input.status,
-        tokenInput,
-        tokenOutput,
-        durationMs,
-        errorCategory,
+        usageId,runRows[0].project_id,input.runId,input.taskId || null,input.routeExecutionId || null,
+        id,correlationId,providerKey,input.modelKey || null,calculatedCost.pricingVersionId,
+        calculatedCost.costStatus,calculatedCost.estimatedCost,calculatedCost.currency,input.status,
+        tokenInput,tokenOutput,durationMs,errorCategory,
       ]
+    );
+
+    await connection.execute(
+      `UPDATE usage_ledger
+       SET cached_input_tokens=?, cache_write_tokens=?, service_tier=?, context_band=?,
+           regional_uplift_bps=?, cost_formula_version=?
+       WHERE id=?`,
+      [cachedInputTokens,cacheWriteTokens,calculatedCost.serviceTier,calculatedCost.contextBand,
+       calculatedCost.regionalUpliftBps,calculatedCost.formulaVersion,usageId]
     );
 
     await connection.execute(
@@ -219,14 +207,7 @@ export const recordToolExecution = async input => {
            token_output = token_output + ?,
            cost_amount = cost_amount + ?
        WHERE id = ?`,
-      [
-        tokenInput,
-        tokenOutput,
-        calculatedCost.costStatus === 'CALCULATED'
-          ? calculatedCost.estimatedCost
-          : 0,
-        input.runId
-      ]
+      [tokenInput,tokenOutput,calculatedCost.costStatus === 'CALCULATED' ? calculatedCost.estimatedCost : 0,input.runId]
     );
 
     await connection.commit();
@@ -238,15 +219,11 @@ export const recordToolExecution = async input => {
   }
 
   return {
-    id,
-    usageLedgerId: usageId,
-    correlationId,
-    status: input.status,
-    toolKey: input.toolKey,
-    costStatus: calculatedCost.costStatus,
-    pricingVersionId: calculatedCost.pricingVersionId,
-    estimatedCost: calculatedCost.estimatedCost,
-    costCurrency: calculatedCost.currency
+    id,usageLedgerId:usageId,correlationId,status:input.status,toolKey:input.toolKey,
+    costStatus:calculatedCost.costStatus,pricingVersionId:calculatedCost.pricingVersionId,
+    estimatedCost:calculatedCost.estimatedCost,costCurrency:calculatedCost.currency,
+    serviceTier:calculatedCost.serviceTier,contextBand:calculatedCost.contextBand,
+    regionalUpliftBps:calculatedCost.regionalUpliftBps,costFormulaVersion:calculatedCost.formulaVersion,
   };
 };
 

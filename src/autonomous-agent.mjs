@@ -187,7 +187,11 @@ export const executeScriptContinuityAgent = async input => {
       output: providerResult.output,
     },
     tokenInput: providerResult.usage?.input_tokens || 0,
+    cachedInputTokens: providerResult.usage?.input_tokens_details?.cached_tokens || 0,
+    cacheWriteTokens: providerResult.usage?.input_tokens_details?.cache_write_tokens || 0,
     tokenOutput: providerResult.usage?.output_tokens || 0,
+    serviceTier: providerResult.serviceTier || 'STANDARD',
+    regionalUpliftBps: Number(process.env.OPENAI_REGIONAL_UPLIFT_BPS || 0),
     durationMs: providerResult.durationMs,
   });
 

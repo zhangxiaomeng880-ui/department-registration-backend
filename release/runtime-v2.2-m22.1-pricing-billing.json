@@ -1,0 +1,32 @@
+{
+  "milestone": "M22.1",
+  "title": "Pricing Catalog + Usage Billing Model",
+  "version": "V2.2",
+  "status": "IMPLEMENTED_PENDING_GATE",
+  "branch": "feat/ai-native-runtime-v2.2-m22.1-pricing-billing",
+  "baseCommit": "44a33d4c851a1434333fd5d84600736b3b490b47",
+  "productionTouched": false,
+  "designGates": {
+    "missingPrice": "UNKNOWN_NULL",
+    "immutablePriceHistory": true,
+    "executionPricingVersionFrozen": true,
+    "cachedInputBilling": true,
+    "cacheWriteBilling": true,
+    "longContextBilling": true,
+    "serviceTierBilling": [
+      "STANDARD",
+      "FLEX",
+      "BATCH",
+      "FAST"
+    ],
+    "regionalUpliftSupported": true,
+    "privateBodyPersistence": false
+  },
+  "officialCatalog": {
+    "model": "gpt-6-luna",
+    "observedOn": "2026-10-04",
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "automaticImport": "pre-deploy for matching enabled openai-responses provider/model registry entries"
+  },
+  "acceptanceGate": "G22_1_COMMERCIAL_BILLING_PASS"
+}
