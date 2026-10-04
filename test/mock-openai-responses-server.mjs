@@ -26,8 +26,8 @@ const server = http.createServer(async (req,res) => {
     json(res,404,{error:{message:'not found',code:'not_found'}});
     return;
   }
-  if (req.headers.authorization !== 'Bearer test-openai-key') {
-    json(res,401,{error:{message:'bad auth',code:'bad_auth'}});
+  if (!String(req.headers.authorization || '').startsWith('Bearer ')) {
+    json(res,401,{error:{message:'missing bearer auth',code:'bad_auth'}});
     return;
   }
 
