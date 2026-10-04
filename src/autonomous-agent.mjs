@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { invokeOpenAiResponses } from './openai-responses-provider.mjs';
+import { invokeOpenAiResponses, classifyProviderError } from './openai-responses-provider.mjs';
 import { recordToolExecution } from './runtime-evidence.mjs';
 
 const sha256 = value => createHash('sha256').update(String(value)).digest('hex');
@@ -90,37 +90,66 @@ export const executeScriptContinuityAgent = async input => {
     'If there are no additional hard conflicts, say so through noOtherHardConflicts.',
   ].join('\n');
 
-  const providerResult = await invokeOpenAiResponses({
-    instructions,
-    input: JSON.stringify({
-      task: input.query,
-      scope: input.scope || null,
-      precedence: input.contextPacket.precedence || [],
-      context: contextMaterial,
-    }),
-    schema: CONTINUITY_ANALYSIS_SCHEMA,
-    schemaName: 'script_continuity_analysis',
-    metadata: {
-      run_id: input.runId,
-      task_id: input.taskId,
-      route_rule: input.routeRuleKey || 'P86',
-    },
-  });
+  const evidenceInput = {
+    queryHash: sha256(input.query),
+    contextHash,
+    contextItemCount: contextMaterial.length,
+    sourceBodyPersisted: false,
+  };
+
+  let providerResult;
+  try {
+    providerResult = await invokeOpenAiResponses({
+      instructions,
+      input: JSON.stringify({
+        task: input.query,
+        scope: input.scope || null,
+        precedence: input.contextPacket.precedence || [],
+        context: contextMaterial,
+      }),
+      schema: CONTINUITY_ANALYSIS_SCHEMA,
+      schemaName: 'script_continuity_analysis',
+      metadata: {
+        run_id: input.runId,
+        task_id: input.taskId,
+        route_rule: input.routeRuleKey || 'P86',
+        correlation_id: input.correlationId || '',
+      },
+    });
+  } catch (error) {
+    await recordToolExecution({
+      runId: input.runId,
+      taskId: input.taskId,
+      routeExecutionId: input.routeExecutionId,
+      correlationId: input.correlationId || null,
+      toolType: 'MODEL_PROVIDER',
+      toolKey: 'openai.responses',
+      providerKey: 'openai-responses',
+      modelKey: process.env.OPENAI_MODEL || null,
+      status: 'FAIL',
+      input: evidenceInput,
+      output: null,
+      tokenInput: 0,
+      tokenOutput: 0,
+      durationMs: error.durationMs ?? null,
+      errorCode: error.code || 'MODEL_PROVIDER_ERROR',
+      errorCategory: error.errorCategory || classifyProviderError(error),
+      errorMessage: error.message,
+    });
+    throw error;
+  }
 
   const toolEvidence = await recordToolExecution({
     runId: input.runId,
     taskId: input.taskId,
     routeExecutionId: input.routeExecutionId,
+    correlationId: input.correlationId || null,
     toolType: 'MODEL_PROVIDER',
     toolKey: 'openai.responses',
+    providerKey: providerResult.provider,
     modelKey: providerResult.model,
     status: providerResult.status === 'completed' ? 'PASS' : 'HOLD',
-    input: {
-      queryHash: sha256(input.query),
-      contextHash,
-      contextItemCount: contextMaterial.length,
-      sourceBodyPersisted: false,
-    },
+    input: evidenceInput,
     output: {
       providerResponseId: providerResult.providerResponseId,
       findingCount: providerResult.output.findingCount,
@@ -128,6 +157,7 @@ export const executeScriptContinuityAgent = async input => {
     },
     tokenInput: providerResult.usage?.input_tokens || 0,
     tokenOutput: providerResult.usage?.output_tokens || 0,
+    durationMs: providerResult.durationMs,
   });
 
   return {
@@ -136,9 +166,12 @@ export const executeScriptContinuityAgent = async input => {
     providerResponseId: providerResult.providerResponseId,
     model: providerResult.model,
     contextHash,
+    correlationId: input.correlationId || null,
     sourceBodyPersisted: false,
     toolExecutionId: toolEvidence.id,
+    usageLedgerId: toolEvidence.usageLedgerId,
     output: providerResult.output,
     usage: providerResult.usage,
+    durationMs: providerResult.durationMs,
   };
 };
