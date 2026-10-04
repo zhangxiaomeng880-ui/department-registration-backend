@@ -27,7 +27,8 @@
     "validate:billing-operations": "node test/billing-operations.test.mjs",
     "validate:collections": "node test/collections.test.mjs",
     "validate:revenue-analytics": "node test/revenue-analytics.test.mjs",
-    "validate:financial-adjustments": "node test/financial-adjustments.test.mjs"
+    "validate:financial-adjustments": "node test/financial-adjustments.test.mjs",
+    "validate:finance-close": "node test/finance-close.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
