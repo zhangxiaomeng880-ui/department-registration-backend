@@ -4,6 +4,12 @@ import { routeRuntimeTask } from './runtime-router.mjs';
 
 const asJson = value => value == null ? null : JSON.stringify(value);
 
+const resolveCorrelationId = async (db, runId, explicitCorrelationId) => {
+  if (explicitCorrelationId) return explicitCorrelationId;
+  const [rows] = await db.execute('SELECT correlation_id FROM runs WHERE id = ?', [runId]);
+  return rows[0]?.correlation_id || null;
+};
+
 export const routeAndRecord = async input => {
   if (!input?.runId || !input?.taskId) {
     const error = new Error('runId and taskId are required');
@@ -19,6 +25,7 @@ export const routeAndRecord = async input => {
     : Number(input.durationMs);
   const db = getRuntimePool();
   const id = randomUUID();
+  const correlationId = await resolveCorrelationId(db, input.runId, input.correlationId);
 
   await db.execute(
     `INSERT INTO route_executions (
@@ -30,7 +37,7 @@ export const routeAndRecord = async input => {
       id,
       input.runId,
       input.taskId,
-      input.correlationId || null,
+      correlationId,
       decision.routeRuleKey,
       decision.routePriority,
       decision.matched,
@@ -45,7 +52,7 @@ export const routeAndRecord = async input => {
     ]
   );
 
-  return { id, durationMs, correlationId: input.correlationId || null, ...decision };
+  return { id, durationMs, correlationId, ...decision };
 };
 
 export const recordToolExecution = async input => {
@@ -64,12 +71,24 @@ export const recordToolExecution = async input => {
   const tokenOutput = Number(input.tokenOutput || 0);
   const durationMs = input.durationMs == null ? null : Number(input.durationMs);
   const costAmount = Number(input.costAmount || 0);
-  const correlationId = input.correlationId || null;
+  let correlationId = input.correlationId || null;
   const providerKey = input.providerKey || null;
   const errorCategory = input.errorCategory || null;
 
   try {
     await connection.beginTransaction();
+    const [runRows] = await connection.execute(
+      'SELECT project_id, correlation_id FROM runs WHERE id = ? FOR UPDATE',
+      [input.runId]
+    );
+    if (!runRows.length) {
+      const error = new Error('Run not found');
+      error.code = 'RUN_NOT_FOUND';
+      error.statusCode = 404;
+      throw error;
+    }
+    correlationId = correlationId || runRows[0].correlation_id || null;
+
     await connection.execute(
       `INSERT INTO tool_executions (
         id, run_id, task_id, route_execution_id, correlation_id,
@@ -106,12 +125,10 @@ export const recordToolExecution = async input => {
         id, project_id, run_id, task_id, route_execution_id, tool_execution_id,
         correlation_id, provider_key, model_key, status,
         token_input, token_output, duration_ms, error_category
-      )
-      SELECT ?, r.project_id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      FROM runs r
-      WHERE r.id = ?`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         usageId,
+        runRows[0].project_id,
         input.runId,
         input.taskId || null,
         input.routeExecutionId || null,
@@ -124,7 +141,6 @@ export const recordToolExecution = async input => {
         tokenOutput,
         durationMs,
         errorCategory,
-        input.runId,
       ]
     );
 
@@ -163,6 +179,7 @@ export const recordGateResult = async input => {
   }
   const db = getRuntimePool();
   const id = randomUUID();
+  const correlationId = await resolveCorrelationId(db, input.runId, input.correlationId);
   await db.execute(
     `INSERT INTO gate_results (
       id, run_id, task_id, correlation_id, stage_key, gate_key, status,
@@ -172,7 +189,7 @@ export const recordGateResult = async input => {
       id,
       input.runId,
       input.taskId || null,
-      input.correlationId || null,
+      correlationId,
       input.stageKey,
       input.gateKey,
       input.status,
@@ -194,6 +211,7 @@ export const recordQaEvidence = async input => {
   }
   const db = getRuntimePool();
   const id = randomUUID();
+  const correlationId = await resolveCorrelationId(db, input.runId, input.correlationId);
   await db.execute(
     `INSERT INTO qa_evidence (
       id, run_id, task_id, correlation_id, gate_result_id, qa_case_key, status,
@@ -204,7 +222,7 @@ export const recordQaEvidence = async input => {
       id,
       input.runId,
       input.taskId || null,
-      input.correlationId || null,
+      correlationId,
       input.gateResultId || null,
       input.qaCaseKey,
       input.status,
