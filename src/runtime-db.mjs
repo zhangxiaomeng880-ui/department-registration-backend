@@ -14,10 +14,13 @@ const parseDatabaseUrl = value => {
   };
 };
 
+const runtimeDatabaseUrl = () => process.env.DATABASE_URL || process.env.MYSQL_URL || null;
+
 export const runtimeDbConfigured = () =>
   Boolean(
-    process.env.DATABASE_URL ||
-    (process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD)
+    runtimeDatabaseUrl() ||
+    (process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD) ||
+    (process.env.MYSQLHOST && process.env.MYSQLDATABASE && process.env.MYSQLUSER && process.env.MYSQLPASSWORD)
   );
 
 export const checkRuntimeDbReady = async () => {
@@ -44,15 +47,24 @@ export const getRuntimePool = () => {
     throw error;
   }
   if (!pool) {
-    const config = process.env.DATABASE_URL
-      ? parseDatabaseUrl(process.env.DATABASE_URL)
-      : {
-          host: process.env.DB_HOST,
-          port: Number(process.env.DB_PORT || 3306),
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-        };
+    const databaseUrl = runtimeDatabaseUrl();
+    const config = databaseUrl
+      ? parseDatabaseUrl(databaseUrl)
+      : process.env.DB_HOST
+        ? {
+            host: process.env.DB_HOST,
+            port: Number(process.env.DB_PORT || 3306),
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+          }
+        : {
+            host: process.env.MYSQLHOST,
+            port: Number(process.env.MYSQLPORT || 3306),
+            user: process.env.MYSQLUSER,
+            password: process.env.MYSQLPASSWORD,
+            database: process.env.MYSQLDATABASE,
+          };
     pool = mysql.createPool({
       ...config,
       waitForConnections: true,
