@@ -1,0 +1,97 @@
+{
+  "release": "ai-native-runtime-v2.1.0",
+  "releaseDate": "2026-10-04",
+  "status": "PRODUCTION_LIVE",
+  "manualApproval": {
+    "approved": true,
+    "approvalSource": "explicit release-owner approval",
+    "productionPromotionAuthorized": true
+  },
+  "candidate": {
+    "name": "ai-native-runtime-v2.1-rc1",
+    "releaseCandidateBranch": "release/ai-native-runtime-v2.1-rc1",
+    "runtimeCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+    "stagingEvidence": "release/runtime-v2.1-rc1-staging.json",
+    "stagingStatus": "PASS",
+    "stagingExactCandidateSha": true,
+    "stagingProviderSmokePass": true
+  },
+  "production": {
+    "platform": "Railway",
+    "projectId": "34abdc88-da14-4ada-b2a2-bdf1b61240a4",
+    "environmentId": "e8afc1ed-80e4-42d3-85d9-3e3ec193c5f7",
+    "runtimeServiceId": "e9fa97de-0913-4503-8ec8-682d9dfca9ee",
+    "runtimeDeploymentId": "ebb07381-56c5-4bab-85ef-59de1a13358f",
+    "runtimeStatus": "SUCCESS",
+    "runtimeSourceBranch": "release/ai-native-runtime-v2.1-rc1",
+    "runtimeCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+    "domain": "runtime-production-9c39.up.railway.app",
+    "readiness": {
+      "httpStatus": 200,
+      "status": "ready",
+      "databaseReady": true,
+      "runtimeAuthRequired": true,
+      "runtimeAuthReady": true,
+      "modelProviderConfigured": true,
+      "contextBridgeMode": "EPHEMERAL_MEMORY_ONLY",
+      "contextBridgePersisted": false
+    },
+    "authFailClosed": {
+      "unauthorizedRuntimeApiHttpStatus": 401,
+      "result": "PASS"
+    },
+    "migrations": {
+      "applied": 3,
+      "skipped": 4,
+      "total": 7,
+      "result": "RUNTIME_MIGRATIONS_PASS applied=3 skipped=4 total=7",
+      "newlyApplied": [
+        "004_runtime_observability.sql",
+        "005_policy_router_v2.sql",
+        "006_cost_ledger.sql"
+      ]
+    },
+    "database": {
+      "serviceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31",
+      "deploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+      "status": "SUCCESS",
+      "volume": "mysql-runtime-data",
+      "publicTcpProxy": false
+    }
+  },
+  "validatedCapabilities": {
+    "observability": "PASS",
+    "policyRouterV2": "PASS",
+    "costLedger": "PASS",
+    "releasePromotionGate": "PASS",
+    "openAiResponsesLiveOnExactCandidateInStaging": "PASS",
+    "productionReadinessAndAuth": "PASS"
+  },
+  "productionValidationTruth": {
+    "productionAuthorizedSyntheticProviderSmokeRepeated": false,
+    "reason": "Railway resource provisioning limit prevented creating an additional temporary smoke service after promotion.",
+    "releaseGateStillSatisfied": true,
+    "basis": [
+      "exact RC1 SHA passed isolated Railway staging live provider smoke",
+      "production deploy is pinned to the exact same RC1 SHA",
+      "production migrations completed successfully",
+      "production /ready returned 200 ready with model provider configured",
+      "production runtime auth fail-closed returned 401 without authorization"
+    ]
+  },
+  "rollback": {
+    "previousRelease": "v2.0.0",
+    "runtimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+    "deploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+    "captured": true,
+    "previousDeploymentCanRollback": true
+  },
+  "evidence": {
+    "m21_1": "release/runtime-v2.1-m21.1-observability.json",
+    "m21_2": "release/runtime-v2.1-m21.2-policy-router.json",
+    "m21_3": "release/runtime-v2.1-m21.3-cost-ledger.json",
+    "m21_4": "release/runtime-v2.1-m21.4-release-promotion.json",
+    "staging": "release/runtime-v2.1-rc1-staging.json"
+  },
+  "finalDecision": "V2.1 APPROVED AND LIVE IN PRODUCTION"
+}
