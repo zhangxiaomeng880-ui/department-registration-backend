@@ -2,20 +2,107 @@
   "milestone": "M22.4",
   "title": "Tenant Identity / Membership / RBAC + Scoped API Credentials",
   "version": "V2.2",
-  "status": "IMPLEMENTED_PENDING_GATE",
-  "branch": "feat/ai-native-runtime-v2.2-m22.4-iam-rbac",
-  "baseCommit": "238992f2701e0ee28d25376cd8fe6f4ec75f4e0b",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionPromotion": "NOT_STARTED",
   "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.2-m22.4-iam-rbac",
+    "stagingCodeSha": "8fb422574abf02f403d8973cbc0082d3db6058b9",
+    "baseM223EvidenceCommit": "238992f2701e0ee28d25376cd8fe6f4ec75f4e0b"
+  },
+  "gates": {
+    "githubActions": {
+      "workflow": "Runtime v2.2 M22.4 IAM RBAC Gate",
+      "runId": 37199277101,
+      "status": "PASS",
+      "migrationIdempotency": true,
+      "v21CostAccountingRegression": true,
+      "m221CommercialBillingRegression": true,
+      "m222TenantQuotaRegression": true,
+      "m223CommercialControlRegression": true,
+      "acceptance": "G22_4_IAM_RBAC_SCOPED_CREDENTIAL_PASS"
+    },
+    "staging": {
+      "deploymentId": "7006b88b-73e0-4642-8009-03a439338e98",
+      "status": "SUCCESS",
+      "runtime": "ONLINE",
+      "mysql": "ONLINE",
+      "readyHttp": 200,
+      "unauthenticatedIamMeHttp": 401,
+      "unauthenticatedIdentitiesHttp": 401,
+      "unauthenticatedApiCredentialsHttp": 401,
+      "warnings": 0,
+      "criticals": 0
+    },
+    "migrations": {
+      "total": 11,
+      "latest": "010_identity_rbac_scoped_credentials.sql",
+      "appliedOnStaging": true,
+      "status": "PASS"
+    },
+    "pricingRegression": {
+      "model": "gpt-6-luna",
+      "targets": 1,
+      "inserted": 0,
+      "skipped": 4,
+      "conclusion": "M22.1 immutable pricing catalog preserved"
+    }
+  },
   "securityModel": {
     "platformToken": "PLATFORM_ADMIN_COMPATIBILITY",
     "scopedCredentialDefault": "DENY",
+    "scopedRoutePolicy": "EXPLICIT_ALLOWLIST_ONLY",
     "unknownScopedRoute": "403_SCOPED_ROUTE_NOT_ALLOWLISTED",
-    "secretStorage": "SHA256_ONLY",
-    "rawCredentialReturned": "CREATE_ONCE_ONLY",
-    "credentialPermissionModel": "membership role permissions intersect credential scopes",
-    "tenantIsolation": true,
-    "workspaceIsolation": true,
-    "authzAudit": true
+    "identities": [
+      "USER",
+      "SERVICE"
+    ],
+    "membershipScopes": [
+      "TENANT",
+      "WORKSPACE"
+    ],
+    "builtInRoles": [
+      "TENANT_OWNER",
+      "TENANT_OPERATOR",
+      "TENANT_VIEWER",
+      "WORKSPACE_OPERATOR",
+      "WORKSPACE_VIEWER"
+    ],
+    "credentialSecretStorage": "SHA256_ONLY",
+    "credentialPlaintext": "RETURNED_ON_CREATE_ONLY",
+    "permissionResolution": "active membership role permissions intersect credential scopes",
+    "credentialRevocation": "IMMEDIATE",
+    "membershipRevocation": "IMMEDIATE",
+    "authorizationAudit": true
   },
-  "acceptanceGate": "G22_4_IAM_RBAC_SCOPED_CREDENTIAL_PASS"
+  "invariants": {
+    "legacyPlatformTokenCompatibility": true,
+    "unauthenticatedFailClosed": true,
+    "scopedUnknownRouteFailClosed": true,
+    "crossTenantDenied": true,
+    "crossWorkspaceDenied": true,
+    "workspaceCredentialCannotReadTenantAggregate": true,
+    "credentialScopeCannotExceedMembershipRole": true,
+    "revokedCredentialReturns401": true,
+    "revokedMembershipInvalidatesCredential": true,
+    "rawCredentialNeverPersisted": true,
+    "authzAllowAndDenyAudited": true,
+    "previousCommercialGatesPreserved": true,
+    "privateBodyPersistence": false
+  },
+  "knownNonBlockingState": {
+    "historicalRecentFailure": {
+      "deploymentId": "d630ab7c-5ae4-4846-bb49-2767900ada4c",
+      "milestone": "M22.1",
+      "cause": "Historical Docker image omitted pricing catalog directory",
+      "currentImpact": "NONE"
+    },
+    "emptyStagedPatch": {
+      "status": "STAGED",
+      "changes": [],
+      "currentImpact": "NONE"
+    }
+  },
+  "conclusion": "M22.4 STAGING PASS / FROZEN. Production promotion requires separate human approval."
 }
