@@ -548,6 +548,30 @@ export const recordInvoicePayment=async({
       [unitsToString(newPaid),fullyPaid?'PAID':'PARTIALLY_PAID',fullyPaid?received:null,invoiceId]
     );
 
+    if(fullyPaid){
+      const [collectionRows]=await connection.execute(
+        "SELECT id,status FROM collection_cases WHERE invoice_id=? LIMIT 1 FOR UPDATE",
+        [invoiceId]
+      );
+      if(collectionRows.length&&collectionRows[0].status!=='RESOLVED'){
+        const collectionCaseId=collectionRows[0].id;
+        await connection.execute(
+          `UPDATE collection_cases SET
+            status='RESOLVED',next_action_at=NULL,resolved_at=?,resolution_code='PAID'
+           WHERE id=?`,
+          [received,collectionCaseId]
+        );
+        await connection.execute(
+          `INSERT INTO collection_actions (
+            id,case_id,invoice_id,tenant_id,action_type,amount,promise_due_at,
+            idempotency_key,metadata_json,occurred_at
+          ) VALUES (?,?,?,?, 'AUTO_RESOLVED_PAYMENT', ?, NULL, ?, NULL, ?)`,
+          [randomUUID(),collectionCaseId,invoiceId,invoice.tenant_id,unitsToString(amountUnits),
+           `auto-payment:${paymentId}`,received]
+        );
+      }
+    }
+
     const [paymentRows]=await connection.execute('SELECT * FROM invoice_payments WHERE id=?',[paymentId]);
     const [updatedInvoices]=await connection.execute('SELECT * FROM invoices WHERE id=?',[invoiceId]);
     await connection.commit();
