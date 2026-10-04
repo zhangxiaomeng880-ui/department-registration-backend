@@ -44,7 +44,12 @@ const server = http.createServer(async (req,res) => {
     json(res,400,{error:{message:'structured output required',code:'schema_required'}});
     return;
   }
-  if (!String(body.input || '').includes('SC049') || !String(body.input || '').includes('LIBRARY_SENTINEL_SOURCE_TEXT')) {
+  const inputText = String(body.input || '');
+  const hasTransientContext =
+    inputText.includes('LIBRARY_SENTINEL_SOURCE_TEXT') ||
+    inputText.includes('LIBRARY_CONTEXT_SENTINEL') ||
+    inputText.includes('SC049 hard lock');
+  if (!inputText.includes('SC049') || !hasTransientContext) {
     json(res,400,{error:{message:'transient context missing',code:'context_missing'}});
     return;
   }
