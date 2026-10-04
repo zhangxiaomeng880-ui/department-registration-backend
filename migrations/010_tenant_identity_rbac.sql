@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS rbac_role_permissions (
   permission_key VARCHAR(128) NOT NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (role_key,permission_key),
-  CONSTRAINT fk_role_permission_role FOREIGN KEY (role_key) REFERENCES rbac_roles(role_key)
+  CONSTRAINT fk_m224_role_permission_role FOREIGN KEY (role_key) REFERENCES rbac_roles(role_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT IGNORE INTO rbac_roles (role_key,scope_type,name) VALUES
@@ -111,9 +111,9 @@ CREATE TABLE IF NOT EXISTS tenant_memberships (
   status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_tenant_membership_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
-  CONSTRAINT fk_tenant_membership_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
-  CONSTRAINT fk_tenant_membership_role FOREIGN KEY (role_key) REFERENCES rbac_roles(role_key),
+  CONSTRAINT fk_m224_tenant_membership_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_m224_tenant_membership_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
+  CONSTRAINT fk_m224_tenant_membership_role FOREIGN KEY (role_key) REFERENCES rbac_roles(role_key),
   UNIQUE KEY uq_tenant_membership (tenant_id,identity_id),
   INDEX idx_tenant_membership_identity (identity_id,status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -126,9 +126,9 @@ CREATE TABLE IF NOT EXISTS workspace_memberships (
   status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_workspace_membership_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
-  CONSTRAINT fk_workspace_membership_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
-  CONSTRAINT fk_workspace_membership_role FOREIGN KEY (role_key) REFERENCES rbac_roles(role_key),
+  CONSTRAINT fk_m224_workspace_membership_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_m224_workspace_membership_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
+  CONSTRAINT fk_m224_workspace_membership_role FOREIGN KEY (role_key) REFERENCES rbac_roles(role_key),
   UNIQUE KEY uq_workspace_membership (workspace_id,identity_id),
   INDEX idx_workspace_membership_identity (identity_id,status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -147,9 +147,9 @@ CREATE TABLE IF NOT EXISTS api_credentials (
   last_used_at TIMESTAMP(6) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   revoked_at TIMESTAMP(6) NULL,
-  CONSTRAINT fk_credential_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
-  CONSTRAINT fk_credential_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
-  CONSTRAINT fk_credential_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_m224_credential_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
+  CONSTRAINT fk_m224_credential_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_m224_credential_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
   INDEX idx_credential_identity_status (identity_id,status),
   INDEX idx_credential_tenant_workspace (tenant_id,workspace_id,status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -166,10 +166,10 @@ CREATE TABLE IF NOT EXISTS authorization_decisions (
   decision VARCHAR(16) NOT NULL,
   reason_code VARCHAR(128) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_authz_credential FOREIGN KEY (credential_id) REFERENCES api_credentials(id),
-  CONSTRAINT fk_authz_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
-  CONSTRAINT fk_authz_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
-  CONSTRAINT fk_authz_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_m224_authz_credential FOREIGN KEY (credential_id) REFERENCES api_credentials(id),
+  CONSTRAINT fk_m224_authz_identity FOREIGN KEY (identity_id) REFERENCES identities(id),
+  CONSTRAINT fk_m224_authz_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_m224_authz_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
   INDEX idx_authz_identity_created (identity_id,created_at),
   INDEX idx_authz_credential_created (credential_id,created_at),
   INDEX idx_authz_scope_created (tenant_id,workspace_id,created_at)
