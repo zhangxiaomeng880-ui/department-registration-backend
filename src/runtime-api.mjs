@@ -49,7 +49,8 @@ import {
 import {
   createPlanBillingTerm,listPlanBillingTerms,createSubscription,getTenantSubscription,
   issueCredit,getCreditBalance,finalizeBillingCycle,listTenantInvoices,getInvoice,
-  resolveInvoiceScope,resolveBillingCycleScope,reconcileBillingCycle
+  resolveInvoiceScope,resolveBillingCycleScope,reconcileBillingCycle,
+  recordInvoicePayment,listInvoicePayments,getBillingOperationsSummary,listReceivables
 } from './billing-ledger.mjs';
 import {
   createEphemeralContextPacket,
@@ -125,6 +126,52 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && tenantInvoicesMatch) {
     if(!principal?.platformAdmin) await assertAccess({principal,permission:'billing:read',tenantId:tenantInvoicesMatch[1],method:req.method,path:url.pathname});
     json(res,200,{data:await listTenantInvoices(tenantInvoicesMatch[1])});
+    return true;
+  }
+
+  const invoicePaymentsMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)\/payments$/);
+  if (req.method === 'POST' && invoicePaymentsMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await recordInvoicePayment({
+      invoiceId:invoicePaymentsMatch[1],amount:body.amount,currency:body.currency||null,
+      idempotencyKey:body.idempotencyKey,paymentReference:body.paymentReference||null,
+      receivedAt:body.receivedAt||new Date(),metadata:body.metadata||null
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && invoicePaymentsMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveInvoiceScope(invoicePaymentsMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await listInvoicePayments(invoicePaymentsMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/billing-ops/summary') {
+    const requestedTenant=url.searchParams.get('tenantId')||(principal?.platformAdmin?null:principal?.tenantId);
+    if(!principal?.platformAdmin){
+      if(!requestedTenant) throw Object.assign(new Error('Tenant scope is required'),{code:'TENANT_SCOPE_REQUIRED',statusCode:403});
+      await assertAccess({principal,permission:'billing:read',tenantId:requestedTenant,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getBillingOperationsSummary({
+      tenantId:requestedTenant,
+      asOf:url.searchParams.get('asOf')||new Date()
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/billing-ops/receivables') {
+    const requestedTenant=url.searchParams.get('tenantId')||(principal?.platformAdmin?null:principal?.tenantId);
+    if(!principal?.platformAdmin){
+      if(!requestedTenant) throw Object.assign(new Error('Tenant scope is required'),{code:'TENANT_SCOPE_REQUIRED',statusCode:403});
+      await assertAccess({principal,permission:'billing:read',tenantId:requestedTenant,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listReceivables({
+      tenantId:requestedTenant,
+      status:url.searchParams.get('status')||'OPEN',
+      asOf:url.searchParams.get('asOf')||new Date(),
+      limit:url.searchParams.get('limit')||100
+    })});
     return true;
   }
 
