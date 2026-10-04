@@ -29,9 +29,8 @@
   "currentCandidate": {
     "name": "ai-native-runtime-v2.1-rc1",
     "readinessManifest": "release/runtime-v2.1-rc1-readiness.json",
-    "verdict": "HOLD",
+    "verdict": "AWAITING_MANUAL_APPROVAL",
     "blockingReasons": [
-      "STAGING_NOT_VERIFIED",
       "MANUAL_APPROVAL_REQUIRED"
     ],
     "candidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f"
@@ -45,7 +44,11 @@
     "productionModifiedByM21_4": false,
     "currentProductionStatus": "SUCCESS",
     "v2_1DeployedToProduction": false,
-    "stagingVerified": false
+    "stagingVerified": true,
+    "stagingDeploymentId": "b82386a2-bdd0-4f3d-bf87-57678b1b8cfc",
+    "stagingCandidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+    "stagingReadinessHttpStatus": 200,
+    "stagingProviderSmokePass": true
   },
   "ci": [
     {
@@ -84,5 +87,5 @@
       "conclusion": "success"
     }
   ],
-  "decision": "M21.4 automation gate PASS. v2.1 RC1 remains HOLD until isolated Railway staging validation succeeds and explicit manual production approval is recorded."
+  "decision": "M21.4 automation gate PASS. RC1 isolated Railway staging verification PASS. v2.1 RC1 is AWAITING_MANUAL_APPROVAL; production remains unchanged until explicit release-owner approval."
 }
