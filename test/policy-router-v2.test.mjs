@@ -248,6 +248,16 @@ assert.ok(r.body.data.qaEvidenceId);
 assert.ok(r.body.data.checkpointId);
 const fallbackRunId=r.body.data.runId;
 
+r=await request('GET',`/api/runtime/runs/${fallbackRunId}/observability`);
+assert.equal(r.status,200);
+const observedRoute=r.body.data.routes.find(x=>x.selectedProviderKey==='backup-openai');
+assert.ok(observedRoute);
+assert.equal(observedRoute.policyMode,'FALLBACK_ONLY');
+assert.equal(observedRoute.selectedModelKey,'test-model');
+assert.equal(observedRoute.selectedAdapterKey,'openai-responses');
+assert.equal(observedRoute.providerHealthStatus,'HEALTHY');
+assert.equal(JSON.stringify(r.body.data).includes('LIBRARY_CONTEXT_SENTINEL'),false);
+
 r=await request('POST','/api/runtime/context-packets',{
   query:'检查SC049连续性。',
   scope:'SC049',
