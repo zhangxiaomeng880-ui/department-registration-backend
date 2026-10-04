@@ -1,0 +1,35 @@
+{
+  "record": "V2.2 production evidence correction",
+  "status": "CORRECTED",
+  "supersedesEvidenceCommit": "8acba3ca6c19e607d59365c820c84fd8ced03058",
+  "supersedesFile": "release/runtime-v2.2-production-live.json",
+  "correctionReason": "The earlier production-live evidence inferred successful V2.2 commercial migrations from a combined Railway preDeployCommand string. Subsequent production preflight proved migrations 007-011 were still pending because Railway executed only the first command segment.",
+  "discoveredDuring": "V2.2 mysql2 security hotfix promotion",
+  "directEvidence": {
+    "preflightAt": "2026-10-04T13:04:53Z",
+    "appliedV22Migrations": [],
+    "pendingV22Migrations": [
+      "007_commercial_pricing_catalog.sql",
+      "008_tenant_workspace_quota_meter.sql",
+      "009_commercial_control.sql",
+      "010_tenant_identity_rbac.sql",
+      "011_subscription_billing_ledger.sql"
+    ]
+  },
+  "resolution": {
+    "preDeployWrapper": "npm run predeploy:v22-production",
+    "wrapperCommand": "npm run preflight:v22-production && npm run migrate:runtime",
+    "correctedDeploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "correctedCommitSha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "migrationResult": "RUNTIME_MIGRATIONS_PASS applied=6 skipped=7 total=13",
+    "migrationsApplied": [
+      "007_commercial_pricing_catalog.sql",
+      "008_tenant_workspace_quota_meter.sql",
+      "009_commercial_control.sql",
+      "010_tenant_identity_rbac.sql",
+      "011_subscription_billing_ledger.sql",
+      "012_v21_rollback_compatibility.sql"
+    ]
+  },
+  "conclusion": "The earlier V2.2 Runtime deployment was live, but the commercial database migration state was not complete. The corrected deployment above is the first fully verified V2.2 commercial production baseline."
+}
