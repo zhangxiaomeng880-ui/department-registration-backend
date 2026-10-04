@@ -56,6 +56,7 @@ import {
   openCollectionCase,getInvoiceCollectionCase,getCollectionCase,listCollectionCases,
   recordCollectionAction,resolveCollectionCaseScope
 } from './collections.mjs';
+import { getRevenueAnalytics, getRevenuePerformance } from './revenue-analytics.mjs';
 import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
@@ -173,6 +174,33 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     json(res,200,{data:await listReceivables({
       tenantId:requestedTenant,
       status:url.searchParams.get('status')||'OPEN',
+      asOf:url.searchParams.get('asOf')||new Date(),
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/billing-ops/analytics') {
+    const requestedTenant=url.searchParams.get('tenantId')||(principal?.platformAdmin?null:principal?.tenantId);
+    if(!principal?.platformAdmin){
+      if(!requestedTenant) throw Object.assign(new Error('Tenant scope is required'),{code:'TENANT_SCOPE_REQUIRED',statusCode:403});
+      await assertAccess({principal,permission:'billing:read',tenantId:requestedTenant,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getRevenueAnalytics({
+      tenantId:requestedTenant,
+      asOf:url.searchParams.get('asOf')||new Date()
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/billing-ops/revenue-performance') {
+    const requestedTenant=url.searchParams.get('tenantId')||(principal?.platformAdmin?null:principal?.tenantId);
+    if(!principal?.platformAdmin){
+      if(!requestedTenant) throw Object.assign(new Error('Tenant scope is required'),{code:'TENANT_SCOPE_REQUIRED',statusCode:403});
+      await assertAccess({principal,permission:'billing:read',tenantId:requestedTenant,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getRevenuePerformance({
+      tenantId:requestedTenant,
       asOf:url.searchParams.get('asOf')||new Date(),
       limit:url.searchParams.get('limit')||100
     })});
