@@ -81,7 +81,7 @@ const migration=await fs.readFile(new URL('../migrations/019_eval_runner_runtime
 await db.query(migration);
 
 const [cols]=await db.execute(`
-  SELECT table_name,column_name,is_nullable
+  SELECT table_name AS table_name,column_name AS column_name,is_nullable AS is_nullable
   FROM information_schema.columns
   WHERE table_schema=DATABASE()
     AND (
@@ -97,7 +97,7 @@ assert.ok(byKey.has('eval_case_results.error_code'));
 assert.equal(byKey.get('eval_case_results.route_json').is_nullable,'YES');
 
 const [constraints]=await db.execute(`
-  SELECT table_name,constraint_name
+  SELECT table_name AS table_name,constraint_name AS constraint_name
   FROM information_schema.table_constraints
   WHERE constraint_schema=DATABASE()
     AND constraint_name IN ('fk_m242_eval_run_project','fk_m242_case_result_runtime_run')
@@ -107,7 +107,7 @@ assert.ok(names.has('fk_m242_eval_run_project'));
 assert.ok(names.has('fk_m242_case_result_runtime_run'));
 
 const [indexes]=await db.execute(`
-  SELECT DISTINCT index_name
+  SELECT DISTINCT index_name AS index_name
   FROM information_schema.statistics
   WHERE table_schema=DATABASE() AND table_name='eval_runs'
     AND index_name='idx_m242_eval_run_project'
