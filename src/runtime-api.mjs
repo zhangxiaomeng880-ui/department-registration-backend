@@ -27,6 +27,14 @@ import {
   listProviderRegistry,
 } from './provider-registry.mjs';
 import {
+  createPricingVersion,
+  listPricingVersions,
+  upsertProjectBudgetPolicy,
+  getRunCostSummary,
+  getProjectCostSummary,
+  evaluateBudgetPolicy,
+} from './cost-ledger.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -82,6 +90,27 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && url.pathname === '/api/runtime/provider-registry') {
     const result = await listProviderRegistry();
     json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/pricing-versions') {
+    const result = await createPricingVersion(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/pricing-versions') {
+    const result = await listPricingVersions({
+      providerKey:url.searchParams.get('providerKey') || null,
+      modelKey:url.searchParams.get('modelKey') || null,
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/budget-policies') {
+    const result = await upsertProjectBudgetPolicy(await readBody(req));
+    json(res, 201, { data: result });
     return true;
   }
 
@@ -169,6 +198,31 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   const observabilityMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/observability$/);
   if (req.method === 'GET' && observabilityMatch) {
     const result = await getRunObservability(observabilityMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const runCostMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/cost-summary$/);
+  if (req.method === 'GET' && runCostMatch) {
+    const result = await getRunCostSummary(runCostMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const projectCostMatch = match(url.pathname, /^\/api\/runtime\/projects\/([^/]+)\/cost-summary$/);
+  if (req.method === 'GET' && projectCostMatch) {
+    const result = await getProjectCostSummary(projectCostMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const budgetEvaluateMatch = match(url.pathname, /^\/api\/runtime\/projects\/([^/]+)\/budget-evaluate$/);
+  if (req.method === 'POST' && budgetEvaluateMatch) {
+    const body = await readBody(req);
+    const result = await evaluateBudgetPolicy({
+      projectId:budgetEvaluateMatch[1],
+      runId:body.runId || null,
+    });
     json(res, 200, { data: result });
     return true;
   }
