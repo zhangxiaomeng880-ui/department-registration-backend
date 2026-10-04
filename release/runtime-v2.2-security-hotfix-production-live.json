@@ -1,0 +1,81 @@
+{
+  "release": "AI Native Runtime V2.2 Security Hotfix",
+  "status": "PRODUCTION_LIVE",
+  "frozen": true,
+  "productionBaseline": {
+    "branch": "hotfix/v2.2-mysql2-security",
+    "commitSha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "deploymentStatus": "SUCCESS"
+  },
+  "security": {
+    "package": "mysql2",
+    "version": "3.24.5",
+    "dockerBuildAudit": "found 0 vulnerabilities",
+    "ciAudit": "PASS",
+    "ciGateRun": 37204500956,
+    "ciGateConclusion": "success"
+  },
+  "migrations": {
+    "preflight": "PASS",
+    "runtimeMigrations": "PASS",
+    "applied": 6,
+    "skipped": 7,
+    "total": 13,
+    "appliedFiles": [
+      "007_commercial_pricing_catalog.sql",
+      "008_tenant_workspace_quota_meter.sql",
+      "009_commercial_control.sql",
+      "010_tenant_identity_rbac.sql",
+      "011_subscription_billing_ledger.sql",
+      "012_v21_rollback_compatibility.sql"
+    ],
+    "pricingCatalogImport": "PASS",
+    "pricingCatalogNote": "gpt-6-luna not registered; import skipped with targets=0"
+  },
+  "runtimeAcceptance": {
+    "ready": {
+      "status": 200,
+      "durationMs": 4
+    },
+    "unauthenticatedFailClosed": [
+      {
+        "path": "/api/runtime/plan-billing-terms",
+        "status": 401,
+        "durationMs": 24
+      },
+      {
+        "path": "/api/runtime/tenants/test-tenant/subscription",
+        "status": 401,
+        "durationMs": 2
+      },
+      {
+        "path": "/api/runtime/invoices/test-invoice",
+        "status": 401,
+        "durationMs": 25
+      }
+    ],
+    "observedRequests": 8,
+    "http2xx": 2,
+    "http4xx": 6,
+    "http5xx": 0,
+    "fiveXxErrorRate": 0
+  },
+  "railway": {
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "runtimeReplicas": "1/1",
+    "mysqlReplicas": "1/1",
+    "warningCount": 0,
+    "criticalCount": 0,
+    "preDeployCommand": [
+      "npm run predeploy:v22-production"
+    ]
+  },
+  "rollbackCompatibility": {
+    "migration": "012_v21_rollback_compatibility.sql",
+    "implementation": "legacy tenant/workspace defaults only; no triggers or elevated MySQL routine privileges required",
+    "ciValidation": "PASS"
+  },
+  "conclusion": "V2.2 commercial runtime plus mysql2 security hotfix is fully live in production. Commercial migrations 007-012 are verified by direct migration logs, the production image reports zero npm vulnerabilities, /ready returns 200, protected billing endpoints fail closed with 401, and no 5xx were observed."
+}
