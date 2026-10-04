@@ -14,7 +14,8 @@
     "validate:real-chain:phase2": "node test/real-runtime-chain-phase2.test.mjs",
     "validate:autonomous-agent-provider": "node test/autonomous-agent-provider.test.mjs",
     "validate:context-bridge": "node test/context-bridge.test.mjs",
-    "validate:runtime-orchestrator": "node test/runtime-orchestrator.test.mjs"
+    "validate:runtime-orchestrator": "node test/runtime-orchestrator.test.mjs",
+    "migrate:runtime": "node scripts/migrate-runtime.mjs"
   },
   "dependencies": {
     "mysql2": "3.15.1"
