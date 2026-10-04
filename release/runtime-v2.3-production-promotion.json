@@ -1,0 +1,114 @@
+{
+  "release": "AI Native Runtime V2.3",
+  "milestone": "M23.6 Production Promotion",
+  "title": "V2.3 Commercial Finance Production Promotion",
+  "status": "PRODUCTION_PASS",
+  "frozen": true,
+  "productionTouched": true,
+  "approval": "User explicitly approved V2.3 production release in chat",
+  "source": {
+    "repo": "zhangxiaomeng880-ui/department-registration-backend",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "productionCommit": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "rcRuntimeSha": "58fc7a7f479d63e55e0b6691550e08f881bcd841",
+    "rcEvidenceCommit": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "productionCommitRuntimeEquivalentToRc": true,
+    "explanation": "The production commit differs from the validated RC Runtime SHA only by the M23.6 release evidence JSON; Docker runtime sources are unchanged."
+  },
+  "rcGate": {
+    "workflow": "Runtime v2.3 M23.6 Commercial Finance RC Freeze Gate",
+    "prePromotionRunId": 37212523939,
+    "prePromotionConclusion": "SUCCESS",
+    "finalRcEvidenceRunId": 37212732948,
+    "finalRcEvidenceConclusion": "SUCCESS",
+    "frozenPrerequisites": [
+      "M23.1 Billing Operations / Accounts Receivable",
+      "M23.2 Dunning / Collections",
+      "M23.3 Revenue / Billing Operations Analytics",
+      "M23.4 Financial Adjustments / Revenue Assurance",
+      "M23.5 Finance Close / Reconciliation Export"
+    ]
+  },
+  "promotion": {
+    "environment": "production",
+    "project": "ai-native-runtime-v2",
+    "runtimeService": "runtime",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS",
+    "region": "sfo",
+    "previousDeploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "previousVersion": "V2.2 security hotfix",
+    "previousDeploymentExit": "Railway normal replacement / SIGTERM after V2.3 became healthy",
+    "stagedReview": {
+      "destructive": false,
+      "variablesChanged": false,
+      "mysqlServiceChanged": false,
+      "networkingChanged": false,
+      "serviceStructureChanged": false,
+      "effectiveChange": "source branch and commit only"
+    }
+  },
+  "migrations": {
+    "total": 17,
+    "preExistingThrough": "012_v21_rollback_compatibility.sql",
+    "appliedDuringV23Promotion": [
+      "013_billing_operations.sql",
+      "014_collections.sql",
+      "015_financial_adjustments.sql",
+      "016_finance_close.sql"
+    ],
+    "applied": 4,
+    "skipped": 13,
+    "result": "RUNTIME_MIGRATIONS_PASS applied=4 skipped=13 total=17",
+    "v22ProductionPreflight": "PASS"
+  },
+  "productionAcceptance": {
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "1/1 succeeded"
+    },
+    "authorization": {
+      "financeClosesUnauthenticated": 401,
+      "billingOpsAnalyticsUnauthenticated": 401,
+      "billingDisputesUnauthenticated": 401
+    },
+    "httpObservation": {
+      "observedRequests": 3,
+      "http2xx": 0,
+      "http4xx": 3,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p50Ms": 24,
+      "p95Ms": 26,
+      "p99Ms": 26
+    }
+  },
+  "capabilitiesNowLive": [
+    "Pricing / Billing Terms / Subscription / Billing Cycle",
+    "Usage settlement / Credit ledger / Invoice / Reconciliation",
+    "Accounts Receivable and payments",
+    "Dunning / Collections / Promise-to-Pay",
+    "Revenue and billing operations analytics",
+    "Credit Note / Write-off / Debit Adjustment",
+    "Refunds / Billing Disputes / Revenue Assurance",
+    "Finance Close / Reconciliation snapshots",
+    "Deterministic JSON / CSV finance exports",
+    "Closed-period write protection",
+    "Tenant read isolation and platform-admin financial mutation boundary"
+  ],
+  "rollback": {
+    "priorProductionDeployment": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "note": "Prior deployment remains identifiable for rollback; V2.3 schema migrations are additive and M23.6 RC included migration idempotency and compatibility gates."
+  },
+  "conclusion": "AI Native Runtime V2.3 Commercial Finance has been promoted to Production successfully. Production migrations 013 through 016 applied successfully, Runtime and MySQL are healthy, protected finance endpoints remain fail-closed, and no 5xx errors were observed in post-promotion acceptance. V2.3 is PRODUCTION PASS / FROZEN."
+}
