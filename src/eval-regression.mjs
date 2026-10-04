@@ -33,6 +33,7 @@ const stableJson=value=>JSON.stringify(stableValue(value));
 const sha256=value=>createHash('sha256').update(typeof value==='string'?value:stableJson(value),'utf8').digest('hex');
 const deepEqual=(a,b)=>stableJson(a)===stableJson(b);
 const numberOrNull=value=>{
+  if(value==null) return null;
   const parsed=Number(value);
   return Number.isFinite(parsed)?parsed:null;
 };
@@ -71,6 +72,22 @@ const loadRunContext=async runId=>{
   const manifest=await getEvalReplayManifest(run.replayManifestId);
   if(manifest.candidateRuntimeSha!==run.candidateRuntimeSha){
     throw errorOf('Eval run candidate SHA does not match its replay manifest','EVAL_RUN_MANIFEST_SHA_MISMATCH',500,{runId});
+  }
+  if(run.caseCount!==run.cases.length||run.cases.some(item=>!SHA64.test(item.resultSha256||''))){
+    throw errorOf('Eval run case result set is incomplete or unhashed','EVAL_RUN_INTEGRITY_MISMATCH',500,{runId});
+  }
+  const expectedRunSha256=sha256({
+    replayManifestSha256:manifest.manifestSha256,
+    candidateRuntimeSha:run.candidateRuntimeSha,
+    status:run.status,
+    cases:run.cases.map(item=>({
+      caseKey:item.caseKey,sequenceNo:item.sequenceNo,resultSha256:item.resultSha256
+    }))
+  });
+  if(expectedRunSha256!==run.resultSha256){
+    throw errorOf('Eval run result SHA-256 integrity check failed','EVAL_RUN_INTEGRITY_MISMATCH',500,{
+      runId,expected:expectedRunSha256,actual:run.resultSha256
+    });
   }
   return {run,manifest};
 };
