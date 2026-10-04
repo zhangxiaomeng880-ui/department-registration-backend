@@ -17,6 +17,7 @@ import {
   recordGateResult,
   recordQaEvidence,
 } from './runtime-evidence.mjs';
+import { executeScriptContinuityAgent } from './autonomous-agent.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -68,6 +69,12 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && url.pathname === '/api/runtime/qa-evidence') {
     const result = await recordQaEvidence(await readBody(req));
     json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/agent-executions') {
+    const result = await executeScriptContinuityAgent(await readBody(req));
+    json(res, 200, { data: result });
     return true;
   }
 
