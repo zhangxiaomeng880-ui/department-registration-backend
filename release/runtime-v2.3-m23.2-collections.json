@@ -1,0 +1,81 @@
+{
+  "milestone": "M23.2",
+  "release": "AI Native Runtime V2.3",
+  "title": "Dunning / Collections",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.3-m23.2-collections",
+    "stagingRuntimeSha": "c28665f75ee68f0d5e67398c8e39c10f4ff165a1"
+  },
+  "capabilities": [
+    "Collection Case Open",
+    "Collection Case Read/List",
+    "Immutable Collection Action History",
+    "Promise-to-Pay Tracking",
+    "Next Action Scheduling",
+    "Priority / Assignment",
+    "Collection Resolution",
+    "Tenant-scoped billing read access",
+    "Platform-admin collection write control"
+  ],
+  "schema": {
+    "totalMigrations": 15,
+    "latest": "014_collections.sql",
+    "newTables": [
+      "collection_cases",
+      "collection_actions"
+    ],
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=14 total=15",
+    "stagingApplied": [
+      "014_collections.sql"
+    ],
+    "prerequisiteMigration": "013_billing_operations.sql",
+    "prerequisiteState": "already applied"
+  },
+  "ci": {
+    "workflow": "Runtime v2.3 M23.2 Collections Gate",
+    "runId": 37206476051,
+    "status": "SUCCESS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "2917d277-3683-4683-bb3b-430f9616f864",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "http": {
+      "ready": 200,
+      "collectionCasesUnauthenticated": 401,
+      "invoiceCollectionCaseUnauthenticated": 401,
+      "collectionCaseDetailUnauthenticated": 401,
+      "observedRequests": 4,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95Ms": 27
+    }
+  },
+  "historicalNonBlocking": {
+    "recentFailedDeployments": [
+      "a78879cf-790f-45cd-ac28-bae8498116da",
+      "d630ab7c-5ae4-4846-bb49-2767900ada4c"
+    ],
+    "impact": "NONE on current M23.2 deployment"
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "hotfix/v2.2-mysql2-security",
+    "sha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247"
+  },
+  "conclusion": "M23.2 Dunning / Collections is STAGING PASS / FROZEN. Collections schema, runtime behavior, CI gate, migration execution, fail-closed auth, and staging health all passed. Production remains on V2.2."
+}
