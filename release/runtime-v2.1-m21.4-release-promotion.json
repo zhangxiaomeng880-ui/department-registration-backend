@@ -1,0 +1,88 @@
+{
+  "milestone": "M21.4",
+  "name": "Release Promotion Automation",
+  "gate": "G21-RELEASE-PROMOTION",
+  "status": "PASS",
+  "branch": "feat/ai-native-runtime-v2.1-productization",
+  "validatedCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+  "baseMilestone": "M21.3",
+  "implemented": {
+    "automatedReadinessVerdict": true,
+    "milestoneEvidenceRequired": true,
+    "requiredCiEvidence": true,
+    "candidateShaValidation": true,
+    "rollbackTargetRequired": true,
+    "currentProductionHealthRequired": true,
+    "stagingVerificationRequired": true,
+    "stagingCandidateShaMatchRequired": true,
+    "stagingReadiness200Required": true,
+    "stagingProviderSmokeRequired": true,
+    "secretDetection": true,
+    "manualApprovalRequired": true,
+    "automaticProductionPromotionForbidden": true
+  },
+  "verdictStates": [
+    "HOLD",
+    "AWAITING_MANUAL_APPROVAL",
+    "APPROVED_FOR_MANUAL_PRODUCTION_PROMOTION"
+  ],
+  "currentCandidate": {
+    "name": "ai-native-runtime-v2.1-rc1",
+    "readinessManifest": "release/runtime-v2.1-rc1-readiness.json",
+    "verdict": "HOLD",
+    "blockingReasons": [
+      "STAGING_NOT_VERIFIED",
+      "MANUAL_APPROVAL_REQUIRED"
+    ],
+    "candidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f"
+  },
+  "rollback": {
+    "productionRuntimeCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a",
+    "productionDeploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+    "captured": true
+  },
+  "productionTruth": {
+    "productionModifiedByM21_4": false,
+    "currentProductionStatus": "SUCCESS",
+    "v2_1DeployedToProduction": false,
+    "stagingVerified": false
+  },
+  "ci": [
+    {
+      "name": "Runtime v2.1 Release Promotion Gate",
+      "runId": 37189856771,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime v2.1 Cost Ledger Gate",
+      "runId": 37189856768,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime v2.1 Policy Router Gate",
+      "runId": 37189856785,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime v2.1 Observability Gate",
+      "runId": 37189856764,
+      "conclusion": "success"
+    },
+    {
+      "name": "Railway Runtime Compatibility",
+      "runId": 37189856770,
+      "conclusion": "success"
+    },
+    {
+      "name": "Runtime Orchestrator Validation",
+      "runId": 37189856791,
+      "conclusion": "success"
+    },
+    {
+      "name": "Backend Validation",
+      "runId": 37189856760,
+      "conclusion": "success"
+    }
+  ],
+  "decision": "M21.4 automation gate PASS. v2.1 RC1 remains HOLD until isolated Railway staging validation succeeds and explicit manual production approval is recorded."
+}
