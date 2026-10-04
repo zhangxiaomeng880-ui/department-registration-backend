@@ -124,7 +124,7 @@ INSERT INTO tool_executions (
   '$TOOL_ID', '$RUN_ID', '$TASK_ID', '$ROUTE_ID', 'MCP',
   'Knowledge Store', 'PASS',
   JSON_OBJECT('query', 'current facts'),
-  JSON_OBJECT('source', 'git knowledge current'),
+  JSON_OBJECT('source', 'knowledge source current'),
   100, 50, 0.001000, 25,
   CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)
 );
@@ -222,4 +222,4 @@ if [[ "$evidence_count" -lt 5 ]]; then
   exit 1
 fi
 
-echo "PASS: MySQL runtime persistence migration, checkpoint reload, Current uniqueness, and run evidence are verified."
+echo "PASS: MySQL runtime persistence + knowledge metadata migrations, checkpoint reload, Current uniqueness, and run evidence are verified."
