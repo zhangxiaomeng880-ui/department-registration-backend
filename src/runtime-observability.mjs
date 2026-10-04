@@ -67,7 +67,9 @@ export const getRunObservability = async runId => {
     ),
     db.execute(
       `SELECT id, task_id, correlation_id, route_rule_key, route_priority, matched,
-              agent_key, skill_key, tool_key, policy_result, duration_ms,
+              agent_key, skill_key, tool_key, policy_result, policy_mode,
+              selected_provider_key, selected_model_key, selected_adapter_key,
+              provider_health_status, fallback_chain_json, duration_ms,
               error_category, created_at
        FROM route_executions WHERE run_id = ? ORDER BY created_at, id`,
       [runId]
@@ -137,6 +139,12 @@ export const getRunObservability = async runId => {
     skillKey: row.skill_key,
     toolKey: row.tool_key,
     policyResult: row.policy_result,
+    policyMode: row.policy_mode || null,
+    selectedProviderKey: row.selected_provider_key || null,
+    selectedModelKey: row.selected_model_key || null,
+    selectedAdapterKey: row.selected_adapter_key || null,
+    providerHealthStatus: row.provider_health_status || null,
+    fallbackChain: row.fallback_chain_json || [],
     durationMs: n(row.duration_ms),
     errorCategory: row.error_category || null,
     createdAt: row.created_at,
