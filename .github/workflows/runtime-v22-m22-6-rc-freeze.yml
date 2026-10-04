@@ -1,0 +1,125 @@
+name: Runtime v2.2 M22.6 Commercial RC Freeze Gate
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-v2.2-m22.6-rc-freeze
+  workflow_dispatch:
+
+jobs:
+  g22-6-commercial-runtime-rc:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: runtime_ci_password
+          MYSQL_ROOT_PASSWORD: runtime_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pruntime_ci_root_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify frozen M22.1 through M22.5 evidence
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const files=[
+            'release/runtime-v2.2-m22.1-pricing-billing.json',
+            'release/runtime-v2.2-m22.2-tenant-quota-meter.json',
+            'release/runtime-v2.2-m22.3-commercial-control.json',
+            'release/runtime-v2.2-m22.4-tenant-rbac.json',
+            'release/runtime-v2.2-m22.5-billing-ledger.json'
+          ];
+          for(const file of files){
+            const x=JSON.parse(fs.readFileSync(file,'utf8'));
+            if(x.status!=='STAGING_PASS') throw new Error(`${file}: status=${x.status}`);
+            if(x.frozen!==true) throw new Error(`${file}: not frozen`);
+            if(x.productionTouched!==false) throw new Error(`${file}: production touched`);
+          }
+          console.log('M22_1_TO_M22_5_FROZEN_EVIDENCE_PASS');
+          NODE
+
+      - name: Apply Runtime migrations twice
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+        run: |
+          npm run migrate:runtime
+          npm run migrate:runtime
+
+      - name: Validate M21 cost and M22.1 through M22.3 regressions
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          PORT: 3700
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3700
+          RUNTIME_REQUIRE_AUTH: "false"
+        run: |
+          node src/server.mjs > /tmp/runtime-v22-m22-6-regression.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3700/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          node test/cost-ledger.test.mjs
+          npm run validate:commercial-billing
+          npm run validate:tenant-quota
+          npm run validate:commercial-control
+          kill $PID
+          trap - EXIT
+
+      - name: Validate authenticated RBAC, billing, and V2.2 RC E2E
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          MYSQL_URL: mysql://ai_native_runtime:runtime_ci_password@127.0.0.1:3306/ai_native_runtime
+          PORT: 3800
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3800
+          RUNTIME_REQUIRE_AUTH: "true"
+          RUNTIME_API_TOKEN: rc-ci-platform-token
+        run: |
+          node src/server.mjs > /tmp/runtime-v22-m22-6-auth.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3800/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run validate:tenant-rbac
+          npm run validate:billing-ledger
+          node test/runtime-v22-commercial-rc-e2e.test.mjs
+          node test/railway-compatibility.test.mjs
+          kill $PID
+          trap - EXIT
+
+      - name: Print Runtime logs on failure
+        if: failure()
+        run: |
+          cat /tmp/runtime-v22-m22-6-regression.log || true
+          cat /tmp/runtime-v22-m22-6-auth.log || true
