@@ -53,6 +53,10 @@ import {
   recordInvoicePayment,listInvoicePayments,getBillingOperationsSummary,listReceivables
 } from './billing-ledger.mjs';
 import {
+  openCollectionCase,getInvoiceCollectionCase,getCollectionCase,listCollectionCases,
+  recordCollectionAction,resolveCollectionCaseScope
+} from './collections.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -172,6 +176,64 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       asOf:url.searchParams.get('asOf')||new Date(),
       limit:url.searchParams.get('limit')||100
     })});
+    return true;
+  }
+
+  const invoiceCollectionMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)\/collection-case$/);
+  if (req.method === 'POST' && invoiceCollectionMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await openCollectionCase({
+      invoiceId:invoiceCollectionMatch[1],
+      priority:body.priority||'NORMAL',
+      assignedIdentityId:body.assignedIdentityId||null,
+      openedAt:body.openedAt||new Date(),
+      metadata:body.metadata||null
+    })});
+    return true;
+  }
+  if (req.method === 'GET' && invoiceCollectionMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveInvoiceScope(invoiceCollectionMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await getInvoiceCollectionCase(invoiceCollectionMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/collection-cases') {
+    const requestedTenant=url.searchParams.get('tenantId')||(principal?.platformAdmin?null:principal?.tenantId);
+    if(!principal?.platformAdmin){
+      if(!requestedTenant) throw Object.assign(new Error('Tenant scope is required'),{code:'TENANT_SCOPE_REQUIRED',statusCode:403});
+      await assertAccess({principal,permission:'billing:read',tenantId:requestedTenant,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listCollectionCases({
+      tenantId:requestedTenant,
+      status:url.searchParams.get('status')||'ACTIVE',
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const collectionActionMatch=match(url.pathname,/^\/api\/runtime\/collection-cases\/([^/]+)\/actions$/);
+  if (req.method === 'POST' && collectionActionMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await recordCollectionAction({
+      caseId:collectionActionMatch[1],
+      actionType:body.actionType,
+      idempotencyKey:body.idempotencyKey,
+      occurredAt:body.occurredAt||new Date(),
+      nextActionAt:body.nextActionAt||null,
+      promisedAmount:body.promisedAmount??null,
+      promiseDueAt:body.promiseDueAt||null,
+      resolutionCode:body.resolutionCode||null,
+      metadata:body.metadata||null
+    })});
+    return true;
+  }
+
+  const collectionCaseMatch=match(url.pathname,/^\/api\/runtime\/collection-cases\/([^/]+)$/);
+  if (req.method === 'GET' && collectionCaseMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveCollectionCaseScope(collectionCaseMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await getCollectionCase(collectionCaseMatch[1])});
     return true;
   }
 
