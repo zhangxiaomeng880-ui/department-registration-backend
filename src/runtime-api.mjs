@@ -58,6 +58,11 @@ import {
 } from './collections.mjs';
 import { getRevenueAnalytics, getRevenuePerformance } from './revenue-analytics.mjs';
 import {
+  createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
+  getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
+  getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
+} from './financial-adjustments.mjs';
+import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
   consumeEphemeralContextPacket,
@@ -131,6 +136,91 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && tenantInvoicesMatch) {
     if(!principal?.platformAdmin) await assertAccess({principal,permission:'billing:read',tenantId:tenantInvoicesMatch[1],method:req.method,path:url.pathname});
     json(res,200,{data:await listTenantInvoices(tenantInvoicesMatch[1])});
+    return true;
+  }
+
+  const invoiceAdjustmentsMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)\/adjustments$/);
+  if (req.method === 'POST' && invoiceAdjustmentsMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await createInvoiceAdjustment({
+      invoiceId:invoiceAdjustmentsMatch[1],adjustmentType:body.adjustmentType,amount:body.amount,
+      currency:body.currency||null,reasonCode:body.reasonCode,idempotencyKey:body.idempotencyKey,
+      effectiveAt:body.effectiveAt||new Date(),metadata:body.metadata||null
+    })});
+    return true;
+  }
+  if (req.method === 'GET' && invoiceAdjustmentsMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveInvoiceScope(invoiceAdjustmentsMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await listInvoiceAdjustments(invoiceAdjustmentsMatch[1])});
+    return true;
+  }
+
+  const invoiceFinancialMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)\/financial-position$/);
+  if (req.method === 'GET' && invoiceFinancialMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveInvoiceScope(invoiceFinancialMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await getInvoiceFinancialSummary(invoiceFinancialMatch[1],{asOf:url.searchParams.get('asOf')||new Date()})});
+    return true;
+  }
+
+  const paymentRefundMatch=match(url.pathname,/^\/api\/runtime\/payments\/([^/]+)\/refunds$/);
+  if (req.method === 'POST' && paymentRefundMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await recordPaymentRefund({
+      paymentId:paymentRefundMatch[1],amount:body.amount,idempotencyKey:body.idempotencyKey,
+      refundReference:body.refundReference||null,refundedAt:body.refundedAt||new Date(),metadata:body.metadata||null
+    })});
+    return true;
+  }
+
+  const invoiceRefundsMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)\/refunds$/);
+  if (req.method === 'GET' && invoiceRefundsMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveInvoiceScope(invoiceRefundsMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await listInvoiceRefunds(invoiceRefundsMatch[1])});
+    return true;
+  }
+
+  const invoiceDisputesMatch=match(url.pathname,/^\/api\/runtime\/invoices\/([^/]+)\/disputes$/);
+  if (req.method === 'POST' && invoiceDisputesMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await openBillingDispute({
+      invoiceId:invoiceDisputesMatch[1],disputedAmount:body.disputedAmount,currency:body.currency||null,
+      reasonCode:body.reasonCode,idempotencyKey:body.idempotencyKey,openedAt:body.openedAt||new Date(),
+      metadata:body.metadata||null
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/billing-disputes') {
+    const requestedTenant=url.searchParams.get('tenantId')||(principal?.platformAdmin?null:principal?.tenantId);
+    if(!principal?.platformAdmin){
+      if(!requestedTenant) throw Object.assign(new Error('Tenant scope is required'),{code:'TENANT_SCOPE_REQUIRED',statusCode:403});
+      await assertAccess({principal,permission:'billing:read',tenantId:requestedTenant,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listBillingDisputes({
+      tenantId:requestedTenant,status:url.searchParams.get('status')||'ACTIVE',limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const disputeActionMatch=match(url.pathname,/^\/api\/runtime\/billing-disputes\/([^/]+)\/actions$/);
+  if (req.method === 'POST' && disputeActionMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await recordBillingDisputeAction({
+      disputeId:disputeActionMatch[1],actionType:body.actionType,idempotencyKey:body.idempotencyKey,
+      acceptedAmount:body.acceptedAmount??null,resolutionNote:body.resolutionNote||null,
+      occurredAt:body.occurredAt||new Date(),metadata:body.metadata||null
+    })});
+    return true;
+  }
+
+  const disputeMatch=match(url.pathname,/^\/api\/runtime\/billing-disputes\/([^/]+)$/);
+  if (req.method === 'GET' && disputeMatch) {
+    if(!principal?.platformAdmin){const scope=await resolveBillingDisputeScope(disputeMatch[1]);await assertAccess({principal,permission:'billing:read',...scope,method:req.method,path:url.pathname});}
+    json(res,200,{data:await getBillingDispute(disputeMatch[1])});
     return true;
   }
 
