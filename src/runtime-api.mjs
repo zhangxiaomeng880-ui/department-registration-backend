@@ -11,6 +11,12 @@ import {
   listKnowledgeContexts,
   getKnowledgeContextFingerprint,
 } from './runtime-db.mjs';
+import {
+  routeAndRecord,
+  recordToolExecution,
+  recordGateResult,
+  recordQaEvidence,
+} from './runtime-evidence.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -37,6 +43,30 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/tasks') {
     const result = await createTask(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/routes') {
+    const result = await routeAndRecord(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/tool-executions') {
+    const result = await recordToolExecution(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/gate-results') {
+    const result = await recordGateResult(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/qa-evidence') {
+    const result = await recordQaEvidence(await readBody(req));
     json(res, 201, { data: result });
     return true;
   }
