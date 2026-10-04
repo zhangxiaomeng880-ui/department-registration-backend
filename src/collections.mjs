@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
+import { getInvoiceFinancialPosition } from './financial-adjustments.mjs';
 
 const SCALE=10000000000n;
 const CASE_STATUSES=new Set(['OPEN','CONTACTED','PROMISE_TO_PAY','RESOLVED']);
@@ -76,7 +77,8 @@ export const openCollectionCase=async({
     const [invoiceRows]=await connection.execute('SELECT * FROM invoices WHERE id=? FOR UPDATE',[invoiceId]);
     if(!invoiceRows.length) throw errorOf('Invoice not found','INVOICE_NOT_FOUND',404);
     const invoice=invoiceRows[0];
-    const outstanding=toUnits(invoice.total_due)-toUnits(invoice.amount_paid||0);
+    const position=await getInvoiceFinancialPosition(connection,invoiceId,{asOf:opened});
+    const outstanding=position._units.outstanding;
     if(outstanding<=0n) throw errorOf('Invoice has no outstanding balance','INVOICE_NOT_COLLECTIBLE',409);
     if(new Date(invoice.due_at).getTime()>=opened.getTime()) throw errorOf('Invoice is not overdue','INVOICE_NOT_OVERDUE',409);
 
@@ -172,7 +174,8 @@ export const recordCollectionAction=async({
     const [invoiceRows]=await connection.execute('SELECT * FROM invoices WHERE id=? FOR UPDATE',[current.invoice_id]);
     if(!invoiceRows.length) throw errorOf('Invoice not found','INVOICE_NOT_FOUND',404);
     const invoice=invoiceRows[0];
-    const outstanding=toUnits(invoice.total_due)-toUnits(invoice.amount_paid||0);
+    const position=await getInvoiceFinancialPosition(connection,current.invoice_id,{asOf:occurred});
+    const outstanding=position._units.outstanding;
 
     if(current.status==='RESOLVED'&&type!=='REOPEN') throw errorOf('Collection case is already resolved','COLLECTION_CASE_RESOLVED',409);
 
