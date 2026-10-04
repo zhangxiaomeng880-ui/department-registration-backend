@@ -17,6 +17,7 @@
     "validate:runtime-orchestrator": "node test/runtime-orchestrator.test.mjs",
     "preflight:v22-production": "node scripts/preflight-v22-production.mjs",
     "migrate:runtime": "node scripts/migrate-runtime.mjs",
+    "predeploy:v22-production": "npm run preflight:v22-production && npm run migrate:runtime",
     "validate:commercial-billing": "node test/commercial-billing.test.mjs",
     "import:pricing-catalog": "node scripts/import-pricing-catalog.mjs",
     "validate:tenant-quota": "node test/tenant-quota-meter.test.mjs",
