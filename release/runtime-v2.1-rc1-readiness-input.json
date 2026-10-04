@@ -1,6 +1,6 @@
 {
   "releaseCandidate": "ai-native-runtime-v2.1-rc1",
-  "generatedAt": "2026-10-04T08:45:00.000Z",
+  "generatedAt": "2026-10-04T09:07:00.000Z",
   "candidate": {
     "commitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
     "branch": "feat/ai-native-runtime-v2.1-productization"
@@ -17,8 +17,27 @@
     "databaseServiceId": "453ae4d1-e7e1-402b-871b-4ec58585fb31"
   },
   "staging": {
-    "verified": false,
-    "reason": "No isolated Railway staging environment has been validated for the v2.1 candidate."
+    "verified": true,
+    "evidence": "release/runtime-v2.1-rc1-staging.json",
+    "projectId": "8f6bea55-f9a1-4335-849b-d0ba5ad3bbb6",
+    "environmentId": "fc068d5a-6664-42df-8bae-c84cbc569601",
+    "runtimeServiceId": "fe463e22-49b6-452e-afb1-c30590298d42",
+    "databaseServiceId": "a876537f-9e3a-4122-a839-dbe0b6fb34ea",
+    "deploymentId": "b82386a2-bdd0-4f3d-bf87-57678b1b8cfc",
+    "candidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+    "readinessHttpStatus": 200,
+    "providerSmokePass": true,
+    "migrationTotal": 7,
+    "unauthorizedHttpStatus": 401,
+    "model": "gpt-6-luna",
+    "structuredOutputPass": true,
+    "policyRouterPass": true,
+    "observabilityPass": true,
+    "costLedgerPass": true,
+    "budgetPolicyPass": true,
+    "sourceBodyPersisted": false,
+    "sourceBodyExposed": false,
+    "databasePublicTcpExposed": false
   },
   "milestones": [
     {
