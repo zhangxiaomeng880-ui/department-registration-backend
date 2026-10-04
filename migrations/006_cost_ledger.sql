@@ -1,6 +1,6 @@
 -- AI Native 2.1 Cost Ledger
 -- Migration: 006_cost_ledger.sql
--- Additive only. Pricing is versioned metadata; no charging/payment behavior.
+-- Backward-compatible schema extension. Pricing is versioned metadata; no charging/payment behavior.
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
@@ -34,6 +34,8 @@ ALTER TABLE usage_ledger
   ADD INDEX idx_usage_pricing_version (pricing_version_id, recorded_at);
 
 ALTER TABLE tool_executions
+  MODIFY COLUMN cost_amount DECIMAL(18,6) NULL,
+  MODIFY COLUMN cost_currency CHAR(3) NULL,
   ADD COLUMN pricing_version_id CHAR(36) NULL AFTER model_key,
   ADD COLUMN cost_status VARCHAR(32) NOT NULL DEFAULT 'UNKNOWN' AFTER pricing_version_id,
   ADD CONSTRAINT fk_tool_price_version FOREIGN KEY (pricing_version_id) REFERENCES pricing_versions(id),
