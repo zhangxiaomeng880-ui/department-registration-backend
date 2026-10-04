@@ -18,6 +18,11 @@ import {
   recordQaEvidence,
 } from './runtime-evidence.mjs';
 import { executeScriptContinuityAgent } from './autonomous-agent.mjs';
+import {
+  createEphemeralContextPacket,
+  getEphemeralContextPacketMetadata,
+  consumeEphemeralContextPacket,
+} from './context-bridge.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -69,6 +74,43 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && url.pathname === '/api/runtime/qa-evidence') {
     const result = await recordQaEvidence(await readBody(req));
     json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/context-packets') {
+    const result = createEphemeralContextPacket(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  const contextMetadataMatch = match(url.pathname, /^\/api\/runtime\/context-packets\/([^/]+)\/metadata$/);
+  if (req.method === 'GET' && contextMetadataMatch) {
+    const result = getEphemeralContextPacketMetadata(contextMetadataMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const contextExecuteMatch = match(url.pathname, /^\/api\/runtime\/context-packets\/([^/]+)\/execute$/);
+  if (req.method === 'POST' && contextExecuteMatch) {
+    const body = await readBody(req);
+    const packet = consumeEphemeralContextPacket(contextExecuteMatch[1]);
+    const result = await executeScriptContinuityAgent({
+      ...body,
+      query: body.query || packet.query,
+      scope: body.scope || packet.scope,
+      contextPacket: {
+        precedence: packet.precedence,
+        items: packet.items,
+      },
+    });
+    json(res, 200, {
+      data: {
+        ...result,
+        contextPacketId: packet.id,
+        contextPacketConsumed: true,
+        contextPacketHash: packet.contextHash,
+      },
+    });
     return true;
   }
 
