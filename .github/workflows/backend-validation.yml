@@ -89,3 +89,37 @@ jobs:
           npm run validate:runtime-api
           npm run validate:knowledge-source
           npm run validate:knowledge-retrieval
+
+      - name: Validate real SC042-SC050 hybrid chain and Resume after process restart
+        env:
+          PORT: 3100
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3100
+          REAL_CHAIN_STATE_PATH: /tmp/ai-native-real-chain.json
+        run: |
+          node src/server.mjs > /tmp/real-chain-phase1.log 2>&1 &
+          PID1=$!
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          npm run validate:real-chain:phase1
+          kill $PID1
+          wait $PID1 || true
+
+          node src/server.mjs > /tmp/real-chain-phase2.log 2>&1 &
+          PID2=$!
+          trap 'kill $PID2 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          npm run validate:real-chain:phase2
