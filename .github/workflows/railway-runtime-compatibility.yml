@@ -49,11 +49,14 @@ jobs:
 
       - name: Run production migration twice
         run: |
+          EXPECTED_MIGRATIONS="$(find migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
+          test "$EXPECTED_MIGRATIONS" -gt 0
+
           npm run migrate:runtime | tee /tmp/migrate-first.log
-          grep -q 'RUNTIME_MIGRATIONS_PASS applied=5 skipped=0 total=5' /tmp/migrate-first.log
+          grep -q "RUNTIME_MIGRATIONS_PASS applied=$EXPECTED_MIGRATIONS skipped=0 total=$EXPECTED_MIGRATIONS" /tmp/migrate-first.log
 
           npm run migrate:runtime | tee /tmp/migrate-second.log
-          grep -q 'RUNTIME_MIGRATIONS_PASS applied=0 skipped=5 total=5' /tmp/migrate-second.log
+          grep -q "RUNTIME_MIGRATIONS_PASS applied=0 skipped=$EXPECTED_MIGRATIONS total=$EXPECTED_MIGRATIONS" /tmp/migrate-second.log
 
       - name: Start Runtime with Railway-style environment
         run: |
