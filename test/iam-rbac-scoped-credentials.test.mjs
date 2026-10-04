@@ -135,7 +135,7 @@ assert.equal(r.body.error,'RUNTIME_SCOPE_FORBIDDEN');
 
 r=await request('POST','/api/runtime/api-credentials',{
   identityId,tenantId,workspaceId,
-  permissions:['run.read']
+  permissions:['run.read','usage.read']
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const readOnlyCredentialId=r.body.data.credential.id;
