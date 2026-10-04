@@ -17,7 +17,7 @@ services:
       - "127.0.0.1:3306:3306"
     volumes:
       - ai_native_mysql_data:/var/lib/mysql
-      - ./migrations/001_runtime_persistence.sql:/docker-entrypoint-initdb.d/001_runtime_persistence.sql:ro
+      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
