@@ -1,0 +1,75 @@
+-- AI Native Runtime V2.4 M24.3 Regression Comparator + Release Gate
+-- Migration: 019_eval_regression_gate.sql
+
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+
+CREATE TABLE IF NOT EXISTS eval_regression_comparisons (
+  id CHAR(36) PRIMARY KEY,
+  baseline_eval_run_id CHAR(36) NOT NULL,
+  candidate_eval_run_id CHAR(36) NOT NULL,
+  suite_version_id CHAR(36) NOT NULL,
+  fixture_sha256 CHAR(64) NOT NULL,
+  baseline_runtime_sha CHAR(40) NOT NULL,
+  candidate_runtime_sha CHAR(40) NOT NULL,
+  policy_version VARCHAR(64) NOT NULL,
+  policy_sha256 CHAR(64) NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  blocker_count INT UNSIGNED NOT NULL DEFAULT 0,
+  summary_json JSON NOT NULL,
+  comparison_sha256 CHAR(64) NOT NULL,
+  idempotency_key VARCHAR(191) NOT NULL UNIQUE,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m243_cmp_baseline FOREIGN KEY (baseline_eval_run_id) REFERENCES eval_runs(id),
+  CONSTRAINT fk_m243_cmp_candidate FOREIGN KEY (candidate_eval_run_id) REFERENCES eval_runs(id),
+  CONSTRAINT fk_m243_cmp_suite FOREIGN KEY (suite_version_id) REFERENCES eval_suite_versions(id),
+  UNIQUE KEY uq_m243_cmp_pair_policy (baseline_eval_run_id,candidate_eval_run_id,policy_version),
+  INDEX idx_m243_cmp_candidate (candidate_runtime_sha,created_at),
+  INDEX idx_m243_cmp_status (status,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS eval_case_regressions (
+  id CHAR(36) PRIMARY KEY,
+  comparison_id CHAR(36) NOT NULL,
+  case_key VARCHAR(191) NOT NULL,
+  sequence_no INT UNSIGNED NOT NULL,
+  baseline_status VARCHAR(32) NULL,
+  candidate_status VARCHAR(32) NULL,
+  transition VARCHAR(32) NOT NULL,
+  assertion_regression_count INT UNSIGNED NOT NULL DEFAULT 0,
+  assertion_improvement_count INT UNSIGNED NOT NULL DEFAULT 0,
+  assertion_set_drift BOOLEAN NOT NULL DEFAULT FALSE,
+  router_drift BOOLEAN NOT NULL DEFAULT FALSE,
+  evidence_drift BOOLEAN NOT NULL DEFAULT FALSE,
+  baseline_duration_ms BIGINT UNSIGNED NULL,
+  candidate_duration_ms BIGINT UNSIGNED NULL,
+  duration_change_pct DECIMAL(20,6) NULL,
+  baseline_estimated_cost DECIMAL(30,10) NULL,
+  candidate_estimated_cost DECIMAL(30,10) NULL,
+  cost_change_pct DECIMAL(20,6) NULL,
+  cost_currency VARCHAR(16) NULL,
+  blocker_count INT UNSIGNED NOT NULL DEFAULT 0,
+  blockers_json JSON NOT NULL,
+  diff_json JSON NOT NULL,
+  diff_sha256 CHAR(64) NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m243_case_cmp FOREIGN KEY (comparison_id) REFERENCES eval_regression_comparisons(id),
+  UNIQUE KEY uq_m243_case_cmp (comparison_id,case_key),
+  INDEX idx_m243_case_transition (comparison_id,transition,sequence_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS eval_release_gates (
+  id CHAR(36) PRIMARY KEY,
+  comparison_id CHAR(36) NOT NULL,
+  gate_key VARCHAR(64) NOT NULL DEFAULT 'V2_4_RELEASE',
+  decision VARCHAR(16) NOT NULL,
+  blocker_count INT UNSIGNED NOT NULL,
+  blockers_json JSON NOT NULL,
+  gate_sha256 CHAR(64) NOT NULL,
+  idempotency_key VARCHAR(191) NOT NULL UNIQUE,
+  decided_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m243_gate_cmp FOREIGN KEY (comparison_id) REFERENCES eval_regression_comparisons(id),
+  UNIQUE KEY uq_m243_gate_cmp (comparison_id,gate_key),
+  INDEX idx_m243_gate_decision (decision,decided_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
