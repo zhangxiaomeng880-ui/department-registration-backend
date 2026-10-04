@@ -1,0 +1,160 @@
+{
+  "milestone": "M24.2",
+  "release": "AI Native Runtime V2.4",
+  "title": "Eval Runner + Assertion Engine",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "base": {
+    "m241EvidenceCommit": "64039fd13428f05fb7b54d8e0a0cbce344237b04",
+    "productionBaselineSha": "34578464f5d19e87978ccb81719fb23a4b79d6f1"
+  },
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.2-eval-runner",
+    "stagingRuntimeSha": "43f0121cbeab383c3571d3f24d0cdfd04e0d2ad8"
+  },
+  "executionBoundary": {
+    "executionMode": "SYNTHETIC_REPLAY",
+    "providerInvoked": false,
+    "realModelInvoked": false,
+    "realProviderQuotaConsumed": false,
+    "productionDataUsed": false,
+    "routerPolicyExecution": "Current Runtime routeRuntimeTask + selectProviderModel are executed for every case.",
+    "observationSource": "Frozen synthetic fixture replayInput.syntheticObservation supplies output/evidence/duration/cost observations for assertion evaluation.",
+    "realShadowReplayDeferredTo": "M24.4"
+  },
+  "candidateIntegrity": {
+    "candidateShaSource": "server runtime environment only",
+    "clientCandidateShaOverride": false,
+    "activeRuntimeMustEqualManifestCandidate": true,
+    "mismatchBehavior": "EVAL_RUNTIME_SHA_MISMATCH / 409",
+    "frozenFixtureHashRequired": true,
+    "replayManifestHashRequired": true
+  },
+  "assertionEngine": {
+    "groups": [
+      "structuredOutput",
+      "evidence",
+      "router",
+      "execution"
+    ],
+    "structuredOutput": [
+      "requiredKeys",
+      "exact",
+      "jsonSchemaSha256"
+    ],
+    "evidence": [
+      "required",
+      "minCount",
+      "allowedSourceFileIds",
+      "contentHashMatchesFrozenSourceRef"
+    ],
+    "router": [
+      "matched",
+      "policyResult",
+      "routeRuleKey",
+      "selectedProviderKey",
+      "selectedModelKey",
+      "providerHealthStatus"
+    ],
+    "execution": [
+      "status",
+      "maxDurationMs",
+      "maxEstimatedCost",
+      "costCurrency"
+    ],
+    "intentionalFailFixtureValidated": true
+  },
+  "persistence": {
+    "hierarchy": "Eval Run -> Case Result -> Assertion Result",
+    "deterministicRunResultSha256": true,
+    "deterministicCaseResultSha256": true,
+    "idempotentRunCreation": true,
+    "idempotencyConflictDetection": true
+  },
+  "schema": {
+    "migration": "018_eval_runner_assertions.sql",
+    "migrationFilesTotal": 19,
+    "duplicate018Present": false,
+    "tables": [
+      "eval_runs",
+      "eval_case_results",
+      "eval_assertion_results"
+    ],
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=18 total=19",
+    "freshDbDoubleApply": "PASS"
+  },
+  "api": {
+    "runManifest": "POST /api/runtime/eval-replay-manifests/:manifestId/run",
+    "evalRunDetail": "GET /api/runtime/eval-runs/:evalRunId",
+    "authorization": "platform administrator"
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.2 Eval Runner Gate",
+    "finalCandidateRunId": 37216389317,
+    "finalCandidateHeadSha": "43f0121cbeab383c3571d3f24d0cdfd04e0d2ad8",
+    "finalCandidateStatus": "SUCCESS",
+    "dependencyAudit": "PASS",
+    "migrationDoubleApply": "PASS",
+    "v23BillingLedgerRegression": "PASS",
+    "v23BillingOperationsRegression": "PASS",
+    "v23CollectionsRegression": "PASS",
+    "v23RevenueAnalyticsRegression": "PASS",
+    "v23FinancialAdjustmentsRegression": "PASS",
+    "v23FinanceCloseRegression": "PASS",
+    "v23CommercialFinanceRcE2E": "PASS",
+    "m241EvalReplayContract": "PASS",
+    "m242EvalRunnerAssertionEngine": "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "developmentCorrections": {
+    "nonFinalRunsExcluded": true,
+    "notes": [
+      "An alternate real-provider replay draft and duplicate 018 migration appeared during development and were removed before the final candidate.",
+      "The final candidate contains exactly one 018 migration and no M24.2 mock-provider execution.",
+      "Earlier failed/contaminated runs are not release evidence; only final clean run 37216389317 is authoritative."
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "1849582e-d8d4-4403-a75b-8e4c80852454",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "authorization": {
+      "runManifestUnauthenticated": 401,
+      "evalRunDetailUnauthenticated": 401
+    },
+    "http": {
+      "observedRequests": 2,
+      "http4xx": 2,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 25
+    },
+    "predecessor": {
+      "deploymentId": "b05d6673-ef88-4f9c-b0ef-2ed1172d493c",
+      "finalState": "REMOVED",
+      "replacementExit": "Railway sent SIGTERM after M24.2 became healthy; not an application crash."
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true
+  },
+  "nextMilestone": "M24.3 Regression Comparator + Release Gate",
+  "conclusion": "M24.2 Eval Runner + Assertion Engine is STAGING PASS / FROZEN. Frozen replay manifests execute through the current Router/Policy using synthetic observations only, producing deterministic Run/Case/Assertion evidence without invoking a real model/provider or consuming provider quota. Both passing and intentionally failing regression cases are validated, candidate SHA is server-locked, and Production remains on V2.3."
+}
