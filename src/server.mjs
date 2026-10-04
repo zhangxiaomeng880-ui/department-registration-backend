@@ -19,8 +19,8 @@ const route = async (req, res) => {
   if (req.method === 'OPTIONS') return json(res, 204, {});
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { status: 'ok', service: 'department-registration-backend' });
-  if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
   if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
+  if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
   if (req.method === 'GET' && url.pathname === '/api/cities') return json(res, 200, { data: data.cities });
   if (req.method === 'GET' && url.pathname === '/api/hospitals') { const cityId = url.searchParams.get('cityId'); return json(res, 200, { data: data.hospitals.filter(x => !cityId || x.cityId === cityId) }); }
   if (req.method === 'GET' && url.pathname === '/api/campuses') { const hospitalId = url.searchParams.get('hospitalId'); return json(res, 200, { data: data.campuses.filter(x => !hospitalId || x.hospitalId === hospitalId) }); }
