@@ -10,8 +10,11 @@ set -euo pipefail
 export MYSQL_PWD="$DB_PASSWORD"
 MYSQL=(mysql --protocol=tcp -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$DB_NAME" --batch --skip-column-names)
 
-echo "[1/7] Applying runtime persistence migration"
-"${MYSQL[@]}" < migrations/001_runtime_persistence.sql
+echo "[1/7] Applying runtime persistence migrations"
+for migration in migrations/*.sql; do
+  echo "Applying $migration"
+  "${MYSQL[@]}" < "$migration"
+done
 
 echo "[2/7] Verifying required tables"
 required_tables=(
@@ -25,6 +28,7 @@ required_tables=(
   gate_results
   qa_evidence
   audit_logs
+  knowledge_contexts
 )
 for table in "${required_tables[@]}"; do
   count="$("${MYSQL[@]}" -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '$table';")"
