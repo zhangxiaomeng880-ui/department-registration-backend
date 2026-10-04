@@ -4,6 +4,7 @@ import { handleRuntimeRoute } from './runtime-api.mjs';
 import { handleKnowledgeRoute } from './knowledge-api.mjs';
 import { checkRuntimeDbReady } from './runtime-db.mjs';
 import { modelProviderConfigured } from './openai-responses-provider.mjs';
+import { authorizeRuntimeRequest } from './runtime-security.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
