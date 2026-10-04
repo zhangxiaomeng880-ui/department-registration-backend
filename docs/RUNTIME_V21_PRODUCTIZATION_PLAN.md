@@ -9,8 +9,8 @@ Working branch: `feat/ai-native-runtime-v2.1-productization`
 | --- | --- | --- | --- |
 | M21.1 Observable Runtime | G21-OBSERVABILITY | PASS / FROZEN | `release/runtime-v2.1-m21.1-observability.json` |
 | M21.2 Policy Router v2 | G21-MULTI-PROVIDER | PASS / FROZEN | `release/runtime-v2.1-m21.2-policy-router.json` |
-| M21.3 Cost Ledger | G21-COST-ACCOUNTING | NEXT | — |
-| M21.4 Release Promotion | G21-RELEASE-PROMOTION | PLANNED | — |
+| M21.3 Cost Ledger | G21-COST-ACCOUNTING | PASS / FROZEN | `release/runtime-v2.1-m21.3-cost-ledger.json` |
+| M21.4 Release Promotion | G21-RELEASE-PROMOTION | NEXT | — |
 
 ## M21.1 — Observable Runtime
 
@@ -50,25 +50,21 @@ M21.2 proves the multi-provider routing infrastructure and failover semantics us
 
 ## M21.3 — Cost Ledger
 
-Next implementation scope:
+Status: **PASS / EVIDENCE FROZEN** (`release/runtime-v2.1-m21.3-cost-ledger.json`)
 
-1. add versioned provider/model pricing metadata
-2. convert token usage into estimated execution cost
-3. persist price version with every calculated cost
-4. aggregate cost by project/run/task/stage/provider/model
-5. add budget threshold policy hooks
-6. return UNKNOWN/HOLD when required price metadata is missing
-7. keep payment, charging, subscription and checkout out of v2.1
+Completed:
+
+- versioned provider/model pricing metadata
+- token usage to estimated execution cost conversion
+- immutable price-version linkage per execution
+- project/run/task/stage/provider/model rollups
+- budget threshold policy hooks
+- UNKNOWN/HOLD behavior for missing pricing
+- currency mismatch and mixed-currency HOLD behavior
+- no payment, charging, subscription or checkout behavior
+- pricing/budget metadata secret guard
 
 Exit Gate: `G21-COST-ACCOUNTING = PASS`
-
-Required acceptance:
-
-- raw token usage reconciles to calculated estimated cost
-- historical execution cost remains tied to the original price version
-- updating a price never rewrites prior ledger history
-- missing pricing cannot silently produce zero/fabricated cost
-- private source text remains absent from pricing/cost records
 
 ## M21.4 — Release Promotion
 
