@@ -153,8 +153,13 @@ assert.equal(r.status,429,JSON.stringify(r.body));
 assert.equal(r.body.error,'QUOTA_BLOCKED');
 assert.equal(r.body.details.decision,'BLOCK');
 
+r=await request('POST','/api/runtime/tenants',{
+  tenantKey:`unknown-cost-tenant-${suffix}`,name:'Unknown Cost Tenant',planKey:'TEST'
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const unknownTenantId=r.body.data.id;
 r=await request('POST','/api/runtime/workspaces',{
-  tenantId,workspaceKey:`unknown-cost-${suffix}`,name:'Unknown Cost Workspace'
+  tenantId:unknownTenantId,workspaceKey:`unknown-cost-${suffix}`,name:'Unknown Cost Workspace'
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const unknownWorkspaceId=r.body.data.id;
@@ -190,6 +195,11 @@ r=await request('POST',`/api/runtime/runs/${unknownRunId}/quota-evaluate`,{sourc
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.decision,'HOLD');
 assert.equal(r.body.data.evaluations[0].reasonCode,'QUOTA_COST_UNKNOWN');
+
+r=await request('GET',`/api/runtime/tenants/${tenantId}/usage-meter?periodType=MONTH`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.tokenTotal,600);
+assert.equal(r.body.data.runCount,1);
 
 const db=await mysql.createConnection({
   host:process.env.DB_HOST,port:Number(process.env.DB_PORT||3306),
