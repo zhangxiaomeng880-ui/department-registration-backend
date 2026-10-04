@@ -195,13 +195,6 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
-  const evalReleaseGateMatch=match(url.pathname,/^\/api\/runtime\/eval-release-gates\/([^/]+)$/);
-  if (req.method === 'GET' && evalReleaseGateMatch) {
-    requirePlatformAdmin(principal);
-    json(res,200,{data:await getEvalReleaseGate(evalReleaseGateMatch[1])});
-    return true;
-  }
-
   if (req.method === 'POST' && url.pathname === '/api/runtime/finance-closes') {
     requirePlatformAdmin(principal);
     const body=await readBody(req);
