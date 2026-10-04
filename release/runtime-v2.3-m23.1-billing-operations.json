@@ -1,0 +1,88 @@
+{
+  "milestone": "M23.1",
+  "release": "AI Native Runtime V2.3",
+  "title": "Billing Operations / Accounts Receivable",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.3-m23.1-billing-operations",
+    "stagingRuntimeSha": "8aecdef698ce0f6c2cf5f48a86b110ba88da434f"
+  },
+  "capabilities": [
+    "Invoice Payment Receipt",
+    "Partial Payment",
+    "Payment Idempotency",
+    "Invoice Outstanding Balance",
+    "Receivables List",
+    "Overdue Receivables",
+    "Billing Operations Summary",
+    "Tenant-scoped billing read access",
+    "Platform-admin payment write control"
+  ],
+  "schema": {
+    "totalMigrations": 14,
+    "latest": "013_billing_operations.sql",
+    "invoiceColumns": [
+      "amount_paid",
+      "paid_at"
+    ],
+    "newTable": "invoice_payments",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=2 skipped=12 total=14",
+    "stagingApplied": [
+      "012_v21_rollback_compatibility.sql",
+      "013_billing_operations.sql"
+    ]
+  },
+  "ci": {
+    "workflow": "Runtime v2.3 M23.1 Billing Operations Gate",
+    "runId": 37205776632,
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "m225BillingRegression": "PASS",
+    "m231BillingOperations": "G23_1_BILLING_OPERATIONS_PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "d4be0ef9-59e7-4691-a8f1-8eb3c83daeef",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "preDeployCommand": [
+      "npm run predeploy:v22-production"
+    ],
+    "http": {
+      "ready": 200,
+      "billingOpsSummaryUnauthenticated": 401,
+      "receivablesUnauthenticated": 401,
+      "invoicePaymentsUnauthenticated": 401,
+      "observedRequests": 4,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95Ms": 27
+    }
+  },
+  "cutover": {
+    "predecessorDeployment": "7a1f5e66-a7e5-4d4b-a170-dfb578ddee96",
+    "finalState": "REMOVED",
+    "explanation": "Railway explicitly sent SIGTERM during normal drain after the new deployment became healthy. The npm SIGTERM error belongs to predecessor shutdown, not the active M23.1 deployment."
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "hotfix/v2.2-mysql2-security",
+    "sha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247"
+  },
+  "conclusion": "M23.1 Billing Operations is STAGING PASS / FROZEN. Payment receipt, partial payment, outstanding balance, receivables, overdue reporting, billing operations summary, RBAC boundaries, migration idempotency, Railway compatibility, and staging runtime acceptance all passed. Production remains on V2.2."
+}
