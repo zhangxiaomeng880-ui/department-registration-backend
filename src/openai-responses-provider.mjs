@@ -16,6 +16,15 @@ const extractOutputText = payload => {
 export const modelProviderConfigured = () =>
   Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL);
 
+export const classifyProviderError = error => {
+  if (error?.name === 'AbortError') return 'TIMEOUT';
+  const code = String(error?.code || '');
+  if (code === 'MODEL_PROVIDER_NOT_CONFIGURED') return 'CONFIGURATION';
+  if (code === 'MODEL_PROVIDER_INVALID_JSON' || code === 'MODEL_PROVIDER_EMPTY_OUTPUT') return 'PROVIDER_RESPONSE';
+  if (code === 'MODEL_PROVIDER_HTTP_ERROR' || Number(error?.details?.providerStatus || 0) >= 400) return 'PROVIDER_HTTP';
+  return 'PROVIDER_RUNTIME';
+};
+
 export const invokeOpenAiResponses = async ({
   instructions,
   input,
@@ -34,6 +43,7 @@ export const invokeOpenAiResponses = async ({
   const controller = new AbortController();
   const timeoutMs = Number(process.env.OPENAI_TIMEOUT_MS || 120000);
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = performance.now();
 
   try {
     const response = await fetch(`${baseUrl}/responses`, {
@@ -65,7 +75,10 @@ export const invokeOpenAiResponses = async ({
       const error = new Error(payload?.error?.message || `OpenAI Responses request failed: ${response.status}`);
       error.code = payload?.error?.code || 'MODEL_PROVIDER_HTTP_ERROR';
       error.statusCode = 502;
-      error.details = { providerStatus: response.status };
+      error.details = {
+        providerStatus: response.status,
+        durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      };
       throw error;
     }
 
@@ -94,7 +107,14 @@ export const invokeOpenAiResponses = async ({
       status: payload.status || 'completed',
       output,
       usage: payload.usage || null,
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
     };
+  } catch (error) {
+    error.errorCategory = error.errorCategory || classifyProviderError(error);
+    error.durationMs = error.durationMs
+      ?? error.details?.durationMs
+      ?? Math.max(0, Math.round(performance.now() - startedAt));
+    throw error;
   } finally {
     clearTimeout(timer);
   }
