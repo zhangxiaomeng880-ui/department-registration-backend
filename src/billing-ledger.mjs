@@ -284,13 +284,43 @@ export const getInvoice=async invoiceId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute('SELECT * FROM invoices WHERE id=?',[invoiceId]);
   if(!rows.length) throw errorOf('Invoice not found','INVOICE_NOT_FOUND',404);
-  return invoiceWithItems(db,rows[0]);
+  const invoice=await invoiceWithItems(db,rows[0]);
+  const position=await getInvoiceFinancialPosition(db,invoiceId,{asOf:new Date()});
+  return {
+    ...invoice,
+    adjustedBilledRevenue:position.adjustedBilledRevenue,
+    collectibleAmount:position.collectibleAmount,
+    grossPaid:position.grossPaid,
+    refundTotal:position.refundTotal,
+    netCollected:position.netCollected,
+    creditNotes:position.creditNotes,
+    writeOffs:position.writeOffs,
+    debitAdjustments:position.debitAdjustments,
+    outstandingAmount:position.outstandingAmount,
+    overpaidAmount:position.overpaidAmount
+  };
 };
 
 export const listTenantInvoices=async tenantId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute('SELECT * FROM invoices WHERE tenant_id=? ORDER BY issued_at DESC,id DESC',[tenantId]);
-  return rows.map(normalizeInvoice);
+  return Promise.all(rows.map(async row=>{
+    const invoice=normalizeInvoice(row);
+    const position=await getInvoiceFinancialPosition(db,row.id,{asOf:new Date()});
+    return {
+      ...invoice,
+      adjustedBilledRevenue:position.adjustedBilledRevenue,
+      collectibleAmount:position.collectibleAmount,
+      grossPaid:position.grossPaid,
+      refundTotal:position.refundTotal,
+      netCollected:position.netCollected,
+      creditNotes:position.creditNotes,
+      writeOffs:position.writeOffs,
+      debitAdjustments:position.debitAdjustments,
+      outstandingAmount:position.outstandingAmount,
+      overpaidAmount:position.overpaidAmount
+    };
+  }));
 };
 
 export const resolveInvoiceScope=async invoiceId=>{
