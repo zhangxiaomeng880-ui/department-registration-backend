@@ -50,10 +50,10 @@ jobs:
       - name: Run production migration twice
         run: |
           npm run migrate:runtime | tee /tmp/migrate-first.log
-          grep -q 'RUNTIME_MIGRATIONS_PASS applied=4 skipped=0 total=4' /tmp/migrate-first.log
+          grep -q 'RUNTIME_MIGRATIONS_PASS applied=5 skipped=0 total=5' /tmp/migrate-first.log
 
           npm run migrate:runtime | tee /tmp/migrate-second.log
-          grep -q 'RUNTIME_MIGRATIONS_PASS applied=0 skipped=4 total=4' /tmp/migrate-second.log
+          grep -q 'RUNTIME_MIGRATIONS_PASS applied=0 skipped=5 total=5' /tmp/migrate-second.log
 
       - name: Start Runtime with Railway-style environment
         run: |
