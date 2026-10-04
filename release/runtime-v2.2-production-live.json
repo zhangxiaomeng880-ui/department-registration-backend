@@ -1,0 +1,109 @@
+{
+  "release": "AI Native Runtime V2.2",
+  "status": "PRODUCTION_LIVE",
+  "frozen": true,
+  "promotedAt": "2026-10-04T12:46:10Z",
+  "source": {
+    "repository": "zhangxiaomeng880-ui/department-registration-backend",
+    "branch": "release/ai-native-runtime-v2.2-production-final",
+    "deployedCommitSha": "82c456336529ffce40ac689b96239b6c406653dc"
+  },
+  "railway": {
+    "project": "ai-native-runtime-v2",
+    "environment": "production",
+    "runtimeService": "runtime",
+    "runtimeDeploymentId": "a3a08afd-156e-4182-a4ed-6523443f909f",
+    "runtimeDeploymentStatus": "SUCCESS",
+    "mysqlService": "mysql-runtime",
+    "mysqlDeploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "warningCount": 0,
+    "criticalCount": 0
+  },
+  "preflight": {
+    "status": "PASS",
+    "historicalProductionRows": {
+      "projects": 2,
+      "runs": 2,
+      "usageLedger": 1,
+      "pricingVersions": 0
+    },
+    "m007PricingShape": "PASS",
+    "m008BackfillIntegrity": "PASS",
+    "foreignKeyNamesAvailable": "PASS",
+    "baseMigrationBaseline": "PASS",
+    "partialSchemaDetection": "PASS",
+    "historicalDataBackfill": "PASS"
+  },
+  "migrations": {
+    "migrationFilesInRelease": 13,
+    "latest": "012_v21_rollback_compatibility.sql",
+    "filesAddedForV22": [
+      "007_commercial_pricing_catalog.sql",
+      "008_tenant_workspace_quota_meter.sql",
+      "009_commercial_control.sql",
+      "010_tenant_identity_rbac.sql",
+      "011_subscription_billing_ledger.sql",
+      "012_v21_rollback_compatibility.sql"
+    ],
+    "verification": {
+      "mode": "release-chain-verified",
+      "directSchemaMigrationsQueryAvailableThroughConnector": false,
+      "basis": [
+        "Production preflight ran before migration and reported 007-011 pending with all safety checks PASS.",
+        "Railway preDeployCommand is `npm run preflight:v22-production && npm run migrate:runtime`.",
+        "migrate-runtime.mjs enumerates every .sql file in migrations in sorted order.",
+        "For each unapplied migration it executes SQL and then inserts its filename/hash into schema_migrations.",
+        "Any migration error sets a non-zero process exit code.",
+        "The application start step and Railway SUCCESS terminal state occurred only after preDeploy completed successfully.",
+        "012_v21_rollback_compatibility.sql is present in the deployed release after 011, so it was included in the successful migration runner pass."
+      ],
+      "caveat": "The connector could not execute an independent SELECT against schema_migrations inside the MySQL container, so this evidence is execution-chain proof rather than an independently queried row dump."
+    }
+  },
+  "httpAcceptance": {
+    "ready": {
+      "method": "GET",
+      "path": "/ready",
+      "status": 200,
+      "durationMs": 29
+    },
+    "unauthenticatedFailClosed": [
+      {
+        "path": "/api/runtime/plan-billing-terms",
+        "status": 401,
+        "durationMs": 25
+      },
+      {
+        "path": "/api/runtime/tenants/test-tenant/subscription",
+        "status": 401,
+        "durationMs": 26
+      },
+      {
+        "path": "/api/runtime/invoices/test-invoice",
+        "status": 401,
+        "durationMs": 24
+      }
+    ],
+    "observedRequests": 4,
+    "http2xx": 1,
+    "http4xx": 3,
+    "http5xx": 0,
+    "fiveXxErrorRate": 0
+  },
+  "rollbackCompatibility": {
+    "migration": "012_v21_rollback_compatibility.sql",
+    "purpose": "Preserve V2.1 project/run/usage write compatibility after V2.2 tenant/workspace NOT NULL scoping.",
+    "productionRollbackBuildAvailable": "ebb07381-56c5-4bab-85ef-59de1a13358f"
+  },
+  "priorGates": {
+    "m226RcGateRun": 37201397848,
+    "productionPromotionGateRun": 37202465615,
+    "productionPromotionGateStatus": "SUCCESS"
+  },
+  "knownNonBlocking": {
+    "npmAuditBuildWarning": "1 high severity vulnerability reported by npm audit during image build; release was not blocked. Follow-up remediation should be tracked separately."
+  },
+  "conclusion": "V2.2 is live in production. Runtime and MySQL are online, /ready is 200, commercial billing endpoints are fail-closed at 401 without authorization, and no 5xx were observed in the acceptance traffic."
+}
