@@ -89,14 +89,16 @@ Current RC:
 - candidate code SHA: `7b0d0f152395e39f4bdc5ea48217c4a24b7a284f`
 - isolated Railway staging: **PASS**
 - staging evidence: `release/runtime-v2.1-rc1-staging.json`
-- readiness: **AWAITING_MANUAL_APPROVAL**
-- remaining blocker: `MANUAL_APPROVAL_REQUIRED`
-- current production remains v2.0 and SUCCESS
-- rollback target is captured in the RC readiness manifest
+- readiness: **PRODUCTION LIVE**
+- manual release-owner approval: **GRANTED**
+- production deployment: `ebb07381-56c5-4bab-85ef-59de1a13358f`
+- production runtime SHA: `7b0d0f152395e39f4bdc5ea48217c4a24b7a284f`
+- production evidence: `release/runtime-v2.1.0-production-live.json`
+- v2.0 rollback target remains captured and available
 
-Next release action:
+Release outcome:
 
-An explicit release-owner approval is required before any production promotion. Production promotion remains manual; it must deploy the exact RC SHA and preserve the captured v2.0 rollback target.
+v2.1.0 was manually promoted to production using the exact RC1 SHA after all four v2.1 gates and isolated Railway staging validation passed.
 
 ## Release rule
 
