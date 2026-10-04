@@ -17,7 +17,8 @@
     "validate:runtime-orchestrator": "node test/runtime-orchestrator.test.mjs",
     "migrate:runtime": "node scripts/migrate-runtime.mjs",
     "validate:commercial-billing": "node test/commercial-billing.test.mjs",
-    "import:pricing-catalog": "node scripts/import-pricing-catalog.mjs"
+    "import:pricing-catalog": "node scripts/import-pricing-catalog.mjs",
+    "validate:tenant-quota": "node test/tenant-quota-meter.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.15.1"
