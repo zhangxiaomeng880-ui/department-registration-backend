@@ -15,7 +15,7 @@
   },
   "deploy": {
     "preDeployCommand": [
-      "npm run migrate:runtime && npm run import:pricing-catalog"
+      "npm run migrate:runtime"
     ],
     "startCommand": "npm run start",
     "healthcheckPath": "/ready",

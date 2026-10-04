@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import mysql from 'mysql2/promise';
+import { importPricingCatalog } from './import-pricing-catalog.mjs';
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 
@@ -127,6 +128,11 @@ try {
     applied += 1;
   }
 
+  const pricingImport = await importPricingCatalog({ db });
+  if (pricingImport.targetCount === 0) {
+    console.log(`PRICING_CATALOG_SKIP model_not_registered=${pricingImport.modelKey}`);
+  }
+  console.log(`PRICING_CATALOG_IMPORT_PASS model=${pricingImport.modelKey} targets=${pricingImport.targetCount} inserted=${pricingImport.inserted} skipped=${pricingImport.skipped}`);
   console.log(`RUNTIME_MIGRATIONS_PASS applied=${applied} skipped=${skipped} total=${files.length}`);
 } catch (error) {
   console.error(`RUNTIME_MIGRATIONS_FAIL ${error.code || 'MIGRATION_ERROR'}: ${error.message}`);
