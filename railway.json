@@ -9,12 +9,14 @@
       "scripts/**",
       "package.json",
       "Dockerfile",
-      "railway.json"
+      "railway.json",
+      "pricing/**"
     ]
   },
   "deploy": {
     "preDeployCommand": [
-      "npm run migrate:runtime"
+      "npm run migrate:runtime",
+      "npm run import:pricing-catalog"
     ],
     "startCommand": "npm run start",
     "healthcheckPath": "/ready",
