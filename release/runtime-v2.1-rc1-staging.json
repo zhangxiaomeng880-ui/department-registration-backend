@@ -1,0 +1,63 @@
+{
+  "releaseCandidate": "ai-native-runtime-v2.1-rc1",
+  "candidateCommitSha": "7b0d0f152395e39f4bdc5ea48217c4a24b7a284f",
+  "status": "PASS",
+  "validatedAt": "2026-10-04T09:07:00.000Z",
+  "railway": {
+    "projectId": "8f6bea55-f9a1-4335-849b-d0ba5ad3bbb6",
+    "projectName": "ai-native-runtime-v2-staging",
+    "environmentId": "fc068d5a-6664-42df-8bae-c84cbc569601",
+    "environmentName": "staging",
+    "runtimeServiceId": "fe463e22-49b6-452e-afb1-c30590298d42",
+    "runtimeServiceName": "runtime-staging-rc1",
+    "runtimeDeploymentId": "b82386a2-bdd0-4f3d-bf87-57678b1b8cfc",
+    "runtimeDomain": "runtime-staging-rc1-staging.up.railway.app",
+    "databaseServiceId": "a876537f-9e3a-4122-a839-dbe0b6fb34ea",
+    "databaseServiceName": "mysql-staging",
+    "databaseDeploymentId": "10204672-ba09-4ca8-b35b-3dcad3db44ac",
+    "databaseVolumeId": "fee346c3-a65b-4237-98c4-0833887c32e1",
+    "databasePublicTcpExposed": false
+  },
+  "deploymentEvidence": {
+    "exactCandidateShaPinned": true,
+    "deploymentStatus": "SUCCESS",
+    "readinessPath": "/ready",
+    "readinessHttpStatus": 200,
+    "unauthorizedRuntimeApiHttpStatus": 401,
+    "migrations": {
+      "applied": 7,
+      "skipped": 0,
+      "total": 7,
+      "result": "RUNTIME_MIGRATIONS_PASS applied=7 skipped=0 total=7"
+    }
+  },
+  "liveSmoke": {
+    "syntheticContextOnly": true,
+    "syntheticPricingOnly": true,
+    "providerInvoked": true,
+    "providerType": "openai-responses",
+    "model": "gpt-6-luna",
+    "structuredContractPass": true,
+    "policyRouterPass": true,
+    "observabilityPass": true,
+    "costLedgerPass": true,
+    "budgetPolicyPass": true,
+    "gateQaCheckpointPass": true,
+    "sourceBodyPersisted": false,
+    "sourceBodyExposed": false,
+    "costStatus": "CALCULATED",
+    "estimatedCostPositive": true
+  },
+  "productionSafety": {
+    "productionModified": false,
+    "productionRuntimeStatus": "SUCCESS",
+    "productionDatabaseStatus": "SUCCESS",
+    "productionRuntimeDeploymentId": "31e58eab-78a3-467b-b994-f73d873d5f18",
+    "productionRollbackCommitSha": "ca159922a609639b72656dbf7424777db1d6d00a"
+  },
+  "cleanup": {
+    "smokeServiceDeleted": true,
+    "obsoleteStagingRuntimeDeleted": true
+  },
+  "decision": "RC1 isolated Railway staging verification PASS. Candidate may advance to manual production approval gate."
+}
