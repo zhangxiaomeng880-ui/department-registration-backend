@@ -136,7 +136,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const tenantPlanMatch=match(url.pathname,/^\/api\/runtime\/tenants\/([^/]+)\/plan$/);
   if (req.method === 'PATCH' && tenantPlanMatch) {
-    if(!principal?.platformAdmin) await assertAccess({principal,permission:'commercial:write',tenantId:tenantPlanMatch[1],method:req.method,path:url.pathname});
+    requirePlatformAdmin(principal);
     const body=await readBody(req);
     json(res,200,{data:await assignTenantPlan({tenantId:tenantPlanMatch[1],planKey:body.planKey})});
     return true;
@@ -515,7 +515,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const knowledgeMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/knowledge-contexts$/);
   if (req.method === 'POST' && knowledgeMatch) {
-    if(!principal?.platformAdmin){ const scope=await resolveRunScope(knowledgeMatch[1]); await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname}); }
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(knowledgeMatch[1]); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
     const result = await addKnowledgeContexts(knowledgeMatch[1], await readBody(req));
     json(res, 201, { data: result });
     return true;
