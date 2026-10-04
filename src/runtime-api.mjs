@@ -34,6 +34,8 @@ import {
   getProjectCostSummary,
   evaluateBudgetPolicy,
 } from './cost-ledger.mjs';
+import { createTenant, listTenants, createWorkspace, listWorkspaces } from './tenant-workspace.mjs';
+import { upsertQuotaPolicy, listQuotaPolicies, getUsageMeter, evaluateRunQuota } from './quota-meter.mjs';
 import {
   createEphemeralContextPacket,
   getEphemeralContextPacketMetadata,
@@ -48,6 +50,29 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/tenants') {
+    const result = await createTenant(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/tenants') {
+    json(res, 200, { data: await listTenants() });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/workspaces') {
+    const result = await createWorkspace(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/workspaces') {
+    const result = await listWorkspaces({ tenantId:url.searchParams.get('tenantId') || null });
+    json(res, 200, { data: result });
     return true;
   }
 
@@ -104,6 +129,57 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       providerKey:url.searchParams.get('providerKey') || null,
       modelKey:url.searchParams.get('modelKey') || null,
       serviceTier:url.searchParams.get('serviceTier') || null,
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/quota-policies') {
+    const result = await upsertQuotaPolicy(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/quota-policies') {
+    const result = await listQuotaPolicies({
+      tenantId:url.searchParams.get('tenantId') || null,
+      workspaceId:url.searchParams.get('workspaceId') || null,
+      enabledOnly:url.searchParams.get('enabledOnly') === 'true',
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const workspaceMeterMatch = match(url.pathname, /^\/api\/runtime\/workspaces\/([^/]+)\/usage-meter$/);
+  if (req.method === 'GET' && workspaceMeterMatch) {
+    const result = await getUsageMeter({
+      workspaceId:workspaceMeterMatch[1],
+      periodType:url.searchParams.get('periodType') || 'MONTH',
+      at:url.searchParams.get('at') || new Date(),
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const tenantMeterMatch = match(url.pathname, /^\/api\/runtime\/tenants\/([^/]+)\/usage-meter$/);
+  if (req.method === 'GET' && tenantMeterMatch) {
+    const result = await getUsageMeter({
+      tenantId:tenantMeterMatch[1],
+      periodType:url.searchParams.get('periodType') || 'MONTH',
+      at:url.searchParams.get('at') || new Date(),
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const runQuotaMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/quota-evaluate$/);
+  if (req.method === 'POST' && runQuotaMatch) {
+    const body = await readBody(req);
+    const result = await evaluateRunQuota({
+      runId:runQuotaMatch[1],
+      persist:body.persist !== false,
+      source:body.source || 'RUNTIME_API',
+      at:body.at || new Date(),
     });
     json(res, 200, { data: result });
     return true;

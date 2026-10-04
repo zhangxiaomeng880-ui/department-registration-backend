@@ -79,6 +79,9 @@ export const getRuntimePool = () => {
 
 const asJson = value => value == null ? null : JSON.stringify(value);
 
+export const LEGACY_TENANT_ID='00000000-0000-4000-8000-000000000101';
+export const LEGACY_WORKSPACE_ID='00000000-0000-4000-8000-000000000102';
+
 export const createProject = async input => {
   const db = getRuntimePool();
   const id = input.id || randomUUID();
@@ -88,22 +91,30 @@ export const createProject = async input => {
     error.statusCode = 400;
     throw error;
   }
+  const workspaceId=input.workspaceId||LEGACY_WORKSPACE_ID;
+  const [scopeRows]=await db.execute(
+    `SELECT w.id AS workspace_id,w.tenant_id,w.status AS workspace_status,t.status AS tenant_status
+     FROM workspaces w JOIN tenants t ON t.id=w.tenant_id WHERE w.id=?`,
+    [workspaceId]
+  );
+  if(!scopeRows.length){
+    const error=new Error('Workspace not found');error.code='WORKSPACE_NOT_FOUND';error.statusCode=404;throw error;
+  }
+  if(scopeRows[0].workspace_status!=='ACTIVE'||scopeRows[0].tenant_status!=='ACTIVE'){
+    const error=new Error('Tenant/workspace scope is not active');error.code='PROJECT_SCOPE_NOT_ACTIVE';error.statusCode=409;throw error;
+  }
+  const tenantId=scopeRows[0].tenant_id;
   await db.execute(
     `INSERT INTO projects (
-      id, project_key, name, project_type, status,
+      id, tenant_id, workspace_id, project_key, name, project_type, status,
       current_workflow_version, current_knowledge_commit_sha
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      id,
-      input.projectKey,
-      input.name,
-      input.projectType,
-      input.status || 'ACTIVE',
-      input.currentWorkflowVersion || null,
-      input.currentKnowledgeCommitSha || null,
+      id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.status || 'ACTIVE',
+      input.currentWorkflowVersion || null,input.currentKnowledgeCommitSha || null,
     ]
   );
-  return { id, projectKey: input.projectKey, name: input.name, projectType: input.projectType, status: input.status || 'ACTIVE' };
+  return { id,tenantId,workspaceId,projectKey:input.projectKey,name:input.name,projectType:input.projectType,status:input.status || 'ACTIVE' };
 };
 
 export const createRun = async input => {
@@ -114,31 +125,27 @@ export const createRun = async input => {
     error.statusCode = 400;
     throw error;
   }
+  const [projects]=await db.execute('SELECT id,tenant_id,workspace_id,status FROM projects WHERE id=?',[input.projectId]);
+  if(!projects.length){const error=new Error('Project not found');error.code='PROJECT_NOT_FOUND';error.statusCode=404;throw error;}
+  if(projects[0].status!=='ACTIVE'){const error=new Error('Project is not active');error.code='PROJECT_NOT_ACTIVE';error.statusCode=409;throw error;}
   const id = input.id || randomUUID();
   const correlationId = input.correlationId || randomUUID();
+  const tenantId=projects[0].tenant_id;
+  const workspaceId=projects[0].workspace_id;
   await db.execute(
     `INSERT INTO runs (
-      id, correlation_id, project_id, parent_run_id, run_type, status, trigger_source,
+      id, tenant_id, workspace_id, correlation_id, project_id, parent_run_id, run_type, status, trigger_source,
       input_json, runtime_commit_sha, knowledge_commit_sha,
       workflow_version, router_version, rag_index_version, started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
     [
-      id,
-      correlationId,
-      input.projectId,
-      input.parentRunId || null,
-      input.runType || 'WORKFLOW',
-      input.status || 'RUNNING',
-      input.triggerSource || 'USER',
-      asJson(input.input || null),
-      input.runtimeCommitSha || null,
-      input.knowledgeCommitSha || null,
-      input.workflowVersion || null,
-      input.routerVersion || null,
-      input.ragIndexVersion || null,
+      id,tenantId,workspaceId,correlationId,input.projectId,input.parentRunId || null,
+      input.runType || 'WORKFLOW',input.status || 'RUNNING',input.triggerSource || 'USER',
+      asJson(input.input || null),input.runtimeCommitSha || null,input.knowledgeCommitSha || null,
+      input.workflowVersion || null,input.routerVersion || null,input.ragIndexVersion || null,
     ]
   );
-  return { id, projectId: input.projectId, correlationId, status: input.status || 'RUNNING' };
+  return { id,projectId:input.projectId,tenantId,workspaceId,correlationId,status:input.status || 'RUNNING' };
 };
 
 export const createTask = async input => {

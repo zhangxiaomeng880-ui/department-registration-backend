@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { invokeOpenAiResponses, classifyProviderError } from './openai-responses-provider.mjs';
 import { recordToolExecution } from './runtime-evidence.mjs';
+import { evaluateRunQuota } from './quota-meter.mjs';
 
 const sha256 = value => createHash('sha256').update(String(value)).digest('hex');
 
@@ -127,6 +128,27 @@ export const executeScriptContinuityAgent = async input => {
     throw error;
   }
 
+  const quotaDecision = await evaluateRunQuota({
+    runId:input.runId,
+    persist:true,
+    source:'AUTONOMOUS_AGENT',
+  });
+  if (quotaDecision.decision !== 'ALLOW') {
+    const error = new Error(quotaDecision.decision === 'BLOCK'
+      ? 'Usage quota blocked model execution'
+      : 'Usage quota requires hold before model execution');
+    error.code = quotaDecision.decision === 'BLOCK' ? 'QUOTA_BLOCKED' : 'QUOTA_HOLD';
+    error.statusCode = quotaDecision.decision === 'BLOCK' ? 429 : 409;
+    error.errorCategory = 'QUOTA';
+    error.details = {
+      decision:quotaDecision.decision,
+      tenantId:quotaDecision.tenantId,
+      workspaceId:quotaDecision.workspaceId,
+      policyCount:quotaDecision.policyCount,
+    };
+    throw error;
+  }
+
   let providerResult;
   try {
     providerResult = await invokeOpenAiResponses({
@@ -204,6 +226,7 @@ export const executeScriptContinuityAgent = async input => {
     contextHash,
     correlationId: input.correlationId || null,
     sourceBodyPersisted: false,
+    quotaDecision:quotaDecision.decision,
     toolExecutionId: toolEvidence.id,
     usageLedgerId: toolEvidence.usageLedgerId,
     output: providerResult.output,

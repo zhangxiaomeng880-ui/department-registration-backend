@@ -13,6 +13,8 @@ const notFound = runId => {
 
 const normalizeRun = row => ({
   id: row.id,
+  tenantId: row.tenant_id,
+  workspaceId: row.workspace_id,
   projectId: row.project_id,
   correlationId: row.correlation_id || null,
   runType: row.run_type,
@@ -38,7 +40,7 @@ export const getRunObservability = async runId => {
 
   const db = getRuntimePool();
   const [runRows] = await db.execute(
-    `SELECT id, project_id, correlation_id, run_type, status, trigger_source,
+    `SELECT id, tenant_id, workspace_id, project_id, correlation_id, run_type, status, trigger_source,
             workflow_version, router_version, started_at, finished_at,
             last_checkpoint_at, token_input, token_output, cost_amount,
             cost_currency, error_code, error_category, created_at, updated_at
@@ -85,7 +87,7 @@ export const getRunObservability = async runId => {
       [runId]
     ),
     db.execute(
-      `SELECT id, task_id, route_execution_id, tool_execution_id, correlation_id,
+      `SELECT id, tenant_id, workspace_id, task_id, route_execution_id, tool_execution_id, correlation_id,
               provider_key, model_key, service_tier, pricing_version_id, cost_status, context_band,
               estimated_cost, cost_currency, status, token_input, cached_input_tokens,
               cache_write_tokens, token_output, regional_uplift_bps, cost_formula_version,
@@ -184,6 +186,8 @@ export const getRunObservability = async runId => {
   }));
   const usage = usageRows.map(row => ({
     id: row.id,
+    tenantId: row.tenant_id,
+    workspaceId: row.workspace_id,
     taskId: row.task_id,
     routeExecutionId: row.route_execution_id,
     toolExecutionId: row.tool_execution_id,

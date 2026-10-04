@@ -1,0 +1,33 @@
+{
+  "milestone": "M22.2",
+  "title": "Tenant / Workspace + Quota / Usage Meter",
+  "version": "V2.2",
+  "status": "IMPLEMENTED_PENDING_GATE",
+  "branch": "feat/ai-native-runtime-v2.2-m22.2-tenant-quota-meter",
+  "baseCommit": "b5a37540c7d43aa11e712d9736bc00e0f0b5832c",
+  "productionTouched": false,
+  "scope": {
+    "hierarchy": "TENANT > WORKSPACE > PROJECT > RUN > USAGE_LEDGER",
+    "backwardCompatibility": "Existing projects map to Legacy Runtime Tenant/Workspace",
+    "frozenExecutionScope": true,
+    "quotaPeriods": [
+      "DAY",
+      "MONTH"
+    ],
+    "quotaMetrics": [
+      "COST_AMOUNT",
+      "TOKEN_INPUT",
+      "TOKEN_OUTPUT",
+      "TOKEN_TOTAL",
+      "RUN_COUNT",
+      "TOOL_EXECUTION_COUNT"
+    ],
+    "decisions": [
+      "ALLOW",
+      "HOLD",
+      "BLOCK"
+    ],
+    "autonomousAgentPreflight": true
+  },
+  "acceptanceGate": "G22_2_TENANT_QUOTA_METER_PASS"
+}
