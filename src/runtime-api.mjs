@@ -64,6 +64,9 @@ import {
 } from './eval-replay.mjs';
 import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
 import {
+  compareEvalRuns,getEvalRegressionComparison,evaluateEvalReleaseGate,getEvalReleaseGate
+} from './eval-regression.mjs';
+import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
   getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
@@ -162,6 +165,32 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && evalRunMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getEvalRun(evalRunMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-regression-comparisons') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await compareEvalRuns(await readBody(req))});
+    return true;
+  }
+
+  const evalComparisonMatch=match(url.pathname,/^\/api\/runtime\/eval-regression-comparisons\/([^/]+)$/);
+  if (req.method === 'GET' && evalComparisonMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalRegressionComparison(evalComparisonMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-release-gates') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await evaluateEvalReleaseGate(await readBody(req))});
+    return true;
+  }
+
+  const evalReleaseGateMatch=match(url.pathname,/^\/api\/runtime\/eval-release-gates\/([^/]+)$/);
+  if (req.method === 'GET' && evalReleaseGateMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalReleaseGate(evalReleaseGateMatch[1])});
     return true;
   }
 
