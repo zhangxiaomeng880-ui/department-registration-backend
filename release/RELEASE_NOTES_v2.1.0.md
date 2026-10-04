@@ -37,6 +37,8 @@ v2.1.0 promotes the exact RC1 runtime commit already validated in isolated Railw
 
 The exact RC1 SHA previously passed isolated Railway staging with live OpenAI Responses invocation, structured output, Policy Router v2, Observability, Cost Ledger, Budget Policy, Gate/QA/Checkpoint, and no private source-body persistence/exposure.
 
+After production promotion, an authorized synthetic production smoke was also executed successfully against the live Runtime. It confirmed OpenAI Responses invocation with `gpt-6-luna`, structured output, Gate/QA/Checkpoint creation, correlation-consistent Observability, readable Provider Registry, Cost Summary behavior, and no private source-body persistence or Observability exposure. Production pricing metadata is intentionally not hardcoded, so executions without an imported price version correctly report `UNKNOWN` cost rather than a fabricated zero.
+
 ## Product capabilities
 
 ### Observable Runtime
