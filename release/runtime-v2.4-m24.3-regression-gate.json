@@ -1,0 +1,189 @@
+{
+  "milestone": "M24.3",
+  "release": "AI Native Runtime V2.4",
+  "title": "Regression Comparator + Release Gate",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "authoritativeBaseline": {
+    "source": "actual deployed Staging",
+    "m242RuntimeSha": "68b94ca0c56ca5969154a01b045f9099c19d1e7e",
+    "executionMode": "RUNTIME_REPLAY",
+    "migrationBaseline": [
+      "018_eval_runner.sql",
+      "019_eval_runner_runtime_replay_compatibility.sql"
+    ],
+    "migrationFilesBeforeM243": 20,
+    "note": "Earlier synthetic M24.2 assumptions were superseded by the actual deployed Staging Runtime Replay schema. M24.3 was rebuilt from the real deployed SHA rather than attempting to rewrite 018/019."
+  },
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.3-regression-gate-runtime-compatible",
+    "stagingRuntimeSha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2",
+    "addedFiles": [
+      "migrations/020_eval_regression_gate.sql",
+      "src/eval-regression.mjs",
+      "test/eval-regression-gate.test.mjs",
+      ".github/workflows/runtime-v24-m24-3-regression-gate-runtime-compatible.yml"
+    ],
+    "modifiedFiles": [
+      "src/runtime-api.mjs",
+      "package.json"
+    ]
+  },
+  "comparator": {
+    "policyVersion": "eval-regression-strict-v1",
+    "clientPolicyOverrideAllowed": false,
+    "compatibleExecutionModes": [
+      "RUNTIME_REPLAY",
+      "SYNTHETIC_REPLAY"
+    ],
+    "authoritativeStagingMode": "RUNTIME_REPLAY",
+    "requiresSameSuiteVersion": true,
+    "requiresSameFixtureSha256": true,
+    "requiresCandidateManifestBaselineShaMatch": true,
+    "requiresDifferentBaselineAndCandidateRuntimeSha": true,
+    "verifiesManifestCandidateSha": true,
+    "verifiesEvalRunResultSha256": true,
+    "deterministicComparisonSha256": true,
+    "deterministicGateSha256": true
+  },
+  "strictPolicy": {
+    "directBlockers": [
+      "CANDIDATE_EVAL_NOT_PASS",
+      "CASE_SET_DRIFT",
+      "NEW_CASE_FAILURE",
+      "NEW_ASSERTION_FAILURE",
+      "ASSERTION_SET_DRIFT",
+      "ROUTER_DRIFT",
+      "EVIDENCE_DRIFT",
+      "COST_CURRENCY_MISMATCH"
+    ],
+    "durationRegression": {
+      "maxIncreasePct": 25,
+      "absoluteIncreaseFloorMs": 100,
+      "rule": "BLOCK only when both percentage and absolute increase thresholds are exceeded"
+    },
+    "costRegression": {
+      "maxIncreasePct": 15,
+      "absoluteIncreaseFloor": 0.001,
+      "rule": "BLOCK only when both percentage and absolute increase thresholds are exceeded"
+    }
+  },
+  "comparisonEvidence": {
+    "caseTransition": [
+      "STABLE",
+      "REGRESSED",
+      "IMPROVED",
+      "CHANGED",
+      "ADDED",
+      "MISSING"
+    ],
+    "assertionPassToFailBlocks": true,
+    "assertionSetDriftBlocks": true,
+    "routerFingerprint": [
+      "matched",
+      "policyResult",
+      "routeRuleKey",
+      "selectedProviderKey",
+      "selectedModelKey",
+      "selectedAdapterKey",
+      "providerHealthStatus"
+    ],
+    "evidenceFingerprint": [
+      "sourceFileId",
+      "contentSha256",
+      "lineStart",
+      "lineEnd",
+      "provenanceValid"
+    ],
+    "durationCompared": true,
+    "estimatedCostCompared": true,
+    "costCurrencyCompared": true
+  },
+  "schema": {
+    "migration": "020_eval_regression_gate.sql",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=20 total=21",
+    "migrationFilesTotal": 21,
+    "tables": [
+      "eval_regression_comparisons",
+      "eval_case_regressions",
+      "eval_release_gates"
+    ],
+    "rewroteM242Schema": false
+  },
+  "api": {
+    "compare": "POST /api/runtime/eval-regression-comparisons",
+    "detail": "GET /api/runtime/eval-regression-comparisons/:comparisonId",
+    "authorization": "platform administrator",
+    "unauthenticatedLiveCompareStatus": 401
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.3 Regression Gate",
+    "finalRunId": 37217922561,
+    "finalHeadSha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2",
+    "finalStatus": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "freshDbMigrations": "PASS / 21 applied",
+    "migrationIdempotence": "PASS / 21 skipped on second run",
+    "v23CommercialFinanceRegression": "PASS",
+    "m241EvalReplayContract": "PASS",
+    "m242RuntimeReplayRunner": "PASS",
+    "m242StagingSchemaCompatibility": "PASS",
+    "m243RegressionComparator": "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "excludedDevelopmentBranches": [
+    {
+      "branch": "feat/ai-native-runtime-v2.4-m24.3-regression-gate",
+      "reason": "Parallel/contaminated implementation; excluded from release evidence and Staging."
+    },
+    {
+      "branch": "feat/ai-native-runtime-v2.4-m24.3-regression-release-gate",
+      "reason": "Alternate draft migration; excluded from release evidence and Staging."
+    },
+    {
+      "branch": "feat/ai-native-runtime-v2.4-m24.3-regression-gate-clean",
+      "reason": "Built against superseded synthetic M24.2 schema assumption; CI-only exploration, never deployed to Staging."
+    }
+  ],
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "35faae12-b7fb-43f6-a028-cbdae62428c4",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "source": {
+      "branch": "feat/ai-native-runtime-v2.4-m24.3-regression-gate-runtime-compatible",
+      "sha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2"
+    },
+    "http": {
+      "observedRequestsLastHour": 6,
+      "http4xx": 6,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 26
+    },
+    "predecessor": {
+      "deploymentId": "168fe295-9b7a-4658-8d9a-91e812ae9118",
+      "finalState": "REMOVED",
+      "replacementExit": "Railway sent SIGTERM after M24.3 became healthy; not an application crash."
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M24.4 Production-safe Replay / Shadow Eval",
+  "conclusion": "M24.3 Regression Comparator + Release Gate is STAGING PASS / FROZEN on top of the actual deployed M24.2 Runtime Replay schema. It compares immutable baseline/candidate Eval Runs, verifies run integrity, detects quality/router/evidence/cost/latency regressions under a server-owned STRICT_V1 policy, persists deterministic comparison and release-gate hashes, and blocks regressions without adding model execution. Production remains on V2.3."
+}
