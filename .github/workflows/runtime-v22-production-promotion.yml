@@ -38,15 +38,6 @@ jobs:
       - name: Verify frozen M22.6 RC evidence
         run: |
           node -e "const x=require('./release/runtime-v2.2-m22.6-commercial-rc-freeze.json'); if(x.status!=='STAGING_PASS'||x.frozen!==true||x.productionTouched!==false) process.exit(1); console.log('M22_6_RC_EVIDENCE_PASS')"
-      - name: Align CI MySQL routine policy with production
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_NAME: ai_native_runtime
-          DB_USER: root
-          DB_PASSWORD: ci
-        run: |
-          node --input-type=module -e "import mysql from 'mysql2/promise'; const db=await mysql.createConnection({host:process.env.DB_HOST,port:Number(process.env.DB_PORT),user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME}); await db.query('SET GLOBAL log_bin_trust_function_creators=1'); await db.end(); console.log('CI_MYSQL_ROUTINE_POLICY_PASS');"
       - name: Validate production preflight and migration
         env:
           DB_HOST: 127.0.0.1
