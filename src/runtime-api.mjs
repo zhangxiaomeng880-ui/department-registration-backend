@@ -63,7 +63,7 @@ import {
   freezeEvalSuiteVersion,createEvalReplayManifest,getEvalReplayManifest
 } from './eval-replay.mjs';
 import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
-import { compareEvalRuns,getEvalRegressionComparison,createEvalReleaseGate,getEvalReleaseGate } from './eval-regression.mjs';
+import { compareEvalRuns,getEvalRegressionComparison,getEvalReleaseGate } from './eval-regression.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -174,17 +174,6 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && evalComparisonMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getEvalRegressionComparison(evalComparisonMatch[1])});
-    return true;
-  }
-
-  const evalReleaseGateCreateMatch=match(url.pathname,/^\/api\/runtime\/eval-regression-comparisons\/([^/]+)\/release-gate$/);
-  if (req.method === 'POST' && evalReleaseGateCreateMatch) {
-    requirePlatformAdmin(principal);
-    const body=await readBody(req);
-    json(res,201,{data:await createEvalReleaseGate(evalReleaseGateCreateMatch[1],{
-      gateKey:body.gateKey||'PRODUCTION_PROMOTION',
-      idempotencyKey:body.idempotencyKey
-    })});
     return true;
   }
 
