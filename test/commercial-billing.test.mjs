@@ -12,6 +12,18 @@ assert.equal(r.status,201,JSON.stringify(r.body));
 r=await request('POST','/api/runtime/models',{providerKey,modelKey:'gpt-6-luna',displayName:'GPT-6 Luna',qualityTier:'STANDARD',latencyTier:'BALANCED',costTier:'LOW',priority:1,capabilities:{taskTypes:['SCRIPT_CONTINUITY'],structuredOutput:true}});
 assert.equal(r.status,201,JSON.stringify(r.body));
 
+r=await request('POST','/api/runtime/models',{providerKey,modelKey:'granular-price-model',displayName:'Granular Price Model',qualityTier:'STANDARD',latencyTier:'BALANCED',costTier:'LOW',priority:2});
+assert.equal(r.status,201,JSON.stringify(r.body));
+r=await request('POST','/api/runtime/pricing-versions',{
+  providerKey,modelKey:'granular-price-model',serviceTier:'STANDARD',currency:'USD',
+  inputRatePerMillion:1,cachedInputRatePerMillion:0.1,cacheWriteRatePerMillion:1.25,outputRatePerMillion:5,
+  longContextThresholdTokens:272000,longContextInputRatePerMillion:2,longContextCachedInputRatePerMillion:0.2,
+  longContextCacheWriteRatePerMillion:2.5,longContextOutputRatePerMillion:7.5,
+  effectiveFrom:'2020-01-01T00:00:00.000Z',sourceLabel:'GRANULAR_API_TEST'
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+assert.equal(r.body.data.longContextThresholdTokens,272000);
+
 execFileSync(process.execPath,['scripts/import-pricing-catalog.mjs'],{stdio:'inherit',env:process.env});
 execFileSync(process.execPath,['scripts/import-pricing-catalog.mjs'],{stdio:'inherit',env:process.env});
 

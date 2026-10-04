@@ -5,13 +5,14 @@ const PRICE_STATUS = new Set(['ACTIVE','HISTORICAL','REVOKED']);
 const BUDGET_ACTION = new Set(['HOLD','BLOCK']);
 const asJson = value => value == null ? null : JSON.stringify(value);
 const secretPattern = /(api[_-]?key|secret|token|password|credential|authorization)/i;
+const safeCostFieldNames = new Set(['longContextThresholdTokens']);
 
 const rejectSecrets = value => {
   const visit = (node, path = '') => {
     if (!node || typeof node !== 'object') return;
     for (const [key, child] of Object.entries(node)) {
       const next = path ? `${path}.${key}` : key;
-      if (secretPattern.test(key)) {
+      if (secretPattern.test(key) && !safeCostFieldNames.has(key)) {
         throw errorOf(
           'Cost metadata must not persist credentials or secrets',
           'COST_METADATA_SECRET_NOT_ALLOWED',

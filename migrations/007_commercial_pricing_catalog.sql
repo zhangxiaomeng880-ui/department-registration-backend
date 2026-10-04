@@ -19,7 +19,11 @@ ALTER TABLE pricing_versions
   ADD UNIQUE KEY uq_price_effective_tier (provider_key, model_key, service_tier, effective_from),
   ADD INDEX idx_price_lookup_v2 (provider_key, model_key, service_tier, effective_from, status);
 
+ALTER TABLE runs
+  MODIFY COLUMN cost_amount DECIMAL(20,10) NOT NULL DEFAULT 0;
+
 ALTER TABLE tool_executions
+  MODIFY COLUMN cost_amount DECIMAL(20,10) NULL,
   ADD COLUMN service_tier VARCHAR(32) NOT NULL DEFAULT 'STANDARD' AFTER model_key,
   ADD COLUMN context_band VARCHAR(16) NULL AFTER cost_status,
   ADD COLUMN cached_input_tokens BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER token_input,
