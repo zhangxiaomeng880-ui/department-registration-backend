@@ -51,6 +51,7 @@ jobs:
           DB_NAME: ai_native_runtime
           DB_USER: ai_native_runtime
           DB_PASSWORD: ci
+          MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
           PORT: 3900
           RUNTIME_API_BASE_URL: http://127.0.0.1:3900
           RUNTIME_REQUIRE_AUTH: "true"
