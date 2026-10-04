@@ -123,3 +123,31 @@ jobs:
             sleep 1
           done
           npm run validate:real-chain:phase2
+
+      - name: Validate autonomous model provider bridge
+        env:
+          PORT: 3100
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3100
+          OPENAI_API_KEY: test-openai-key
+          OPENAI_MODEL: test-model
+          OPENAI_BASE_URL: http://127.0.0.1:4010/v1
+        run: |
+          node test/mock-openai-responses-server.mjs > /tmp/mock-openai.log 2>&1 &
+          MOCK_PID=$!
+          node src/server.mjs > /tmp/autonomous-runtime.log 2>&1 &
+          RUNTIME_PID=$!
+          trap 'kill $MOCK_PID $RUNTIME_PID 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3100/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          npm run validate:autonomous-agent-provider
