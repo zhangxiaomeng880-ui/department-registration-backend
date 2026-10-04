@@ -140,7 +140,7 @@ assert.equal(blockedRun.status,'FAIL');
 
 const compare=async(label,candidateRunId)=>{
   const x=await request('POST','/api/runtime/eval-regression-comparisons',{
-    baselineEvalRunId:baselineRun.id,candidateEvalRunId,idempotencyKey:`m243-cmp-${label}-${suffix}`
+    baselineEvalRunId:baselineRun.id,candidateEvalRunId:candidateRunId,idempotencyKey:`m243-cmp-${label}-${suffix}`
   });
   assert.equal(x.status,201,JSON.stringify(x.body));
   return x.body.data;
