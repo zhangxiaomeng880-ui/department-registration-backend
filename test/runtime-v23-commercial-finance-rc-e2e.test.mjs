@@ -58,7 +58,7 @@ assert.equal(r.status,201,JSON.stringify(r.body));
 const caseId=r.body.data.id;
 
 r=await request('POST',`/api/runtime/collection-cases/${caseId}/actions`,{
-  actionType:'PROMISE_TO_PAY',amount:12,promiseDueAt:'2026-07-15T00:00:00.000Z',
+  actionType:'PROMISE_TO_PAY',promisedAmount:12,promiseDueAt:'2026-07-15T00:00:00.000Z',
   idempotencyKey:`rc23-promise-${suffix}`,occurredAt:'2026-07-10T12:00:00.000Z'
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
