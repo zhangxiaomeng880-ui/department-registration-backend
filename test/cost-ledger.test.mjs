@@ -368,11 +368,12 @@ const [[priceCount]]=await db.execute(
 );
 assert.equal(Number(priceCount.count),2);
 
+// M22.5 intentionally introduces subscriptions; payment-provider tables remain out of scope.
 const [[forbiddenCommercialTables]]=await db.execute(
   `SELECT COUNT(*) AS count
    FROM information_schema.tables
    WHERE table_schema=DATABASE()
-     AND table_name IN ('payments','charges','subscriptions','checkout_sessions')`
+     AND table_name IN ('payments','charges','checkout_sessions')`
 );
 assert.equal(Number(forbiddenCommercialTables.count),0);
 
