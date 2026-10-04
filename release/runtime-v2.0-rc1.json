@@ -1,0 +1,56 @@
+{
+  "releaseCandidate": "ai-native-runtime-v2.0-rc1",
+  "releaseBranch": "release/ai-native-runtime-v2.0-rc1",
+  "commitSha": "f11deb61cf6013adfe84fd1b032f63904aab25e3",
+  "routerVersion": "router-p86-v1",
+  "workflowVersion": "context-orchestrator-v1",
+  "executionMode": "AUTONOMOUS_CONTEXT_ORCHESTRATOR",
+  "migrations": [
+    "001_runtime_persistence.sql",
+    "002_knowledge_contexts.sql",
+    "002_knowledge_source_adapter.sql",
+    "003_knowledge_retrieval_provenance.sql"
+  ],
+  "knowledgeBodyPolicy": {
+    "chatgptLibraryIsCanonicalBodySource": true,
+    "gitStoresProjectBody": false,
+    "mysqlStoresProjectBody": false,
+    "contextBridge": "EPHEMERAL_MEMORY_ONLY"
+  },
+  "validation": {
+    "backendValidation": {
+      "runId": 37182998655,
+      "runNumber": 116,
+      "conclusion": "success"
+    },
+    "runtimeOrchestratorValidation": {
+      "runId": 37182998665,
+      "runNumber": 24,
+      "conclusion": "success"
+    },
+    "runtimeDeploymentValidation": {
+      "runId": 37182998699,
+      "runNumber": 10,
+      "conclusion": "success"
+    },
+    "vpsDeploymentScriptsValidation": {
+      "runId": 37182998698,
+      "runNumber": 1,
+      "conclusion": "success"
+    }
+  },
+  "knownExternalBlockers": [
+    {
+      "code": "OPENAI_LIVE_SECRET_INJECTION_UNVERIFIED",
+      "scope": "real OpenAI provider Live validation",
+      "affectsRuntimeCore": false,
+      "runtimeReadiness": "degraded_not_failed",
+      "userReconfigurationRequired": false
+    },
+    {
+      "code": "REAL_VPS_EXECUTION_PENDING",
+      "scope": "actual authorized VPS terminal execution",
+      "affectsReleaseCandidateBuild": false
+    }
+  ]
+}
