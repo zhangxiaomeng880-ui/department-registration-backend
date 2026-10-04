@@ -282,6 +282,22 @@ assert.equal(r.body.data.decision,'BLOCK');
 assert.equal(r.body.data.reason,'RUN_BUDGET_EXCEEDED');
 assert.equal(r.body.data.runSummary.estimatedCost,20);
 
+r=await request('POST','/api/runtime/budget-policies',{
+  projectId:projectB,
+  policyKey:'hard-run-budget',
+  currency:'EUR',
+  runLimitAmount:10,
+  actionOnExceed:'BLOCK'
+});
+assert.equal(r.status,201);
+
+r=await request('POST',`/api/runtime/projects/${projectB}/budget-evaluate`,{runId:runB});
+assert.equal(r.status,200);
+assert.equal(r.body.data.decision,'HOLD');
+assert.equal(r.body.data.reason,'BUDGET_CURRENCY_MISMATCH');
+assert.equal(r.body.data.policyCurrency,'EUR');
+assert.equal(r.body.data.costCurrency,'USD');
+
 r=await request('GET',`/api/runtime/projects/${projectB}/cost-summary`);
 assert.equal(r.status,200);
 assert.equal(r.body.data.costStatus,'CALCULATED');
