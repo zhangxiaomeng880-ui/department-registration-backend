@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/ai-native-runtime-persistence
+      - feat/ai-native-runtime-v2.1-productization
   workflow_dispatch:
 
 jobs:
