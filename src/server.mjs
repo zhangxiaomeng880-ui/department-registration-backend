@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import { handleRuntimeRoute } from './runtime-api.mjs';
+import { handleKnowledgeRoute } from './knowledge-api.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
@@ -19,6 +20,7 @@ const route = async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { status: 'ok', service: 'department-registration-backend' });
   if (await handleRuntimeRoute(req, res, url, { json, readBody })) return;
+  if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
   if (req.method === 'GET' && url.pathname === '/api/cities') return json(res, 200, { data: data.cities });
   if (req.method === 'GET' && url.pathname === '/api/hospitals') { const cityId = url.searchParams.get('cityId'); return json(res, 200, { data: data.hospitals.filter(x => !cityId || x.cityId === cityId) }); }
   if (req.method === 'GET' && url.pathname === '/api/campuses') { const hospitalId = url.searchParams.get('hospitalId'); return json(res, 200, { data: data.campuses.filter(x => !hospitalId || x.hospitalId === hospitalId) }); }
