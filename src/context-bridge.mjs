@@ -1,6 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 const packets = new Map();
+const MAX_ITEMS = 24;
+const MAX_TOTAL_CHARS = 240000;
+const DEFAULT_ALLOWED_STATUSES = new Set(['CURRENT','FACT','RULE','FINAL']);
 
 const sha256 = value => createHash('sha256').update(String(value)).digest('hex');
 
@@ -36,6 +39,13 @@ export const createEphemeralContextPacket = input => {
     throw error;
   }
 
+  if (input.items.length > MAX_ITEMS) {
+    const error = new Error(`Context packet supports at most ${MAX_ITEMS} items`);
+    error.code = 'CONTEXT_PACKET_TOO_MANY_ITEMS';
+    error.statusCode = 413;
+    throw error;
+  }
+
   const ttlSeconds = Math.max(30, Math.min(Number(input.ttlSeconds || 300), 1800));
   const normalizedItems = input.items.map((item, index) => {
     if (!item?.sourceFileId || !item?.sourceText) {
@@ -44,17 +54,33 @@ export const createEphemeralContextPacket = input => {
       error.statusCode = 400;
       throw error;
     }
+    const sourceStatus = item.sourceStatus || 'CURRENT';
+    if (!DEFAULT_ALLOWED_STATUSES.has(sourceStatus)) {
+      const error = new Error(`Context item ${index + 1} status ${sourceStatus} is not allowed for default execution`);
+      error.code = 'CONTEXT_SOURCE_STATUS_NOT_ALLOWED';
+      error.statusCode = 409;
+      throw error;
+    }
     return {
       sourceFileId: item.sourceFileId,
       sourceLibraryFileId: item.sourceLibraryFileId || null,
       sourceVersion: item.sourceVersion || null,
       sourcePath: item.sourcePath || null,
+      sourceStatus,
       lineStart: item.lineStart == null ? null : Number(item.lineStart),
       lineEnd: item.lineEnd == null ? null : Number(item.lineEnd),
       contentSha256: sha256(item.sourceText),
       sourceText: item.sourceText,
     };
   });
+
+  const totalChars = normalizedItems.reduce((sum, item) => sum + item.sourceText.length, 0);
+  if (totalChars > MAX_TOTAL_CHARS) {
+    const error = new Error(`Context packet exceeds ${MAX_TOTAL_CHARS} characters`);
+    error.code = 'CONTEXT_PACKET_TOO_LARGE';
+    error.statusCode = 413;
+    throw error;
+  }
 
   const id = input.id || randomUUID();
   const createdAtMs = nowMs();
@@ -73,6 +99,7 @@ export const createEphemeralContextPacket = input => {
       sourceLibraryFileId: item.sourceLibraryFileId,
       sourceVersion: item.sourceVersion,
       sourcePath: item.sourcePath,
+      sourceStatus: item.sourceStatus,
       lineStart: item.lineStart,
       lineEnd: item.lineEnd,
       contentSha256: item.contentSha256,
