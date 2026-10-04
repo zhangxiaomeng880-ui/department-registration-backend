@@ -63,6 +63,7 @@ import {
   freezeEvalSuiteVersion,createEvalReplayManifest,getEvalReplayManifest
 } from './eval-replay.mjs';
 import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
+import { compareEvalRuns,getEvalRegressionComparison,createEvalReleaseGate,getEvalReleaseGate,enforceEvalReleaseGate } from './eval-regression.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -162,6 +163,39 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && evalRunMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getEvalRun(evalRunMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-regression-comparisons') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await compareEvalRuns(await readBody(req))});
+    return true;
+  }
+
+  const evalRegressionMatch=match(url.pathname,/^\/api\/runtime\/eval-regression-comparisons\/([^/]+)$/);
+  if (req.method === 'GET' && evalRegressionMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalRegressionComparison(evalRegressionMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-release-gates') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createEvalReleaseGate(await readBody(req))});
+    return true;
+  }
+
+  const evalReleaseGateEnforceMatch=match(url.pathname,/^\/api\/runtime\/eval-release-gates\/([^/]+)\/enforce$/);
+  if (req.method === 'POST' && evalReleaseGateEnforceMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await enforceEvalReleaseGate(evalReleaseGateEnforceMatch[1])});
+    return true;
+  }
+
+  const evalReleaseGateMatch=match(url.pathname,/^\/api\/runtime\/eval-release-gates\/([^/]+)$/);
+  if (req.method === 'GET' && evalReleaseGateMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalReleaseGate(evalReleaseGateMatch[1])});
     return true;
   }
 
