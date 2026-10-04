@@ -72,10 +72,9 @@ r = await request('POST', `/api/runtime/runs/${runId}/knowledge-contexts`, {
     retrievalQuery: 'task-scoped current facts',
     retrievalMode: 'search+read',
     contextRole: 'PROJECT_MANIFEST',
-    content: {
-      status: 'CURRENT',
-      rule: 'Only accepted current assets are default retrieval sources'
-    }
+    sourceLineStart: 1,
+    sourceLineEnd: 20,
+    contentSha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
   }]
 });
 assert.equal(r.status, 201);
@@ -87,7 +86,9 @@ r = await request('GET', `/api/runtime/runs/${runId}/knowledge-contexts`);
 assert.equal(r.status, 200);
 assert.equal(r.body.data.items.length, 1);
 assert.equal(r.body.data.items[0].sourceVersion, '1');
-assert.equal(r.body.data.items[0].content.rule, 'Only accepted current assets are default retrieval sources');
+assert.equal(r.body.data.items[0].sourceLineStart, 1);
+assert.equal(r.body.data.items[0].sourceLineEnd, 20);
+assert.equal(Object.hasOwn(r.body.data.items[0], 'content'), false);
 assert.match(r.body.data.fingerprint, /^[a-f0-9]{64}$/);
 const knowledgeFingerprint = r.body.data.fingerprint;
 
