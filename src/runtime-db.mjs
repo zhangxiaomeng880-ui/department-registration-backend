@@ -115,14 +115,16 @@ export const createRun = async input => {
     throw error;
   }
   const id = input.id || randomUUID();
+  const correlationId = input.correlationId || randomUUID();
   await db.execute(
     `INSERT INTO runs (
-      id, project_id, parent_run_id, run_type, status, trigger_source,
+      id, correlation_id, project_id, parent_run_id, run_type, status, trigger_source,
       input_json, runtime_commit_sha, knowledge_commit_sha,
       workflow_version, router_version, rag_index_version, started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
     [
       id,
+      correlationId,
       input.projectId,
       input.parentRunId || null,
       input.runType || 'WORKFLOW',
@@ -136,7 +138,7 @@ export const createRun = async input => {
       input.ragIndexVersion || null,
     ]
   );
-  return { id, projectId: input.projectId, status: input.status || 'RUNNING' };
+  return { id, projectId: input.projectId, correlationId, status: input.status || 'RUNNING' };
 };
 
 export const createTask = async input => {
@@ -150,12 +152,13 @@ export const createTask = async input => {
   const id = input.id || randomUUID();
   await db.execute(
     `INSERT INTO tasks (
-      id, run_id, parent_task_id, stage_key, task_key, task_type,
+      id, run_id, correlation_id, parent_task_id, stage_key, task_key, task_type,
       status, sequence_no, input_json, dependency_json, max_retries, started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
     [
       id,
       input.runId,
+      input.correlationId || null,
       input.parentTaskId || null,
       input.stageKey,
       input.taskKey,
@@ -167,7 +170,13 @@ export const createTask = async input => {
       Number(input.maxRetries || 0),
     ]
   );
-  return { id, runId: input.runId, taskKey: input.taskKey, status: input.status || 'RUNNING' };
+  return {
+    id,
+    runId: input.runId,
+    correlationId: input.correlationId || null,
+    taskKey: input.taskKey,
+    status: input.status || 'RUNNING'
+  };
 };
 
 export const updateTask = async (taskId, input) => {
@@ -179,6 +188,7 @@ export const updateTask = async (taskId, input) => {
   if (input.output !== undefined) { fields.push('output_json = ?'); values.push(asJson(input.output)); }
   if (input.retryCount !== undefined) { fields.push('retry_count = ?'); values.push(Number(input.retryCount)); }
   if (input.errorCode !== undefined) { fields.push('error_code = ?'); values.push(input.errorCode); }
+  if (input.errorCategory !== undefined) { fields.push('error_category = ?'); values.push(input.errorCategory); }
   if (input.errorMessage !== undefined) { fields.push('error_message = ?'); values.push(input.errorMessage); }
   if (input.finished === true) { fields.push('finished_at = CURRENT_TIMESTAMP(6)'); }
 
@@ -222,16 +232,17 @@ export const saveCheckpoint = async (runId, input) => {
 
     await connection.execute(
       `INSERT INTO checkpoints (
-        id, run_id, task_id, sequence_no, checkpoint_type, status,
+        id, run_id, task_id, correlation_id, sequence_no, checkpoint_type, status,
         stage_key, step_key, state_json,
         completed_task_keys_json, pending_task_keys_json, blocked_task_keys_json,
         dependency_fingerprint, runtime_commit_sha, knowledge_commit_sha,
         workflow_version, router_version, resume_from_task_key, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         runId,
         input.taskId || null,
+        input.correlationId || null,
         sequenceNo,
         input.checkpointType || 'AUTO',
         input.status || 'VALID',
@@ -268,6 +279,7 @@ const normalizeCheckpoint = row => row ? ({
   id: row.id,
   runId: row.run_id,
   taskId: row.task_id,
+  correlationId: row.correlation_id || null,
   sequenceNo: Number(row.sequence_no),
   checkpointType: row.checkpoint_type,
   status: row.status,
