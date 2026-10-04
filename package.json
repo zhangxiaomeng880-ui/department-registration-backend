@@ -10,6 +10,6 @@
     "validate:runtime-api": "node test/runtime-api.test.mjs"
   },
   "dependencies": {
-    "mysql2": "^3.15.1"
+    "mysql2": "3.15.1"
   }
 }
