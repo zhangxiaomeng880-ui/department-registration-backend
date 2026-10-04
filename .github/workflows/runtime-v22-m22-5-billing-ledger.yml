@@ -1,0 +1,100 @@
+name: Runtime v2.2 M22.5 Billing Ledger Gate
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-v2.2-m22.5-billing-ledger
+  workflow_dispatch:
+
+jobs:
+  g22-5-billing-ledger:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: runtime_ci_password
+          MYSQL_ROOT_PASSWORD: runtime_ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pruntime_ci_root_password --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Apply Runtime migrations twice
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+        run: |
+          npm run migrate:runtime
+          npm run migrate:runtime
+
+      - name: Validate M21 through M22.3 regressions
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          PORT: 3400
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3400
+        run: |
+          node src/server.mjs > /tmp/runtime-v22-m22-5-regression.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3400/health >/dev/null; then break; fi
+            sleep 1
+          done
+          node test/cost-ledger.test.mjs
+          npm run validate:commercial-billing
+          npm run validate:tenant-quota
+          npm run validate:commercial-control
+          kill $PID
+          trap - EXIT
+
+      - name: Validate M22.4 and M22.5 authenticated billing
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
+          MYSQL_URL: mysql://ai_native_runtime:runtime_ci_password@127.0.0.1:3306/ai_native_runtime
+          PORT: 3600
+          RUNTIME_API_BASE_URL: http://127.0.0.1:3600
+          RUNTIME_REQUIRE_AUTH: "true"
+          RUNTIME_API_TOKEN: billing-ci-platform-token
+        run: |
+          node src/server.mjs > /tmp/runtime-v22-m22-5-auth.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3600/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          npm run validate:tenant-rbac
+          npm run validate:billing-ledger
+          node test/railway-compatibility.test.mjs
+
+      - name: Print Runtime logs on failure
+        if: failure()
+        run: |
+          cat /tmp/runtime-v22-m22-5-regression.log || true
+          cat /tmp/runtime-v22-m22-5-auth.log || true
