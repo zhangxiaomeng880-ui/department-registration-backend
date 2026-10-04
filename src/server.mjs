@@ -2,6 +2,8 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import { handleRuntimeRoute } from './runtime-api.mjs';
 import { handleKnowledgeRoute } from './knowledge-api.mjs';
+import { checkRuntimeDbReady } from './runtime-db.mjs';
+import { modelProviderConfigured } from './openai-responses-provider.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
