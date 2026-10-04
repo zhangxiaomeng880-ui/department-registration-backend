@@ -52,6 +52,7 @@ const required = [
   'provider_registry','model_registry','provider_health_events','pricing_versions','project_budget_policies',
   'tenants','workspaces','quota_policies','quota_evaluations',
   'plans','plan_entitlements','entitlement_evaluations','rate_limit_policies','rate_limit_buckets','rate_limit_decisions','usage_reservations',
+  'identities','rbac_roles','rbac_role_permissions','tenant_memberships','workspace_memberships','api_credentials','authorization_decisions',
   'knowledge_contexts','knowledge_sources','knowledge_documents','knowledge_sync_runs',
   'knowledge_retrievals','knowledge_retrieval_items'
 ];
