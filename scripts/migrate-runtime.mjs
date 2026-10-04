@@ -51,12 +51,39 @@ if (!files.length) {
   process.exit(3);
 }
 
-const db = await mysql.createConnection({
-  ...config,
-  multipleStatements: true,
-  charset: 'utf8mb4',
-  timezone: 'Z',
-});
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+const connectWithRetry = async () => {
+  const maxAttempts = Number(process.env.DB_MIGRATION_CONNECT_ATTEMPTS || 30);
+  const delayMs = Number(process.env.DB_MIGRATION_CONNECT_DELAY_MS || 2000);
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const connection = await mysql.createConnection({
+        ...config,
+        multipleStatements: true,
+        charset: 'utf8mb4',
+        timezone: 'Z',
+        connectTimeout: Number(process.env.DB_CONNECT_TIMEOUT_MS || 10000),
+      });
+      if (attempt > 1) {
+        console.log(`DATABASE_CONNECT_RECOVERED attempt=${attempt}`);
+      }
+      return connection;
+    } catch (error) {
+      lastError = error;
+      const retryable = ['ECONNREFUSED','ETIMEDOUT','EHOSTUNREACH','ENETUNREACH','PROTOCOL_CONNECTION_LOST'].includes(error.code);
+      if (!retryable || attempt === maxAttempts) throw error;
+      console.log(`DATABASE_CONNECT_RETRY attempt=${attempt} code=${error.code}`);
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+};
+
+const db = await connectWithRetry();
 
 let applied = 0;
 let skipped = 0;
