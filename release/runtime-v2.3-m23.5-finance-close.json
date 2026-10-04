@@ -1,0 +1,142 @@
+{
+  "milestone": "M23.5",
+  "release": "AI Native Runtime V2.3",
+  "title": "Finance Close / Reconciliation Export",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.3-m23.5-finance-close",
+    "stagingRuntimeSha": "25b1608649874661bc526acb56514ca15ac2b192"
+  },
+  "scope": {
+    "closeLevel": "platform-global",
+    "snapshotDimension": "currency",
+    "access": "platform administrator only",
+    "closedPeriodConvention": "[periodStart, periodEnd)",
+    "periodProgression": "contiguous after the first explicit close"
+  },
+  "reconciliation": {
+    "invariant": "openingNetAR + adjustedBilledRevenue - writeOffs - netCashCollected = endingNetAR",
+    "openingNetAR": "openingAr - openingOverpayment",
+    "adjustedBilledRevenue": "originalBilled + debitAdjustments - creditNotes",
+    "netCashCollected": "grossCashCollected - refunds",
+    "endingNetAR": "endingAr - endingOverpayment",
+    "closeBlockedOnNonZeroDelta": true,
+    "exactDecimalScale": 10
+  },
+  "controls": {
+    "immutableCloseSnapshots": true,
+    "snapshotSha256": true,
+    "deterministicExports": [
+      "JSON",
+      "CSV"
+    ],
+    "exportSha256Verification": true,
+    "closeIdempotency": true,
+    "overlappingPeriodsBlocked": true,
+    "financeCloseBarrier": true,
+    "serializedFinancialMutationBoundary": true,
+    "backdatedWritesIntoClosedPeriodsBlocked": [
+      "billing cycle finalization / invoice issuance",
+      "invoice payment",
+      "credit note",
+      "write-off",
+      "debit adjustment",
+      "payment refund",
+      "accepted billing dispute"
+    ],
+    "tenantScopedFinanceCloseRead": false
+  },
+  "schema": {
+    "migration": "016_finance_close.sql",
+    "migrationFilesTotal": 17,
+    "tables": [
+      "finance_close_lock",
+      "finance_close_periods",
+      "finance_close_currency_snapshots",
+      "finance_close_exports"
+    ],
+    "initialStagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=16 total=17",
+    "finalStagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=17 total=17"
+  },
+  "api": {
+    "close": "POST /api/runtime/finance-closes",
+    "list": "GET /api/runtime/finance-closes",
+    "detail": "GET /api/runtime/finance-closes/:closeId",
+    "export": "GET /api/runtime/finance-closes/:closeId/export?format=JSON|CSV",
+    "authorization": "platform administrator"
+  },
+  "ci": {
+    "workflow": "Runtime v2.3 M23.5 Finance Close Gate",
+    "runId": 37211496679,
+    "headSha": "25b1608649874661bc526acb56514ca15ac2b192",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS",
+    "migrationDoubleApply": "PASS",
+    "m225BillingLedgerRegression": "PASS",
+    "m231BillingOperationsRegression": "PASS",
+    "m232CollectionsRegression": "PASS",
+    "m233RevenueAnalyticsRegression": "PASS",
+    "m234FinancialAdjustmentsRegression": "PASS",
+    "m235FinanceClose": "PASS",
+    "jsonExportHash": "PASS",
+    "csvExportHash": "PASS",
+    "closedPeriodPaymentGuard": "PASS",
+    "closedPeriodAdjustmentGuard": "PASS",
+    "closedPeriodRefundGuard": "PASS",
+    "closedPeriodDisputeAcceptanceGuard": "PASS",
+    "platformAdminBoundary": "PASS",
+    "failClosedAuthorization": "PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "testedExample": {
+    "currency": "USD",
+    "periodOriginalBilled": 20,
+    "creditNotes": 2,
+    "debitAdjustments": 1,
+    "adjustedBilledRevenue": 19,
+    "writeOffs": 3,
+    "grossCashCollected": 8,
+    "refunds": 1,
+    "netCashCollected": 7,
+    "providerCost": 0,
+    "grossMargin": 19,
+    "reconciliationDelta": 0
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "initialMigrationDeploymentId": "82c6f93a-f7e9-4ef5-8710-8b9acd409acb",
+    "finalDeploymentId": "5fbdf445-230e-404a-b21a-8b5cd62a6617",
+    "finalDeploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "http": {
+      "ready": "2xx",
+      "financeClosesUnauthenticatedPost": 401,
+      "observedRequestsLastHour": 11,
+      "http2xx": 3,
+      "http4xx": 8,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 26
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "hotfix/v2.2-mysql2-security",
+    "sha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "deploymentStatus": "SUCCESS"
+  },
+  "conclusion": "M23.5 Finance Close / Reconciliation Export is STAGING PASS / FROZEN. Platform-wide period close snapshots reconcile AR, billed revenue, adjustments, write-offs, cash, refunds, provider cost and margin by currency; deterministic JSON/CSV exports are hash-verifiable; a serialized close barrier prevents financial writes from racing the close and closed periods reject backdated financial mutations. Production remains on V2.2."
+}
