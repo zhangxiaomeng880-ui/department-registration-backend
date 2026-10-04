@@ -12,7 +12,7 @@ DEPLOY_TIMEOUT_SECONDS="${DEPLOY_TIMEOUT_SECONDS:-180}"
 
 mkdir -p "$STATE_DIR"
 
-"$ROOT_DIR/scripts/preflight-runtime-vps.sh"
+bash "$ROOT_DIR/scripts/preflight-runtime-vps.sh"
 
 cd "$ROOT_DIR"
 
@@ -54,13 +54,18 @@ curl --fail --silent "$READY_URL" >/tmp/ai-native-ready.json || {
   exit 1
 }
 
-node -e "
-const fs=require('fs');
-const d=JSON.parse(fs.readFileSync('/tmp/ai-native-ready.json','utf8'));
-if (!['ready','degraded'].includes(d.status)) process.exit(1);
-if (!d.components?.database?.ready) process.exit(2);
-if (!d.components?.runtimeAuth?.ready) process.exit(3);
-"
+grep -Eq '"status":"(ready|degraded)"' /tmp/ai-native-ready.json || {
+  echo "RUNTIME_DEPLOY_FAIL: unexpected readiness status" >&2
+  exit 1
+}
+grep -q '"database":{"ready":true}' /tmp/ai-native-ready.json || {
+  echo "RUNTIME_DEPLOY_FAIL: database is not ready" >&2
+  exit 1
+}
+grep -Eq '"runtimeAuth":\{"required":true,"ready":true' /tmp/ai-native-ready.json || {
+  echo "RUNTIME_DEPLOY_FAIL: runtime auth is not ready" >&2
+  exit 1
+}
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" ps
 
