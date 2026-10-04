@@ -1,0 +1,131 @@
+{
+  "milestone": "M23.4",
+  "release": "AI Native Runtime V2.3",
+  "title": "Financial Adjustments / Revenue Assurance",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "code": {
+    "branch": "feat/ai-native-runtime-v2.3-m23.4-financial-adjustments",
+    "stagingRuntimeSha": "c49a9f069f4e28c6b2d6f93350eda2bb67bebe58"
+  },
+  "accountingSemantics": {
+    "creditNote": "reduces billed/recognized revenue and accounts receivable",
+    "writeOff": "reduces collectible accounts receivable without erasing billed/recognized revenue",
+    "debitAdjustment": "increases billed/recognized revenue and accounts receivable",
+    "refund": "reverses collected cash without automatically changing billed/recognized revenue",
+    "netCollected": "gross invoice payments minus payment refunds",
+    "collectibleAmount": "adjusted billed revenue minus write-offs",
+    "outstanding": "max(collectible amount minus net collected, 0)",
+    "immutableEventLedgers": true,
+    "historicalInvoiceAmountOverwritten": false
+  },
+  "capabilities": [
+    "Credit Note",
+    "Write-off",
+    "Debit / Billing Adjustment",
+    "Payment Refund",
+    "Billing Dispute lifecycle",
+    "Dispute accepted amount to Credit Note",
+    "Adjustment-aware invoice financial position",
+    "Adjustment-aware payment collection limits",
+    "Automatic collection case resolve and reopen after financial events",
+    "Adjustment-aware revenue and AR analytics",
+    "Historical as-of adjustment/refund analytics",
+    "Tenant-scoped billing:read access",
+    "Platform-admin-only financial mutations"
+  ],
+  "schema": {
+    "migration": "015_financial_adjustments.sql",
+    "totalMigrations": 16,
+    "newTables": [
+      "invoice_adjustments",
+      "payment_refunds",
+      "billing_disputes",
+      "billing_dispute_actions"
+    ],
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=15 total=16"
+  },
+  "api": {
+    "invoiceAdjustments": "POST/GET /api/runtime/invoices/:invoiceId/adjustments",
+    "financialPosition": "GET /api/runtime/invoices/:invoiceId/financial-position",
+    "paymentRefunds": "POST /api/runtime/payments/:paymentId/refunds",
+    "invoiceRefunds": "GET /api/runtime/invoices/:invoiceId/refunds",
+    "invoiceDisputes": "POST /api/runtime/invoices/:invoiceId/disputes",
+    "disputes": "GET /api/runtime/billing-disputes",
+    "disputeActions": "POST /api/runtime/billing-disputes/:disputeId/actions",
+    "disputeDetail": "GET /api/runtime/billing-disputes/:disputeId",
+    "readPermission": "billing:read",
+    "mutationBoundary": "platform administrator"
+  },
+  "ci": {
+    "workflow": "Runtime v2.3 M23.4 Financial Adjustments Gate",
+    "runId": 37209068236,
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "m225BillingLedgerRegression": "PASS",
+    "m231BillingOperationsRegression": "PASS",
+    "m232CollectionsRegression": "PASS",
+    "m233RevenueAnalyticsRegression": "PASS",
+    "m234FinancialAdjustments": "PASS",
+    "idempotency": "PASS",
+    "refundBounds": "PASS",
+    "disputeLifecycle": "PASS",
+    "crossTenantIsolation": "PASS",
+    "failClosedAuthorization": "PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "testedFinancialExample": {
+    "originalTotalDue": 12,
+    "grossPaymentsBeforeFinalSettlement": 12,
+    "creditNotes": 3.5,
+    "writeOffs": 1,
+    "debitAdjustments": 3,
+    "adjustedBilledRevenue": 11.5,
+    "collectibleAmount": 10.5,
+    "refunds": 2,
+    "netCollectedBeforeFinalSettlement": 10,
+    "outstandingBeforeFinalSettlement": 0.5,
+    "finalAdditionalPayment": 0.5,
+    "finalNetCollected": 10.5,
+    "finalOutstanding": 0,
+    "finalInvoiceStatus": "SETTLED"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "a14c16f7-5b4f-4cf9-b3d2-5327fe59c1dc",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "http": {
+      "ready": 200,
+      "billingDisputesUnauthenticated": 401,
+      "financialPositionUnauthenticated": 401,
+      "analyticsUnauthenticated": 401,
+      "observedRequestsLastHour": 19,
+      "http2xx": 5,
+      "http4xx": 14,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 28
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "branch": "hotfix/v2.2-mysql2-security",
+    "sha": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "deploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "deploymentStatus": "SUCCESS"
+  },
+  "conclusion": "M23.4 Financial Adjustments / Revenue Assurance is STAGING PASS / FROZEN. Immutable credit note, write-off, debit adjustment, refund and dispute ledgers are integrated with payments, collections, invoice financial positions and revenue analytics. CI and live Staging acceptance passed. Production remains on V2.2."
+}
