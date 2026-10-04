@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 
 const SUBJECTS=new Set(['TENANT','WORKSPACE']);
-const METRICS=new Set(['COST_AMOUNT','TOKEN_INPUT','TOKEN_OUTPUT','TOKEN_TOTAL','RUN_COUNT','TOOL_EXECUTION_COUNT']);
+const METRICS=new Set(['COST_AMOUNT','TOKEN_INPUT','TOKEN_OUTPUT','TOKEN_TOTAL','TOOL_EXECUTION_COUNT']);
 const PERIODS=new Set(['DAY','MONTH']);
 const ACTIONS=new Set(['HOLD','BLOCK']);
 const decisionRank={ALLOW:0,HOLD:1,BLOCK:2};
 const asJson=value=>value==null?null:JSON.stringify(value);
-const secretPattern=/(api[_-]?key|secret|password|credential|authorization)/i;
+const secretPattern=/(api[_-]?key|secret|token|password|credential|authorization)/i;
 const rejectSecrets=value=>{
   const visit=(node,path='')=>{
     if(!node||typeof node!=='object') return;
@@ -190,7 +190,6 @@ const metricValue=(metric,meter)=>{
   if(metric==='TOKEN_INPUT') return meter.tokenInput;
   if(metric==='TOKEN_OUTPUT') return meter.tokenOutput;
   if(metric==='TOKEN_TOTAL') return meter.tokenTotal;
-  if(metric==='RUN_COUNT') return meter.runCount;
   if(metric==='TOOL_EXECUTION_COUNT') return meter.usageCount;
   return null;
 };
