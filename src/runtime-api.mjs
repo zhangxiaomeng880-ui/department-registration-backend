@@ -59,6 +59,10 @@ import {
 import { getRevenueAnalytics, getRevenuePerformance } from './revenue-analytics.mjs';
 import { closeFinancePeriod,getFinanceClose,listFinanceCloses,getFinanceCloseExport } from './finance-close.mjs';
 import {
+  createEvalSuite,listEvalSuites,createEvalSuiteVersion,addEvalCase,getEvalSuiteVersion,
+  freezeEvalSuiteVersion,createEvalReplayManifest,getEvalReplayManifest
+} from './eval-replay.mjs';
+import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
   getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
@@ -77,6 +81,66 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-suites') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createEvalSuite(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/eval-suites') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listEvalSuites()});
+    return true;
+  }
+
+  const evalSuiteVersionsMatch=match(url.pathname,/^\/api\/runtime\/eval-suites\/([^/]+)\/versions$/);
+  if (req.method === 'POST' && evalSuiteVersionsMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await createEvalSuiteVersion({
+      suiteId:evalSuiteVersionsMatch[1],versionNo:body.versionNo
+    })});
+    return true;
+  }
+
+  const evalVersionCasesMatch=match(url.pathname,/^\/api\/runtime\/eval-suite-versions\/([^/]+)\/cases$/);
+  if (req.method === 'POST' && evalVersionCasesMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await addEvalCase({
+      suiteVersionId:evalVersionCasesMatch[1],caseKey:body.caseKey,sequenceNo:body.sequenceNo,
+      replayInput:body.replayInput,sourceRefs:body.sourceRefs||[],assertions:body.assertions
+    })});
+    return true;
+  }
+
+  const evalVersionFreezeMatch=match(url.pathname,/^\/api\/runtime\/eval-suite-versions\/([^/]+)\/freeze$/);
+  if (req.method === 'POST' && evalVersionFreezeMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await freezeEvalSuiteVersion(evalVersionFreezeMatch[1])});
+    return true;
+  }
+
+  const evalVersionMatch=match(url.pathname,/^\/api\/runtime\/eval-suite-versions\/([^/]+)$/);
+  if (req.method === 'GET' && evalVersionMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalSuiteVersion(evalVersionMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-replay-manifests') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createEvalReplayManifest(await readBody(req))});
+    return true;
+  }
+
+  const evalReplayManifestMatch=match(url.pathname,/^\/api\/runtime\/eval-replay-manifests\/([^/]+)$/);
+  if (req.method === 'GET' && evalReplayManifestMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalReplayManifest(evalReplayManifestMatch[1])});
     return true;
   }
 
