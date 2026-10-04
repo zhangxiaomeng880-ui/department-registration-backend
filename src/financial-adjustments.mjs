@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
-import { assertFinancePeriodOpen } from './finance-close.mjs';
+import { assertFinancePeriodOpen, lockFinanceCloseBarrier } from './finance-close.mjs';
 
 const SCALE=10000000000n;
 const ADJUSTMENT_TYPES=new Set(['CREDIT_NOTE','WRITE_OFF','DEBIT_ADJUSTMENT']);
@@ -177,6 +177,7 @@ export const createInvoiceAdjustment=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await lockFinanceCloseBarrier(connection);
     await assertFinancePeriodOpen(connection,effective);
     const [existing]=await connection.execute('SELECT * FROM invoice_adjustments WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
@@ -229,6 +230,7 @@ export const recordPaymentRefund=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    await lockFinanceCloseBarrier(connection);
     await assertFinancePeriodOpen(connection,refunded);
     const [existing]=await connection.execute('SELECT * FROM payment_refunds WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
@@ -342,6 +344,7 @@ export const recordBillingDisputeAction=async({
   const db=getRuntimePool(),connection=await db.getConnection();
   try{
     await connection.beginTransaction();
+    if(type==='ACCEPT') await lockFinanceCloseBarrier(connection);
     const [existing]=await connection.execute('SELECT * FROM billing_dispute_actions WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
       const row=existing[0];
