@@ -35,7 +35,7 @@ jobs:
         run: npm install
 
       - name: Apply Runtime migrations twice
-        env: &db-env
+        env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
           DB_NAME: ai_native_runtime
@@ -47,7 +47,11 @@ jobs:
 
       - name: Validate V2.1, M22.1 and M22.2
         env:
-          <<: *db-env
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: runtime_ci_password
           PORT: 3300
           RUNTIME_API_BASE_URL: http://127.0.0.1:3300
         run: |
