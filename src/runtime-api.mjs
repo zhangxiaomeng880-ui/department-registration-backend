@@ -177,6 +177,24 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const evalReleaseGateCreateMatch=match(url.pathname,/^\/api\/runtime\/eval-regression-comparisons\/([^/]+)\/release-gate$/);
+  if (req.method === 'POST' && evalReleaseGateCreateMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await createEvalReleaseGate(evalReleaseGateCreateMatch[1],{
+      gateKey:body.gateKey||'PRODUCTION_PROMOTION',
+      idempotencyKey:body.idempotencyKey
+    })});
+    return true;
+  }
+
+  const evalReleaseGateMatch=match(url.pathname,/^\/api\/runtime\/eval-release-gates\/([^/]+)$/);
+  if (req.method === 'GET' && evalReleaseGateMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalReleaseGate(evalReleaseGateMatch[1])});
+    return true;
+  }
+
   const evalReleaseGateMatch=match(url.pathname,/^\/api\/runtime\/eval-release-gates\/([^/]+)$/);
   if (req.method === 'GET' && evalReleaseGateMatch) {
     requirePlatformAdmin(principal);
