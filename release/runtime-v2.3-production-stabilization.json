@@ -1,0 +1,110 @@
+{
+  "release": "AI Native Runtime V2.3",
+  "milestone": "Production Stabilization",
+  "title": "V2.3 Production Stabilization Baseline",
+  "status": "PRODUCTION_STABLE",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeAnchor": {
+    "releaseBranch": "release/ai-native-runtime-v2.3-production",
+    "deployedCommit": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "productionEvidenceCommit": "1318409395a62d021db0f59b516c61dac0a402e8",
+    "exactRuntimeAnchor": true,
+    "note": "The release branch points exactly to the deployed Production runtime commit. Evidence commits are not deployed."
+  },
+  "production": {
+    "project": "ai-native-runtime-v2",
+    "environment": "production",
+    "runtimeService": "runtime",
+    "runtimeDeploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "runtimeDeploymentStatus": "SUCCESS",
+    "mysqlService": "mysql-runtime",
+    "mysqlDeploymentId": "ef5f63ce-0c9e-499b-95a5-ddd670c7e539",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "stagedChanges": 0,
+    "source": {
+      "repo": "zhangxiaomeng880-ui/department-registration-backend",
+      "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+      "commitSha": "34578464f5d19e87978ccb81719fb23a4b79d6f1"
+    }
+  },
+  "database": {
+    "migrationFilesTotal": 17,
+    "latest": "016_finance_close.sql",
+    "productionPromotionApplied": [
+      "013_billing_operations.sql",
+      "014_collections.sql",
+      "015_financial_adjustments.sql",
+      "016_finance_close.sql"
+    ],
+    "productionPromotionResult": "RUNTIME_MIGRATIONS_PASS applied=4 skipped=13 total=17",
+    "schemaState": "stable after production promotion"
+  },
+  "authorizationAcceptance": {
+    "financeClosesUnauthenticated": 401,
+    "billingOpsAnalyticsUnauthenticated": 401,
+    "billingDisputesUnauthenticated": 401,
+    "repeatedProbeLogs": "PASS",
+    "failClosed": true
+  },
+  "observability": {
+    "metricsWindowHours": 1,
+    "metricsObservedRequests": 3,
+    "http4xx": 3,
+    "http5xx": 0,
+    "fiveXxErrorRate": 0,
+    "p50Ms": 24,
+    "p90Ms": 26,
+    "p95Ms": 26,
+    "p99Ms": 26,
+    "httpLogProbeCount": 5,
+    "httpLogProbeStatuses": [
+      401,
+      401,
+      401,
+      401,
+      401
+    ],
+    "upstreamErrorsObserved": false
+  },
+  "health": {
+    "railwayHealthcheckPath": "/ready",
+    "railwayHealthcheckResult": "1/1 succeeded",
+    "runtimeState": "online",
+    "mysqlState": "online"
+  },
+  "rollback": {
+    "previousVersion": "V2.2 security hotfix",
+    "previousDeploymentId": "51c97e1a-6618-4ee8-b664-507888d41247",
+    "previousCommit": "dbd20be3b50e9f417a3fa8aa4f632d9ee93983bd",
+    "canRollback": true,
+    "note": "Previous deployment remains identifiable and rollback-capable. V2.3 migrations are additive; schema rollback is not assumed by an application rollback."
+  },
+  "validation": {
+    "m236RcGateRunId": 37212523939,
+    "m236RcGate": "SUCCESS",
+    "m236EvidenceGateRunId": 37212732948,
+    "m236EvidenceGate": "SUCCESS",
+    "productionEvidenceGateRunId": 37213579994,
+    "productionEvidenceGate": "SUCCESS",
+    "dependencyAudit": "PASS",
+    "fullCommercialFinanceRegression": "PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "v24Boundary": {
+    "recommendedBaseBranch": "release/ai-native-runtime-v2.3-production",
+    "recommendedBaseCommit": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "productionBaselineFrozen": true,
+    "rule": "V2.4 development must not mutate the V2.3 production anchor; new work branches from this frozen runtime baseline."
+  },
+  "conclusion": "AI Native Runtime V2.3 production is stable and frozen. Runtime and MySQL remain healthy, authorization remains fail-closed, no 5xx errors were observed in the stabilization window, rollback evidence is preserved, and an exact production runtime release branch has been created for future V2.4 development."
+}
