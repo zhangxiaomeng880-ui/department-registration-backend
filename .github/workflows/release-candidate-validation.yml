@@ -1,0 +1,45 @@
+name: Release Candidate Validation
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-persistence
+  workflow_dispatch:
+
+jobs:
+  rc-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate RC manifest
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('release/runtime-v2.0-rc1.json','utf8'));
+          if (m.releaseCandidate !== 'ai-native-runtime-v2.0-rc1') process.exit(1);
+          if (m.releaseBranch !== 'release/ai-native-runtime-v2.0-rc1') process.exit(2);
+          if (m.commitSha !== 'f11deb61cf6013adfe84fd1b032f63904aab25e3') process.exit(3);
+          if (m.routerVersion !== 'router-p86-v1') process.exit(4);
+          if (m.workflowVersion !== 'context-orchestrator-v1') process.exit(5);
+          const validations = Object.values(m.validation || {});
+          if (validations.length !== 4 || validations.some(x => x.conclusion !== 'success')) process.exit(6);
+          if (m.knowledgeBodyPolicy?.gitStoresProjectBody !== false) process.exit(7);
+          if (m.knowledgeBodyPolicy?.mysqlStoresProjectBody !== false) process.exit(8);
+          console.log('RELEASE_MANIFEST_PASS');
+          NODE
+
+      - name: Verify frozen release branch
+        run: bash scripts/verify-release-candidate.sh
+
+      - name: Validate pinned deployment entrypoint
+        run: |
+          bash -n scripts/deploy-runtime-rc.sh
+          grep -q 'f11deb61cf6013adfe84fd1b032f63904aab25e3' scripts/deploy-runtime-rc.sh
+          echo "PINNED_RC_DEPLOY_ENTRYPOINT_PASS"
