@@ -128,15 +128,18 @@ export const executeScriptContinuityAgent = async input => {
     throw error;
   }
 
-  const commercialAuthorization=await authorizeCommercialExecution({
-    runId:input.runId,
-    entitlementKey:'MODEL_EXECUTION',
-    operationKey:'MODEL_EXECUTION',
-    reservationMetric:'TOOL_EXECUTION_COUNT',
-    reservationAmount:1,
-    reservationTtlSeconds:300,
-    source:'AUTONOMOUS_AGENT',
-  });
+  const shadowMode=input.executionMode==='SHADOW_EVAL';
+  const commercialAuthorization=shadowMode
+    ? {reservationId:null,planKey:null,decision:'ALLOW',shadowBypass:true}
+    : await authorizeCommercialExecution({
+        runId:input.runId,
+        entitlementKey:'MODEL_EXECUTION',
+        operationKey:'MODEL_EXECUTION',
+        reservationMetric:'TOOL_EXECUTION_COUNT',
+        reservationAmount:1,
+        reservationTtlSeconds:300,
+        source:'AUTONOMOUS_AGENT',
+      });
 
   let providerResult;
   try {
@@ -181,12 +184,14 @@ export const executeScriptContinuityAgent = async input => {
         errorMessage: error.message,
       });
     } finally {
-      if(failureEvidence?.id){
-        await commitUsageReservation(commercialAuthorization.reservationId,{
-          actualAmount:1,toolExecutionId:failureEvidence.id
-        });
-      }else{
-        await releaseUsageReservation(commercialAuthorization.reservationId,{reasonCode:'PROVIDER_FAILURE_UNRECORDED'});
+      if(!shadowMode){
+        if(failureEvidence?.id){
+          await commitUsageReservation(commercialAuthorization.reservationId,{
+            actualAmount:1,toolExecutionId:failureEvidence.id
+          });
+        }else{
+          await releaseUsageReservation(commercialAuthorization.reservationId,{reasonCode:'PROVIDER_FAILURE_UNRECORDED'});
+        }
       }
     }
     throw error;
@@ -217,10 +222,12 @@ export const executeScriptContinuityAgent = async input => {
     durationMs: providerResult.durationMs,
   });
 
-  await commitUsageReservation(commercialAuthorization.reservationId,{
-    actualAmount:1,
-    toolExecutionId:toolEvidence.id,
-  });
+  if(!shadowMode){
+    await commitUsageReservation(commercialAuthorization.reservationId,{
+      actualAmount:1,
+      toolExecutionId:toolEvidence.id,
+    });
+  }
 
   return {
     executionMode: 'AUTONOMOUS_MODEL_PROVIDER',
@@ -231,7 +238,7 @@ export const executeScriptContinuityAgent = async input => {
     contextHash,
     correlationId: input.correlationId || null,
     sourceBodyPersisted: false,
-    commercialAuthorization:'ALLOW',
+    commercialAuthorization:shadowMode?'SHADOW_BYPASS':'ALLOW',
     planKey:commercialAuthorization.planKey,
     usageReservationId:commercialAuthorization.reservationId,
     toolExecutionId: toolEvidence.id,
