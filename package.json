@@ -34,7 +34,8 @@
     "validate:shadow-eval": "node test/eval-shadow.test.mjs",
     "validate:m242-staging-compat": "node test/m242-staging-schema-compatibility.test.mjs",
     "validate:eval-regression-gate": "node test/eval-regression-gate.test.mjs",
-    "validate:m244-staging-compat": "node test/m244-staging-schema-compatibility.test.mjs"
+    "validate:m244-staging-compat": "node test/m244-staging-schema-compatibility.test.mjs",
+    "validate:eval-reliability": "node test/eval-reliability.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
