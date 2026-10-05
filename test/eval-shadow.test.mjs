@@ -141,8 +141,8 @@ r=await request('POST',`/api/runtime/eval-shadow-replays/${shadowId}/run`,{
   contextsByCaseKey:{'shadow-case':contexts}
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
-assert.equal(r.body.data.shadowReplay.status,'PASS');
-assert.equal(r.body.data.evalRun.status,'PASS');
+assert.equal(r.body.data.shadowReplay.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evalRun.status,'PASS',JSON.stringify(r.body));
 assert.equal(r.body.data.evalRun.executionProjectId,internalProjectId);
 assert.equal(r.body.data.shadowReplay.safetySummary.runtimeScopeVerified,true);
 assert.equal(r.body.data.shadowReplay.safetySummary.usageBillingClassVerified,true);
