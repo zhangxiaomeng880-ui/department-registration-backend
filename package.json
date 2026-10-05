@@ -31,6 +31,7 @@
     "validate:finance-close": "node test/finance-close.test.mjs",
     "validate:eval-replay-contract": "node test/eval-replay-contract.test.mjs",
     "validate:eval-runner": "node test/eval-runner.test.mjs",
+    "validate:shadow-eval": "node test/eval-shadow.test.mjs",
     "validate:m242-staging-compat": "node test/m242-staging-schema-compatibility.test.mjs",
     "validate:eval-regression-gate": "node test/eval-regression-gate.test.mjs"
   },
