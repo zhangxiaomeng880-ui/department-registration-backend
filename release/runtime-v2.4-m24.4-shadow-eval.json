@@ -1,0 +1,137 @@
+{
+  "milestone": "M24.4",
+  "release": "AI Native Runtime V2.4",
+  "title": "Production-safe Replay / Shadow Eval",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.4-shadow-eval",
+    "sha": "d82d76ac4312200946430bad3f00a370851cc15a",
+    "predecessorMilestone": "M24.3",
+    "predecessorSha": "1a00c72fdf20a6db3cff823e5200edf9e5f4d5d2"
+  },
+  "scope": {
+    "executionMode": "RUNTIME_REPLAY",
+    "shadowExecutionProject": "00000000-0000-4000-8000-000000002403",
+    "internalEvalTenant": "00000000-0000-4000-8000-000000002401",
+    "internalEvalWorkspace": "00000000-0000-4000-8000-000000002402",
+    "frozenSyntheticFixturesOnly": true,
+    "productionSourceBodyRead": false,
+    "productionSourceBodyPersisted": false,
+    "callerRuntimeShaOverrideAllowed": false,
+    "customerBillingEligible": false,
+    "businessSideEffectsAllowed": false,
+    "access": "platform administrator only"
+  },
+  "integrity": {
+    "sourceRunMustBeTerminal": true,
+    "sourceRuntimeShaMustMatchManifestBaseline": true,
+    "candidateRuntimeShaMustDifferFromBaseline": true,
+    "sourceFingerprint": "safe run metadata only; no input_json/output_json body hashing",
+    "sourceMetadataDriftBlocksExecution": true,
+    "separateShadowProjectRequired": true,
+    "candidateRuntimeShaResolvedServerSide": true,
+    "replayManifestFrozenAndHashVerified": true,
+    "idempotencyConflictDetection": true,
+    "sourceRunMutationAllowed": false
+  },
+  "billingIsolation": {
+    "billingClass": "INTERNAL_EVAL",
+    "customerBillingFinalizationFilter": "usage_ledger.billing_class='CUSTOMER'",
+    "internalEvalSettlementsExpected": 0,
+    "evidence": "M24.4 CI verifies Internal Eval usage does not enter customer billing settlements or usage revenue"
+  },
+  "schema": {
+    "immutableAppliedMigration": "021_eval_shadow_replay.sql",
+    "compatibilityMigration": "022_shadow_eval_schema_compatibility.sql",
+    "migrationsTotal": 23,
+    "rule": "021 remains byte-compatible with the already-applied staging migration; 022 converges early M24.4 schema to final metadata-only shadow contract",
+    "freshDbDoubleApply": "PASS",
+    "ciFirstApply": "RUNTIME_MIGRATIONS_PASS applied=23 skipped=0 total=23",
+    "ciSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=23 total=23",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=22 total=23"
+  },
+  "api": {
+    "registerShadowProject": "POST /api/runtime/eval-shadow-projects",
+    "prepareShadowReplay": "POST /api/runtime/eval-shadow-replays",
+    "shadowReplayDetail": "GET /api/runtime/eval-shadow-replays/:shadowReplayId",
+    "sourceIntegrity": "GET /api/runtime/eval-shadow-replays/:shadowReplayId/source-integrity",
+    "executeShadowReplay": "POST /api/runtime/eval-shadow-replays/:shadowReplayId/run",
+    "authorization": "platform administrator",
+    "authorizationCiContract": "unauthenticated protected routes return 401; caller runtimeCommitSha override returns 400 SHADOW_RUNTIME_SHA_OVERRIDE_NOT_ALLOWED"
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.4 Shadow Eval",
+    "runId": 37258420777,
+    "headSha": "d82d76ac4312200946430bad3f00a370851cc15a",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "v23BillingLedgerRegression": "G22_5_BILLING_LEDGER_PASS",
+    "v23BillingOperationsRegression": "G23_1_BILLING_OPERATIONS_PASS",
+    "v23CollectionsRegression": "G23_2_COLLECTIONS_PASS",
+    "v23RevenueAnalyticsRegression": "G23_3_REVENUE_ANALYTICS_PASS",
+    "v23FinancialAdjustmentsRegression": "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+    "v23FinanceCloseRegression": "G23_5_FINANCE_CLOSE_PASS",
+    "v23CommercialFinanceRcE2E": "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+    "m241EvalReplayContract": "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+    "m242EvalRunnerAssertionEngine": "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+    "m242StagingSchemaCompatibility": "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "m243RegressionGate": "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+    "m244StagingSchemaCompatibility": "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "m244ProductionSafeShadowEval": "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "98f59e36-7f43-4494-9837-999583772f68",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "d82d76ac4312200946430bad3f00a370851cc15a",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration022Applied": true,
+    "knownResolvedDeploymentAttempts": [
+      {
+        "deploymentId": "b84e2517-5574-40b0-a08f-c52b72e970b7",
+        "status": "FAILED",
+        "reason": "021 migration hash mismatch before immutable migration restoration"
+      },
+      {
+        "deploymentId": "be8b9bbf-1817-408d-b9de-dd9bad6ba559",
+        "status": "FAILED",
+        "reason": "same pre-fix migration hash mismatch on duplicate trigger"
+      }
+    ],
+    "note": "Resolved failed attempts are retained as audit history; the active deployment is the exact CI-green candidate SHA."
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true
+  },
+  "evidenceStrategy": {
+    "evidenceBranch": "release/ai-native-runtime-v2.4-m24.4-evidence",
+    "reason": "Keep evidence-only commits separate from the Railway-linked runtime candidate branch to avoid an unnecessary staging redeploy."
+  },
+  "nextMilestone": "M24.5 Reliability Analytics",
+  "conclusion": "M24.4 Production-safe Replay / Shadow Eval is STAGING PASS / FROZEN. Shadow execution uses frozen synthetic Eval fixtures inside an isolated Internal Eval tenant/workspace/project, production source request bodies are neither read by the shadow control plane nor persisted, candidate Runtime SHA selection is server-controlled, source metadata drift fails closed, and Internal Eval usage is excluded from customer billing. Migration 021 remains immutable for already-applied environments while migration 022 converges the final schema. Production remains on V2.3."
+}
