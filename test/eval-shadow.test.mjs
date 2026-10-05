@@ -99,15 +99,22 @@ assert.equal(r.body.data.executionProjectId,shadowProjectId); assert.match(r.bod
 r=await request('GET',`/api/runtime/eval-shadow-replays/${shadowReplayId}/source-integrity`);
 assert.equal(r.status,200,JSON.stringify(r.body)); assert.equal(r.body.data.matches,true);
 
+// Production-safe contract: caller cannot override the active Runtime SHA.
 r=await request('POST',`/api/runtime/eval-shadow-replays/${shadowReplayId}/run`,{
-  runtimeCommitSha:candidateSha,contextsByCaseKey:{'shadow-case':contexts}
+  runtimeCommitSha:'f'.repeat(40),contextsByCaseKey:{'shadow-case':contexts}
+});
+assert.equal(r.status,400,JSON.stringify(r.body));
+assert.equal(r.body.error,'SHADOW_RUNTIME_SHA_OVERRIDE_NOT_ALLOWED');
+
+r=await request('POST',`/api/runtime/eval-shadow-replays/${shadowReplayId}/run`,{
+  contextsByCaseKey:{'shadow-case':contexts}
 });
 assert.equal(r.status,201,JSON.stringify(r.body)); assert.equal(r.body.data.shadowReplay.status,'PASS');
 assert.equal(r.body.data.evalRun.status,'PASS'); assert.equal(r.body.data.evalRun.executionProjectId,shadowProjectId);
 const shadowEvalRunId=r.body.data.evalRun.id;
 
 r=await request('POST',`/api/runtime/eval-shadow-replays/${shadowReplayId}/run`,{
-  runtimeCommitSha:candidateSha,contextsByCaseKey:{'shadow-case':contexts}
+  contextsByCaseKey:{'shadow-case':contexts}
 });
 assert.equal(r.status,201,JSON.stringify(r.body)); assert.equal(r.body.data.evalRun.id,shadowEvalRunId); assert.equal(r.body.data.idempotent,true);
 
@@ -133,8 +140,15 @@ assert.equal(r.status,201,JSON.stringify(r.body)); const driftSourceRunId=r.body
 await db.execute('UPDATE runs SET finished_at=? WHERE id=?',[new Date('2026-10-01T13:00:00Z'),driftSourceRunId]);
 r=await request('POST','/api/runtime/eval-shadow-replays',{sourceRunId:driftSourceRunId,replayManifestId:manifestId,executionProjectId:shadowProjectId,idempotencyKey:`drift-${suffix}`});
 assert.equal(r.status,201,JSON.stringify(r.body)); const driftShadowId=r.body.data.id;
+
+// Private source bodies are not part of the shadow fingerprint and are never required by shadow control logic.
+await db.execute("UPDATE runs SET input_json=JSON_OBJECT('prompt','MUTATED_PRIVATE_BODY_AFTER_PREPARE') WHERE id=?",[driftSourceRunId]);
+r=await request('GET',`/api/runtime/eval-shadow-replays/${driftShadowId}/source-integrity`);
+assert.equal(r.status,200,JSON.stringify(r.body)); assert.equal(r.body.data.matches,true);
+
+// Safe metadata drift still invalidates the prepared shadow replay.
 await db.execute("UPDATE runs SET workflow_version='tampered-after-prepare' WHERE id=?",[driftSourceRunId]);
-r=await request('POST',`/api/runtime/eval-shadow-replays/${driftShadowId}/run`,{runtimeCommitSha:candidateSha,contextsByCaseKey:{'shadow-case':contexts}});
+r=await request('POST',`/api/runtime/eval-shadow-replays/${driftShadowId}/run`,{contextsByCaseKey:{'shadow-case':contexts}});
 assert.equal(r.status,409,JSON.stringify(r.body)); assert.equal(r.body.error,'SHADOW_SOURCE_DRIFT');
 
 const noAuth=await request('GET','/api/runtime/eval-shadow-projects',undefined,null);
