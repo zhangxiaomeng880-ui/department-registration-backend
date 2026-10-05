@@ -31,7 +31,7 @@ const normalizeShadowReplay=row=>({
 const loadSourceRun=async(db,runId,lock=false)=>{
   const [rows]=await db.execute(
     `SELECT r.id,r.project_id,r.status,r.finished_at,r.runtime_commit_sha,r.knowledge_commit_sha,
-            r.workflow_version,r.router_version,r.rag_index_version,r.input_json,
+            r.run_type,r.trigger_source,r.workflow_version,r.router_version,r.rag_index_version,
             p.project_type,p.tenant_id,p.workspace_id,p.status AS project_status
      FROM runs r JOIN projects p ON p.id=r.project_id
      WHERE r.id=?${lock?' FOR UPDATE':''}`,
@@ -50,7 +50,8 @@ const sourceSnapshotMaterial=row=>({
   workflowVersion:row.workflow_version||null,
   routerVersion:row.router_version||null,
   ragIndexVersion:row.rag_index_version||null,
-  inputSha256:sha256(row.input_json??null)
+  runType:row.run_type||null,
+  triggerSource:row.trigger_source||null
 });
 const sourceSnapshotSha=row=>sha256(sourceSnapshotMaterial(row));
 const assertSourceEligible=row=>{
@@ -175,7 +176,7 @@ const loadShadowReplay=async(db,id,lock=false)=>{
 };
 
 export const executeShadowReplay=async(shadowReplayId,{
-  contextsByCaseKey={},runtimeCommitSha=null
+  contextsByCaseKey={}
 }={})=>{
   if(!shadowReplayId) throw errorOf('shadowReplayId is required','INVALID_SHADOW_REPLAY');
   const db=getRuntimePool(),connection=await db.getConnection();
@@ -199,7 +200,7 @@ export const executeShadowReplay=async(shadowReplayId,{
       'Source Runtime run changed after shadow replay preparation','SHADOW_SOURCE_DRIFT',409,
       {expected:shadow.source_snapshot_sha256,actual:currentSnapshot}
     );
-    const activeSha=String(runtimeCommitSha||resolveEvalRuntimeSha()||'').toLowerCase();
+    const activeSha=String(resolveEvalRuntimeSha()||'').toLowerCase();
     if(!SHA40.test(activeSha)) throw errorOf('Active Runtime SHA is unavailable','EVAL_RUNTIME_SHA_UNAVAILABLE',503);
     if(activeSha!==String(shadow.candidate_runtime_sha).toLowerCase()) throw errorOf(
       'Active Runtime SHA does not match the shadow candidate SHA','SHADOW_RUNTIME_SHA_MISMATCH',409,
@@ -215,7 +216,6 @@ export const executeShadowReplay=async(shadowReplayId,{
   try{
     const evalRun=await runEvalReplayManifest(shadow.replay_manifest_id,{
       idempotencyKey:`shadow:${shadow.id}`,
-      runtimeCommitSha:shadow.candidate_runtime_sha,
       executionProjectId:shadow.execution_project_id,
       contextsByCaseKey
     });
