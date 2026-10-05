@@ -121,6 +121,7 @@ export const recordToolExecution = async input => {
   const serviceTier = normalizePricingServiceTier(input.serviceTier);
   const regionalUpliftBps = Number(input.regionalUpliftBps || 0);
   let correlationId = input.correlationId || null;
+  let usageClass = 'BILLABLE';
   const providerKey = input.providerKey || null;
   const errorCategory = input.errorCategory || null;
   let calculatedCost = {
@@ -141,7 +142,7 @@ export const recordToolExecution = async input => {
       throw error;
     }
     correlationId = correlationId || runRows[0].correlation_id || null;
-    const usageClass = runRows[0].run_type === 'SHADOW_EVAL' ? 'SHADOW' : 'BILLABLE';
+    usageClass = runRows[0].run_type === 'SHADOW_EVAL' ? 'SHADOW' : 'BILLABLE';
 
     const pricingVersion = await resolvePricingVersion(connection,{
       providerKey,modelKey:input.modelKey || null,serviceTier,at:new Date(),
@@ -225,7 +226,7 @@ export const recordToolExecution = async input => {
     estimatedCost:calculatedCost.estimatedCost,costCurrency:calculatedCost.currency,
     serviceTier:calculatedCost.serviceTier,contextBand:calculatedCost.contextBand,
     regionalUpliftBps:calculatedCost.regionalUpliftBps,costFormulaVersion:calculatedCost.formulaVersion,
-    usageClass:runRows?.[0]?.run_type === 'SHADOW_EVAL' ? 'SHADOW' : 'BILLABLE',
+    usageClass,
   };
 };
 
