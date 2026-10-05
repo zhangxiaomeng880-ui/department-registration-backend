@@ -272,6 +272,7 @@ const executeCase=async({evalRunId,evalCase,manifest,executionProjectId,transien
         routeRuleKey:route.routeRuleKey,selectedProviderKey:route.selectedProviderKey,
         selectedModelKey:route.selectedModelKey,selectedAdapterKey:route.selectedAdapterKey,
         query:evalCase.replayInput.query,scope:evalCase.replayInput.scope||null,
+        executionMode,
         contextPacket:{precedence:evalCase.replayInput.precedence||[],items:contextItems}
       });
       output=agent.output;
