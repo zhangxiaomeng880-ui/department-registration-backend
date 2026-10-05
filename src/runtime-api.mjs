@@ -65,6 +65,10 @@ import {
 import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
 import { compareEvalRuns,getEvalRegressionComparison } from './eval-regression.mjs';
 import {
+  registerShadowEvalProject,listShadowEvalProjects,prepareShadowReplay,executeShadowReplay,
+  getShadowReplay,verifyShadowSourceSnapshot
+} from './eval-shadow.mjs';
+import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
   getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
@@ -176,6 +180,50 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && evalComparisonMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getEvalRegressionComparison(evalComparisonMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-shadow-projects') {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await registerShadowEvalProject(body.projectId)});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/eval-shadow-projects') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listShadowEvalProjects()});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-shadow-replays') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await prepareShadowReplay(await readBody(req))});
+    return true;
+  }
+
+  const shadowReplayRunMatch=match(url.pathname,/^\/api\/runtime\/eval-shadow-replays\/([^/]+)\/run$/);
+  if (req.method === 'POST' && shadowReplayRunMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,201,{data:await executeShadowReplay(shadowReplayRunMatch[1],{
+      contextsByCaseKey:body.contextsByCaseKey||{},
+      runtimeCommitSha:body.runtimeCommitSha||resolveEvalRuntimeSha()
+    })});
+    return true;
+  }
+
+  const shadowReplayIntegrityMatch=match(url.pathname,/^\/api\/runtime\/eval-shadow-replays\/([^/]+)\/source-integrity$/);
+  if (req.method === 'GET' && shadowReplayIntegrityMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await verifyShadowSourceSnapshot(shadowReplayIntegrityMatch[1])});
+    return true;
+  }
+
+  const shadowReplayMatch=match(url.pathname,/^\/api\/runtime\/eval-shadow-replays\/([^/]+)$/);
+  if (req.method === 'GET' && shadowReplayMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getShadowReplay(shadowReplayMatch[1])});
     return true;
   }
 
