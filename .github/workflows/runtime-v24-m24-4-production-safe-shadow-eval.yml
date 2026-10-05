@@ -58,7 +58,6 @@ jobs:
           MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
           PORT: 4900
           RUNTIME_API_BASE_URL: http://127.0.0.1:4900
-          RUNTIME_REQUIRE_AUTH: "true"
           RUNTIME_API_TOKEN: m244-platform-token
           RUNTIME_COMMIT_SHA: ${{ github.sha }}
           OPENAI_API_KEY: test
@@ -68,14 +67,16 @@ jobs:
         run: |
           node test/mock-openai-responses-server.mjs > /tmp/m244-mock-openai.log 2>&1 &
           MOCK_PID=$!
-          node src/server.mjs > /tmp/runtime-v24-m244.log 2>&1 &
-          RUNTIME_PID=$!
-          trap 'kill $RUNTIME_PID $MOCK_PID 2>/dev/null || true' EXIT
+          trap 'kill ${RUNTIME_PID:-} $MOCK_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
             grep -q 'MOCK_OPENAI_READY' /tmp/m244-mock-openai.log && break
             sleep 1
           done
           grep -q 'MOCK_OPENAI_READY' /tmp/m244-mock-openai.log
+
+          export RUNTIME_REQUIRE_AUTH=false
+          node src/server.mjs > /tmp/runtime-v24-m244-commercial.log 2>&1 &
+          RUNTIME_PID=$!
           for i in $(seq 1 30); do
             curl --fail --silent http://127.0.0.1:4900/ready >/dev/null && break
             sleep 1
@@ -90,6 +91,17 @@ jobs:
           npm run validate:financial-adjustments
           npm run validate:finance-close
           node test/runtime-v23-commercial-finance-rc-e2e.test.mjs
+          kill $RUNTIME_PID
+          wait $RUNTIME_PID 2>/dev/null || true
+
+          export RUNTIME_REQUIRE_AUTH=true
+          node src/server.mjs > /tmp/runtime-v24-m244-reliability.log 2>&1 &
+          RUNTIME_PID=$!
+          for i in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:4900/ready >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4900/ready >/dev/null
           npm run validate:eval-replay-contract
           npm run validate:eval-runner
           npm run validate:m242-staging-compat
@@ -102,5 +114,6 @@ jobs:
       - name: Print Runtime logs on failure
         if: failure()
         run: |
-          cat /tmp/runtime-v24-m244.log || true
+          cat /tmp/runtime-v24-m244-commercial.log || true
+          cat /tmp/runtime-v24-m244-reliability.log || true
           cat /tmp/m244-mock-openai.log || true
