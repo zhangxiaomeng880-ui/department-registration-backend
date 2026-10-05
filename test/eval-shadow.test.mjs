@@ -169,8 +169,8 @@ assert.ok(scopeRows.every(x=>x.tenant_id===internalTenantId&&x.workspace_id===in
 
 const [shadowRows]=await db.execute('SELECT * FROM eval_shadow_replays WHERE id=?',[shadowId]);
 const persistedShadow=JSON.stringify(shadowRows);
-assert.equal(persistedShadow.includes('M244_PRIVATE_SOURCE_SENTINEL'),false);
-assert.equal(persistedShadow.includes('M244_MOVIE_SENTINEL'),false);
+assert.equal(persistedShadow.includes('LIBRARY_SENTINEL_SOURCE_TEXT'),false);
+assert.equal(persistedShadow.includes('SC049 current movie text'),false);
 assert.equal(persistedShadow.includes('M244_SOURCE_RUN_PRIVATE_INPUT_SENTINEL'),false);
 
 const [caseRows]=await db.execute(
@@ -178,8 +178,8 @@ const [caseRows]=await db.execute(
   [evalRunId]
 );
 const persistedEval=JSON.stringify(caseRows);
-assert.equal(persistedEval.includes('M244_PRIVATE_SOURCE_SENTINEL'),false);
-assert.equal(persistedEval.includes('M244_MOVIE_SENTINEL'),false);
+assert.equal(persistedEval.includes('LIBRARY_SENTINEL_SOURCE_TEXT'),false);
+assert.equal(persistedEval.includes('SC049 current movie text'),false);
 
 r=await request('POST','/api/runtime/eval-shadow-replays',{
   sourceRunId,replayManifestId:manifestId,idempotencyKey:`m244-drift-${suffix}`
