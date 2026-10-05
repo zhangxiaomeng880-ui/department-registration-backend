@@ -1,0 +1,143 @@
+{
+  "milestone": "M24.4",
+  "release": "AI Native Runtime V2.4",
+  "title": "Production-safe Replay / Shadow Eval",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "authoritativeBranch": "feat/ai-native-runtime-v2.4-m24.4-shadow-eval",
+  "code": {
+    "stagingRuntimeSha": "d82d76ac4312200946430bad3f00a370851cc15a",
+    "verificationHeadSha": "7eeff3f91aef88b3ab36286ca6b6b674e40c0044",
+    "verificationHeadRuntimeEquivalent": true,
+    "runtimeTreeDeltaFromStagingToVerificationHead": 0,
+    "stagingSourceBranch": "rc/ai-native-runtime-v2.4-m24.4-staging-v3"
+  },
+  "architecture": {
+    "mode": "isolated INTERNAL_EVAL shadow execution",
+    "safetyPolicyVersion": "shadow-safe-v1",
+    "internalScope": {
+      "tenantId": "00000000-0000-4000-8000-000000002401",
+      "workspaceId": "00000000-0000-4000-8000-000000002402",
+      "projectId": "00000000-0000-4000-8000-000000002403",
+      "planKey": "INTERNAL_EVAL"
+    },
+    "sourceRunRequirements": [
+      "terminal business Runtime run",
+      "non-eval source run",
+      "valid baseline Runtime SHA",
+      "active source project",
+      "safe metadata fingerprint only"
+    ],
+    "replayRequirements": [
+      "frozen Eval fixture",
+      "baselineRuntimeSha matches source run",
+      "candidateRuntimeSha differs from baseline",
+      "active Runtime SHA matches candidate",
+      "read-only SCRIPT_CONTINUITY task",
+      "isolated INTERNAL_EVAL execution scope"
+    ]
+  },
+  "privacyAndIsolation": {
+    "sourceRequestBodyReadByShadowControlPlane": false,
+    "sourceBodyPersistedInShadowTables": false,
+    "transientContextPersisted": false,
+    "sourceSafeMetadataFingerprint": true,
+    "sourceMetadataDriftBlocksExecution": true,
+    "customerTenantIsolation": true,
+    "customerWorkspaceIsolation": true,
+    "customerProjectIsolation": true,
+    "billingClass": "INTERNAL_EVAL",
+    "customerBillingEligible": false,
+    "customerUsageSettlementEligible": false,
+    "customerBillingCycleProviderCostImpact": 0,
+    "customerBillingCycleUsageRevenueImpact": 0
+  },
+  "migrations": {
+    "total": 23,
+    "immutableAppliedMigration": "021_eval_shadow_replay.sql",
+    "immutableAppliedMigrationBlobSha": "c3a73b7d1563a7acfaaf2c9df10539de1f31a9b3",
+    "compatibilityMigration": "022_shadow_eval_schema_compatibility.sql",
+    "firstCompatibilityDeployment": "98f59e36-7f43-4494-9837-999583772f68",
+    "firstCompatibilityResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=22 total=23",
+    "finalDeploymentResult": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=23 total=23",
+    "migrationImmutabilityEnforced": true
+  },
+  "ci": {
+    "featureGateRunId": 37258172243,
+    "featureGateSha": "0a6596dff14422b18cded56c501e42a9da4a6e1e",
+    "featureGateStatus": "SUCCESS",
+    "deployCompatibleGateRunId": 37258420777,
+    "deployCompatibleSha": "d82d76ac4312200946430bad3f00a370851cc15a",
+    "deployCompatibleGateStatus": "SUCCESS",
+    "finalVerificationRunId": 37258531685,
+    "finalVerificationSha": "7eeff3f91aef88b3ab36286ca6b6b674e40c0044",
+    "finalVerificationStatus": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "v23FinanceRegression": "PASS",
+    "m241ReplayContractRegression": "PASS",
+    "m242EvalRunnerRegression": "PASS",
+    "m243RegressionGateRegression": "PASS",
+    "m244ShadowEval": "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+    "stagingSchemaCompatibility": "PASS",
+    "billingCycleIsolation": "PASS",
+    "railwayCompatibility": "PASS"
+  },
+  "historicalNonBlocking": [
+    {
+      "deploymentId": "be8b9bbf-1817-408d-b9de-dd9bad6ba559",
+      "status": "FAILED",
+      "cause": "Applied migration 021_eval_shadow_replay.sql had been modified after it was already recorded in Staging, so migration hash verification correctly failed.",
+      "impact": "NONE_CURRENT"
+    },
+    {
+      "deploymentId": "b84e2517-5574-40b0-a08f-c52b72e970b7",
+      "status": "FAILED",
+      "cause": "Applied migration 021_eval_shadow_replay.sql had been modified after it was already recorded in Staging, so migration hash verification correctly failed.",
+      "impact": "NONE_CURRENT"
+    }
+  ],
+  "remediation": {
+    "action": "Restored 021 byte-for-byte to the exact applied migration and moved all schema evolution into 022_shadow_eval_schema_compatibility.sql.",
+    "schemaMigrationsRecordEdited": false,
+    "compatibilityVerifiedOnExistingStaging": true
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "c0e89d44-22c8-4e45-b321-31708f898c8c",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "currentDeploymentFailures": 0,
+    "historicalRecentFailures": 2,
+    "http": {
+      "ready": 200,
+      "shadowReplayUnauthenticated": 401,
+      "shadowProjectUnauthenticated": 401,
+      "observedRequestsLastHour": 7,
+      "http2xx": 1,
+      "http4xx": 6,
+      "http5xx": 0,
+      "fiveXxErrorRate": 0,
+      "p95MaxMs": 30
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "version": "V2.3",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M24.5 Reliability Analytics",
+  "conclusion": "M24.4 Production-safe Replay / Shadow Eval is STAGING PASS / FROZEN. Shadow execution is isolated into the INTERNAL_EVAL tenant/workspace/project, source business runs are fingerprinted without reading their request bodies, candidate and baseline Runtime SHAs are bound, transient source text is not persisted, INTERNAL_EVAL usage is excluded from customer billing, and Staging schema compatibility is proven without editing migration history. Production remains on frozen V2.3."
+}
