@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS eval_shadow_replays (
   baseline_runtime_sha CHAR(40) NOT NULL,
   candidate_runtime_sha CHAR(40) NOT NULL,
   source_snapshot_sha256 CHAR(64) NOT NULL,
+  source_input_sha256 CHAR(64) NOT NULL,
   safety_policy_version VARCHAR(64) NOT NULL DEFAULT 'shadow-safe-v1',
   eval_run_id CHAR(36) NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'PREPARED',
