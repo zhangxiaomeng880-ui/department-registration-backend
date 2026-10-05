@@ -74,7 +74,7 @@ export const getUsageMeter=async({tenantId=null,workspaceId=null,periodType='MON
   const db=getRuntimePool();
   const scope=await resolveScope(db,{tenantId,workspaceId});
   const bounds=periodBounds(periodType,at);
-  const clauses=['tenant_id=?','recorded_at>=?','recorded_at<?'];
+  const clauses=['tenant_id=?',"usage_class='BILLABLE'",'recorded_at>=?','recorded_at<?'];
   const values=[scope.tenantId,bounds.start,bounds.end];
   if(scope.workspaceId){clauses.push('workspace_id=?');values.push(scope.workspaceId);}
   const [[row]]=await db.execute(
@@ -92,7 +92,7 @@ export const getUsageMeter=async({tenantId=null,workspaceId=null,periodType='MON
      WHERE ${clauses.join(' AND ')}`,
     values
   );
-  const runClauses=['tenant_id=?','created_at>=?','created_at<?'];
+  const runClauses=['tenant_id=?',"run_type<>'SHADOW_EVAL'",'created_at>=?','created_at<?'];
   const runValues=[scope.tenantId,bounds.start,bounds.end];
   if(scope.workspaceId){runClauses.push('workspace_id=?');runValues.push(scope.workspaceId);}
   const [[runRow]]=await db.execute(
