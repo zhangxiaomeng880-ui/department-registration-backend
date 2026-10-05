@@ -92,6 +92,7 @@ jobs:
           npm run validate:eval-runner
           npm run validate:m242-staging-compat
           npm run validate:eval-regression-gate
+          npm run validate:m244-staging-compat
           npm run validate:shadow-eval
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
