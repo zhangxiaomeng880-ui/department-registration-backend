@@ -9,7 +9,7 @@ const db=await mysql.createConnection({
 });
 
 const [legacyBefore]=await db.execute(`
-  SELECT column_name
+  SELECT column_name AS column_name
   FROM information_schema.columns
   WHERE table_schema=DATABASE()
     AND table_name='eval_shadow_replays'
@@ -28,7 +28,7 @@ await db.query(migration);
 await db.query(migration);
 
 const [legacyAfter]=await db.execute(`
-  SELECT column_name
+  SELECT column_name AS column_name
   FROM information_schema.columns
   WHERE table_schema=DATABASE()
     AND table_name='eval_shadow_replays'
@@ -37,7 +37,7 @@ const [legacyAfter]=await db.execute(`
 assert.equal(legacyAfter.length,0);
 
 const [shadowCols]=await db.execute(`
-  SELECT column_name
+  SELECT column_name AS column_name
   FROM information_schema.columns
   WHERE table_schema=DATABASE()
     AND table_name='eval_shadow_replays'
@@ -49,7 +49,7 @@ assert.deepEqual(
 );
 
 const [usageCols]=await db.execute(`
-  SELECT column_name
+  SELECT column_name AS column_name
   FROM information_schema.columns
   WHERE table_schema=DATABASE()
     AND table_name='usage_ledger'
@@ -58,7 +58,7 @@ const [usageCols]=await db.execute(`
 assert.equal(usageCols.length,1);
 
 const [indexes]=await db.execute(`
-  SELECT DISTINCT index_name
+  SELECT DISTINCT index_name AS index_name
   FROM information_schema.statistics
   WHERE table_schema=DATABASE()
     AND table_name='usage_ledger'
