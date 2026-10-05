@@ -68,6 +68,7 @@ import {
   registerShadowEvalProject,listShadowEvalProjects,prepareShadowReplay,executeShadowReplay,
   getShadowReplay,verifyShadowSourceSnapshot
 } from './eval-shadow.mjs';
+import { createEvalReliabilitySnapshot,getEvalReliabilitySnapshot } from './eval-reliability.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -228,6 +229,19 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && shadowReplayMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getShadowReplay(shadowReplayMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/eval-reliability-snapshots') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createEvalReliabilitySnapshot(await readBody(req))});
+    return true;
+  }
+
+  const evalReliabilityMatch=match(url.pathname,/^\/api\/runtime\/eval-reliability-snapshots\/([^/]+)$/);
+  if (req.method === 'GET' && evalReliabilityMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getEvalReliabilitySnapshot(evalReliabilityMatch[1])});
     return true;
   }
 
