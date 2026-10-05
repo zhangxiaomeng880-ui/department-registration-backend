@@ -131,7 +131,7 @@ export const recordToolExecution = async input => {
   try {
     await connection.beginTransaction();
     const [runRows] = await connection.execute(
-      'SELECT project_id, tenant_id, workspace_id, correlation_id FROM runs WHERE id = ? FOR UPDATE',
+      'SELECT project_id, tenant_id, workspace_id, correlation_id, run_type, trigger_source FROM runs WHERE id = ? FOR UPDATE',
       [input.runId]
     );
     if (!runRows.length) {
@@ -181,14 +181,16 @@ export const recordToolExecution = async input => {
       `INSERT INTO usage_ledger (
         id, tenant_id, workspace_id, project_id, run_id, task_id, route_execution_id, tool_execution_id,
         correlation_id, provider_key, model_key, pricing_version_id, cost_status,
-        estimated_cost, cost_currency, status,
+        estimated_cost, cost_currency, billing_class, status,
         token_input, token_output, duration_ms, error_category
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         usageId,runRows[0].tenant_id,runRows[0].workspace_id,runRows[0].project_id,input.runId,input.taskId || null,input.routeExecutionId || null,
         id,correlationId,providerKey,input.modelKey || null,calculatedCost.pricingVersionId,
-        calculatedCost.costStatus,calculatedCost.estimatedCost,calculatedCost.currency,input.status,
-        tokenInput,tokenOutput,durationMs,errorCategory,
+        calculatedCost.costStatus,calculatedCost.estimatedCost,calculatedCost.currency,
+        (runRows[0].run_type==='EVAL_REPLAY'||runRows[0].run_type==='SHADOW_REPLAY'||runRows[0].trigger_source==='EVAL_RUNNER'||runRows[0].trigger_source==='SHADOW_EVAL')
+          ? 'INTERNAL_EVAL' : 'CUSTOMER',
+        input.status,tokenInput,tokenOutput,durationMs,errorCategory,
       ]
     );
 
