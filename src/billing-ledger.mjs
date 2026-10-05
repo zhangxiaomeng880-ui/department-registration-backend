@@ -370,7 +370,8 @@ export const finalizeBillingCycle=async({cycleId,finalizedAt=new Date()}={})=>{
       `SELECT u.*,s.billing_cycle_id AS settled_cycle_id
        FROM usage_ledger u
        LEFT JOIN billing_usage_settlements s ON s.usage_ledger_id=u.id
-       WHERE u.tenant_id=? AND u.recorded_at>=? AND u.recorded_at<?
+       WHERE u.tenant_id=? AND u.billing_class='CUSTOMER'
+         AND u.recorded_at>=? AND u.recorded_at<?
        ORDER BY u.recorded_at,u.id
        FOR UPDATE`,
       [cycle.tenant_id,cycle.period_start,cycle.period_end]
