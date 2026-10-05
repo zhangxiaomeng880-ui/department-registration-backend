@@ -84,13 +84,6 @@ jobs:
           curl --fail --silent http://127.0.0.1:4900/ready >/dev/null
           npm run validate:tenant-quota
           npm run validate:commercial-control
-          npm run validate:billing-ledger
-          npm run validate:billing-operations
-          npm run validate:collections
-          npm run validate:revenue-analytics
-          npm run validate:financial-adjustments
-          npm run validate:finance-close
-          node test/runtime-v23-commercial-finance-rc-e2e.test.mjs
           kill $RUNTIME_PID
           wait $RUNTIME_PID 2>/dev/null || true
 
@@ -102,6 +95,13 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:4900/ready >/dev/null
+          npm run validate:billing-ledger
+          npm run validate:billing-operations
+          npm run validate:collections
+          npm run validate:revenue-analytics
+          npm run validate:financial-adjustments
+          npm run validate:finance-close
+          node test/runtime-v23-commercial-finance-rc-e2e.test.mjs
           npm run validate:eval-replay-contract
           npm run validate:eval-runner
           npm run validate:m242-staging-compat
