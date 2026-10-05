@@ -64,6 +64,7 @@ import {
 } from './eval-replay.mjs';
 import { runEvalReplayManifest,getEvalRun,resolveEvalRuntimeSha } from './eval-runner.mjs';
 import { compareEvalRuns,getEvalRegressionComparison } from './eval-regression.mjs';
+import { createShadowEvalPolicy,listShadowEvalPolicies,setShadowEvalPolicyStatus,runShadowEval,getShadowEvalExecution } from './shadow-eval.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -176,6 +177,39 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && evalComparisonMatch) {
     requirePlatformAdmin(principal);
     json(res,200,{data:await getEvalRegressionComparison(evalComparisonMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/shadow-eval-policies') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createShadowEvalPolicy(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/shadow-eval-policies') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listShadowEvalPolicies()});
+    return true;
+  }
+
+  const shadowPolicyStatusMatch=match(url.pathname,/^\/api\/runtime\/shadow-eval-policies\/([^/]+)\/status$/);
+  if (req.method === 'POST' && shadowPolicyStatusMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,200,{data:await setShadowEvalPolicyStatus(shadowPolicyStatusMatch[1],body.status)});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/shadow-evals') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await runShadowEval(await readBody(req))});
+    return true;
+  }
+
+  const shadowExecutionMatch=match(url.pathname,/^\/api\/runtime\/shadow-evals\/([^/]+)$/);
+  if (req.method === 'GET' && shadowExecutionMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getShadowEvalExecution(shadowExecutionMatch[1])});
     return true;
   }
 
