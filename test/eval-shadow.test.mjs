@@ -22,11 +22,11 @@ const request=async(method,path,body,token=platformToken)=>{
 
 const suffix=randomUUID().slice(0,8);
 const providerKey=`m244-openai-${suffix}`;
-const factText='M244_PRIVATE_SOURCE_SENTINEL fact: call mother first, then Lin.';
-const movieText='M244_MOVIE_SENTINEL movie: Lin is called directly.';
+const factText='LIBRARY_SENTINEL_SOURCE_TEXT M244_PRIVATE_SOURCE_SENTINEL SC049 hard lock: call mother first, then Lin.';
+const movieText='M244_MOVIE_SENTINEL SC049 current movie text: returns to 62㎡ and calls Lin directly.';
 const refs=[
-  {sourceFileId:'fact-file',sourceVersion:'1',lineStart:10,lineEnd:20,contentSha256:sha256(factText),contextRole:'AUTHORITATIVE',sourceProvider:'SYNTHETIC_FIXTURE'},
-  {sourceFileId:'movie-file',sourceVersion:'1',lineStart:30,lineEnd:40,contentSha256:sha256(movieText),contextRole:'CURRENT',sourceProvider:'SYNTHETIC_FIXTURE'}
+  {sourceFileId:'fact-file',sourceVersion:'53',lineStart:331,lineEnd:343,contentSha256:sha256(factText),contextRole:'AUTHORITATIVE',sourceProvider:'SYNTHETIC_FIXTURE'},
+  {sourceFileId:'movie-file',sourceVersion:null,lineStart:7528,lineEnd:7556,contentSha256:sha256(movieText),contextRole:'CURRENT',sourceProvider:'SYNTHETIC_FIXTURE'}
 ];
 const contexts=[
   {sourceFileId:'fact-file',sourceText:factText,sourceStatus:'CURRENT',sourcePath:'/private/fact'},
