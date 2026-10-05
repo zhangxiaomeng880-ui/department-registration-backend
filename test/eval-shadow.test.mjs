@@ -128,10 +128,17 @@ assert.equal(r.body.data.baselineRuntimeSha,baselineSha);
 assert.equal(r.body.data.candidateRuntimeSha,runtimeSha);
 assert.equal(r.body.data.safetyPolicyVersion,'shadow-safe-v1');
 assert.equal(r.body.data.safetySummary.customerBillingEligible,false);
+assert.equal(r.body.data.safetySummary.sourceBodyRead,false);
 assert.equal(r.body.data.safetySummary.sourceBodyPersisted,false);
 
 r=await request('POST',`/api/runtime/eval-shadow-replays/${shadowId}/run`,{
-  runtimeCommitSha:runtimeSha,contextsByCaseKey:{'shadow-case':contexts}
+  runtimeCommitSha:'f'.repeat(40),contextsByCaseKey:{'shadow-case':contexts}
+});
+assert.equal(r.status,400,JSON.stringify(r.body));
+assert.equal(r.body.error,'SHADOW_RUNTIME_SHA_OVERRIDE_NOT_ALLOWED');
+
+r=await request('POST',`/api/runtime/eval-shadow-replays/${shadowId}/run`,{
+  contextsByCaseKey:{'shadow-case':contexts}
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 assert.equal(r.body.data.shadowReplay.status,'PASS');
@@ -179,9 +186,18 @@ r=await request('POST','/api/runtime/eval-shadow-replays',{
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const driftShadowId=r.body.data.id;
+
+// Production request bodies are outside the shadow control-plane fingerprint.
 await db.execute("UPDATE runs SET input_json=JSON_OBJECT('query','M244_MUTATED_SOURCE') WHERE id=?",[sourceRunId]);
+r=await request('GET',`/api/runtime/eval-shadow-replays/${driftShadowId}/source-integrity`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.matches,true);
+assert.equal(r.body.data.sourceBodyRead,false);
+
+// Safe execution metadata is fingerprinted; drift blocks execution.
+await db.execute("UPDATE runs SET workflow_version='tampered-after-prepare' WHERE id=?",[sourceRunId]);
 r=await request('POST',`/api/runtime/eval-shadow-replays/${driftShadowId}/run`,{
-  runtimeCommitSha:runtimeSha,contextsByCaseKey:{'shadow-case':contexts}
+  contextsByCaseKey:{'shadow-case':contexts}
 });
 assert.equal(r.status,409,JSON.stringify(r.body));
 assert.equal(r.body.error,'SHADOW_SOURCE_DRIFT');
