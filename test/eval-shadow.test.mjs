@@ -276,9 +276,14 @@ r=await request('POST',`/api/runtime/billing-cycles/${billingCycleId}/finalize`,
   finalizedAt:'2026-10-02T00:00:00.000Z'
 });
 assert.equal(r.status,200,JSON.stringify(r.body));
-assert.equal(r.body.data.providerCostTotal,0);
-assert.equal(r.body.data.usageRevenue,0);
 assert.equal(r.body.data.totalDue,10);
+const [[billingCycleRow]]=await db.execute(
+  'SELECT provider_cost_total,usage_revenue,total_due FROM billing_cycles WHERE id=?',
+  [billingCycleId]
+);
+assert.equal(Number(billingCycleRow.provider_cost_total),0);
+assert.equal(Number(billingCycleRow.usage_revenue),0);
+assert.equal(Number(billingCycleRow.total_due),10);
 const [[settledInternal]]=await db.execute(
   `SELECT COUNT(*) AS count
    FROM billing_usage_settlements s
