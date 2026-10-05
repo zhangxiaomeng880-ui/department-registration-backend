@@ -29,7 +29,7 @@ const normalizeShadowReplay=row=>({
   id:row.id,sourceRunId:row.source_run_id,sourceProjectId:row.source_project_id,
   replayManifestId:row.replay_manifest_id,executionProjectId:row.execution_project_id,
   baselineRuntimeSha:row.baseline_runtime_sha,candidateRuntimeSha:row.candidate_runtime_sha,
-  sourceSnapshotSha256:row.source_snapshot_sha256,sourceInputSha256:row.source_input_sha256,
+  sourceSnapshotSha256:row.source_snapshot_sha256,
   safetyPolicyVersion:row.safety_policy_version,evalRunId:row.eval_run_id||null,status:row.status,
   safetySummary:row.safety_summary_json||null,shadowSha256:row.shadow_sha256||null,
   idempotencyKey:row.idempotency_key,preparedAt:row.prepared_at,startedAt:row.started_at||null,
@@ -39,7 +39,7 @@ const normalizeShadowReplay=row=>({
 const loadSourceRun=async(db,runId,lock=false)=>{
   const [rows]=await db.execute(
     `SELECT r.id,r.project_id,r.tenant_id,r.workspace_id,r.run_type,r.trigger_source,r.status,r.finished_at,
-            r.runtime_commit_sha,r.knowledge_commit_sha,r.workflow_version,r.router_version,r.rag_index_version,r.input_json,
+            r.runtime_commit_sha,r.knowledge_commit_sha,r.workflow_version,r.router_version,r.rag_index_version,
             p.project_type,p.status AS project_status
      FROM runs r JOIN projects p ON p.id=r.project_id
      WHERE r.id=?${lock?' FOR UPDATE':''}`,
@@ -48,14 +48,13 @@ const loadSourceRun=async(db,runId,lock=false)=>{
   if(!rows.length) throw errorOf('Source Runtime run not found','SHADOW_SOURCE_RUN_NOT_FOUND',404);
   return rows[0];
 };
-const sourceInputSha=row=>sha256(row.input_json??null);
 const sourceSnapshotMaterial=row=>({
   runId:row.id,projectId:row.project_id,tenantId:row.tenant_id,workspaceId:row.workspace_id,
   runType:row.run_type,triggerSource:row.trigger_source,status:row.status,
   finishedAt:row.finished_at?new Date(row.finished_at).toISOString():null,
   runtimeCommitSha:row.runtime_commit_sha||null,knowledgeCommitSha:row.knowledge_commit_sha||null,
   workflowVersion:row.workflow_version||null,routerVersion:row.router_version||null,
-  ragIndexVersion:row.rag_index_version||null,inputSha256:sourceInputSha(row)
+  ragIndexVersion:row.rag_index_version||null
 });
 const sourceSnapshotSha=row=>sha256(sourceSnapshotMaterial(row));
 const assertSourceEligible=row=>{
@@ -202,21 +201,21 @@ export const prepareShadowReplay=async({
       {sourceProjectType:source.project_type,executionProjectType:shadowProject.project_type}
     );
 
-    const snapshot=sourceSnapshotSha(source),inputHash=sourceInputSha(source),id=randomUUID();
+    const snapshot=sourceSnapshotSha(source),id=randomUUID();
     const safetySummary={
       policyVersion:SHADOW_POLICY_VERSION,sourceRunTerminal:true,sourceIsBusinessRun:true,
       baselineMatchesSource:true,candidateDiffersBaseline:true,readOnlyTaskTypes:true,
       isolatedTenant:true,isolatedWorkspace:true,isolatedProject:true,
-      executionPlan:'INTERNAL_EVAL',customerBillingEligible:false,sourceBodyPersisted:false
+      executionPlan:'INTERNAL_EVAL',customerBillingEligible:false,sourceBodyRead:false,sourceBodyPersisted:false
     };
     await connection.execute(
       `INSERT INTO eval_shadow_replays
        (id,source_run_id,source_project_id,replay_manifest_id,execution_project_id,
-        baseline_runtime_sha,candidate_runtime_sha,source_snapshot_sha256,source_input_sha256,
+        baseline_runtime_sha,candidate_runtime_sha,source_snapshot_sha256,
         safety_policy_version,status,safety_summary_json,idempotency_key)
-       VALUES (?,?,?,?,?,?,?,?,?,?, 'PREPARED',?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?, 'PREPARED',?,?)`,
       [id,sourceRunId,source.project_id,replayManifestId,executionProjectId,
-       manifest.baselineRuntimeSha,manifest.candidateRuntimeSha,snapshot,inputHash,
+       manifest.baselineRuntimeSha,manifest.candidateRuntimeSha,snapshot,
        SHADOW_POLICY_VERSION,JSON.stringify(safetySummary),idempotencyKey]
     );
     const [rows]=await connection.execute('SELECT * FROM eval_shadow_replays WHERE id=?',[id]);
@@ -226,7 +225,7 @@ export const prepareShadowReplay=async({
 };
 
 export const executeShadowReplay=async(shadowReplayId,{
-  contextsByCaseKey={},runtimeCommitSha=null
+  contextsByCaseKey={}
 }={})=>{
   if(!shadowReplayId) throw errorOf('shadowReplayId is required','INVALID_SHADOW_REPLAY');
   const db=getRuntimePool(),connection=await db.getConnection();
@@ -245,10 +244,10 @@ export const executeShadowReplay=async(shadowReplayId,{
 
     const source=await loadSourceRun(connection,shadow.source_run_id,true);
     assertSourceEligible(source);
-    if(sourceSnapshotSha(source)!==shadow.source_snapshot_sha256||sourceInputSha(source)!==shadow.source_input_sha256) throw errorOf(
-      'Source Runtime run changed after shadow replay preparation','SHADOW_SOURCE_DRIFT',409
+    if(sourceSnapshotSha(source)!==shadow.source_snapshot_sha256) throw errorOf(
+      'Source Runtime run metadata changed after shadow replay preparation','SHADOW_SOURCE_DRIFT',409
     );
-    const activeSha=String(runtimeCommitSha||resolveEvalRuntimeSha()||'').toLowerCase();
+    const activeSha=String(resolveEvalRuntimeSha()||'').toLowerCase();
     if(!SHA40.test(activeSha)) throw errorOf('Active Runtime SHA is unavailable','EVAL_RUNTIME_SHA_UNAVAILABLE',503);
     if(activeSha!==String(shadow.candidate_runtime_sha).toLowerCase()) throw errorOf(
       'Active Runtime SHA does not match the shadow candidate SHA','SHADOW_RUNTIME_SHA_MISMATCH',409,
@@ -266,7 +265,6 @@ export const executeShadowReplay=async(shadowReplayId,{
   try{
     const evalRun=await runEvalReplayManifest(shadow.replay_manifest_id,{
       idempotencyKey:`shadow:${shadow.id}`,
-      runtimeCommitSha:shadow.candidate_runtime_sha,
       executionProjectId:shadow.execution_project_id,
       contextsByCaseKey
     });
@@ -276,8 +274,8 @@ export const executeShadowReplay=async(shadowReplayId,{
       await verify.beginTransaction();
       const current=await loadShadowReplay(verify,shadowReplayId,true);
       const source=await loadSourceRun(verify,current.source_run_id,true);
-      if(sourceSnapshotSha(source)!==current.source_snapshot_sha256||sourceInputSha(source)!==current.source_input_sha256){
-        throw errorOf('Source Runtime run changed during shadow execution','SHADOW_SOURCE_DRIFT',409);
+      if(sourceSnapshotSha(source)!==current.source_snapshot_sha256){
+        throw errorOf('Source Runtime run metadata changed during shadow execution','SHADOW_SOURCE_DRIFT',409);
       }
       if(evalRun.executionProjectId!==INTERNAL_EVAL_PROJECT_ID||current.execution_project_id!==INTERNAL_EVAL_PROJECT_ID){
         throw errorOf('Eval run escaped the system Shadow Eval project','SHADOW_EXECUTION_PROJECT_ESCAPE',500);
@@ -354,12 +352,12 @@ export const getShadowReplay=async id=>{
 export const verifyShadowSourceSnapshot=async id=>{
   const db=getRuntimePool(),row=await loadShadowReplay(db,id,false);
   const source=await loadSourceRun(db,row.source_run_id,false);
-  const actual=sourceSnapshotSha(source),inputActual=sourceInputSha(source);
+  const actual=sourceSnapshotSha(source);
   return {
     shadowReplayId:id,sourceRunId:row.source_run_id,
     expectedSha256:row.source_snapshot_sha256,actualSha256:actual,
-    inputExpectedSha256:row.source_input_sha256,inputActualSha256:inputActual,
-    matches:actual===row.source_snapshot_sha256&&inputActual===row.source_input_sha256
+    sourceBodyRead:false,
+    matches:actual===row.source_snapshot_sha256
   };
 };
 
