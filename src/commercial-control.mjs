@@ -369,7 +369,7 @@ const usageValueForPolicy=async(connection,{policy,scope,at})=>{
             COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) AS estimated_cost,
             GROUP_CONCAT(DISTINCT CASE WHEN cost_status='CALCULATED' THEN cost_currency END ORDER BY cost_currency) AS currencies
      FROM usage_ledger
-     WHERE ${scopeColumn}=? AND recorded_at>=? AND recorded_at<?`,
+     WHERE ${scopeColumn}=? AND usage_class='BILLABLE' AND recorded_at>=? AND recorded_at<?`,
     [scopeId,bounds.start,bounds.end]
   );
   const [[reserved]]=await connection.execute(
