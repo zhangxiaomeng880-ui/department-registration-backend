@@ -206,9 +206,13 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && shadowReplayRunMatch) {
     requirePlatformAdmin(principal);
     const body=await readBody(req);
+    if(body.runtimeCommitSha!=null){
+      throw Object.assign(new Error('Shadow eval Runtime SHA is server-controlled and cannot be overridden by the caller'),{
+        code:'SHADOW_RUNTIME_SHA_OVERRIDE_NOT_ALLOWED',statusCode:400
+      });
+    }
     json(res,201,{data:await executeShadowReplay(shadowReplayRunMatch[1],{
-      contextsByCaseKey:body.contextsByCaseKey||{},
-      runtimeCommitSha:body.runtimeCommitSha||resolveEvalRuntimeSha()
+      contextsByCaseKey:body.contextsByCaseKey||{}
     })});
     return true;
   }
