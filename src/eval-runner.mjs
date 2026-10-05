@@ -216,26 +216,28 @@ const executionFromObservability=observability=>{
   };
 };
 
-const executeCase=async({evalRunId,evalCase,manifest,executionProjectId,transientContexts})=>{
+const executeCase=async({evalRunId,evalCase,manifest,executionProjectId,transientContexts,executionMode='RUNTIME_REPLAY',shadowPolicy=null})=>{
   const db=getRuntimePool();
   let runtimeRunId=null,route=null,output=null,errorCode=null;
   try{
     const run=await createRun({
-      projectId:executionProjectId,runType:'EVAL_REPLAY',triggerSource:'EVAL_RUNNER',
-      input:{evalRunId,manifestId:manifest.id,caseKey:evalCase.caseKey,caseSha256:evalCase.caseSha256,sourceBodyPersisted:false},
+      projectId:executionProjectId,runType:executionMode==='SHADOW_EVAL'?'SHADOW_EVAL':'EVAL_REPLAY',
+      triggerSource:executionMode==='SHADOW_EVAL'?'SHADOW_EVAL':'EVAL_RUNNER',
+      input:{evalRunId,manifestId:manifest.id,caseKey:evalCase.caseKey,caseSha256:evalCase.caseSha256,executionMode,sourceBodyPersisted:false},
       runtimeCommitSha:manifest.candidateRuntimeSha,workflowVersion:manifest.workflowVersion||'eval-runner-v1',
       routerVersion:manifest.routerVersion||'policy-router-v2',ragIndexVersion:manifest.ragIndexVersion||null,status:'RUNNING'
     });
     runtimeRunId=run.id;
     const task=await createTask({
-      runId:run.id,stageKey:'EVAL',taskKey:`eval-${trimTaskKey(evalCase.caseKey)}`,
+      runId:run.id,stageKey:executionMode==='SHADOW_EVAL'?'SHADOW_EVAL':'EVAL',
+      taskKey:`${executionMode==='SHADOW_EVAL'?'shadow':'eval'}-${trimTaskKey(evalCase.caseKey)}`,
       taskType:evalCase.replayInput.taskType,sequenceNo:1,
       input:{caseKey:evalCase.caseKey,caseSha256:evalCase.caseSha256,sourceBodyPersisted:false}
     });
     route=await routeAndRecord({
       runId:run.id,taskId:task.id,correlationId:run.correlationId,
       projectType:evalCase.replayInput.projectType,taskType:evalCase.replayInput.taskType,
-      query:evalCase.replayInput.query,executionMode:'EVAL_REPLAY',
+      query:evalCase.replayInput.query,executionMode:executionMode==='SHADOW_EVAL'?'SHADOW_EVAL':'EVAL_REPLAY',
       policyMode:evalCase.replayInput.policyMode,requiredStructuredOutput:evalCase.replayInput.requiredStructuredOutput===true,
       allowedProviderKeys:evalCase.replayInput.allowedProviderKeys,preferredProviderKey:evalCase.replayInput.preferredProviderKey,
       preferredModelKey:evalCase.replayInput.preferredModelKey,fallbackProviderKeys:evalCase.replayInput.fallbackProviderKeys,
@@ -247,6 +249,20 @@ const executeCase=async({evalRunId,evalCase,manifest,executionProjectId,transien
       await updateTask(task.id,{status:'FAIL',output:{error:'ROUTE_NOT_ALLOWED'},errorCode,finished:true});
       await finalizeRuntimeRun(run.id,'FAIL',errorCode);
     }else{
+      if(executionMode==='SHADOW_EVAL'){
+        const allowedTasks=new Set(shadowPolicy?.allowedTaskTypes||[]);
+        const allowedProviders=new Set(shadowPolicy?.allowedProviderKeys||[]);
+        const allowedModels=new Set(shadowPolicy?.allowedModelKeys||[]);
+        if(!allowedTasks.has(String(evalCase.replayInput.taskType))) throw errorOf(
+          'Task type is not allowed by Shadow Eval policy','SHADOW_TASK_NOT_ALLOWED',409,{taskType:evalCase.replayInput.taskType}
+        );
+        if(!allowedProviders.has(String(route.selectedProviderKey||''))) throw errorOf(
+          'Selected provider is not allowed by Shadow Eval policy','SHADOW_PROVIDER_NOT_ALLOWED',409,{providerKey:route.selectedProviderKey||null}
+        );
+        if(!allowedModels.has(String(route.selectedModelKey||''))) throw errorOf(
+          'Selected model is not allowed by Shadow Eval policy','SHADOW_MODEL_NOT_ALLOWED',409,{modelKey:route.selectedModelKey||null}
+        );
+      }
       const contextItems=validateTransientContext(evalCase,transientContexts);
       if(!contextItems.length) throw errorOf(
         'Allowed provider execution requires frozen transient context','EVAL_CONTEXT_REQUIRED_FOR_ALLOWED_ROUTE',409,{caseKey:evalCase.caseKey}
@@ -260,7 +276,7 @@ const executeCase=async({evalRunId,evalCase,manifest,executionProjectId,transien
       });
       output=agent.output;
       await updateTask(task.id,{status:'PASS',output:{
-        executionMode:'EVAL_REPLAY',providerResponseId:agent.providerResponseId,
+        executionMode,providerResponseId:agent.providerResponseId,
         findingCount:agent.output?.findingCount??null,sourceBodyPersisted:false
       },finished:true});
       await finalizeRuntimeRun(run.id,'PASS',null);
@@ -337,10 +353,17 @@ export const getEvalRun=async evalRunId=>{
 };
 
 export const runEvalReplayManifest=async(manifestId,{
-  idempotencyKey,runtimeCommitSha=null,executionProjectId,contextsByCaseKey={}
+  idempotencyKey,runtimeCommitSha=null,executionProjectId,contextsByCaseKey={},
+  executionMode='RUNTIME_REPLAY',shadowPolicy=null
 }={})=>{
   if(!manifestId||!idempotencyKey||!executionProjectId) throw errorOf(
     'manifestId, idempotencyKey and executionProjectId are required','INVALID_EVAL_RUN'
+  );
+  if(!['RUNTIME_REPLAY','SHADOW_EVAL'].includes(executionMode)) throw errorOf(
+    'Unsupported eval execution mode','INVALID_EVAL_EXECUTION_MODE',400,{executionMode}
+  );
+  if(executionMode==='SHADOW_EVAL'&&!shadowPolicy) throw errorOf(
+    'Shadow Eval requires a server-owned policy','SHADOW_POLICY_REQUIRED',409
   );
   const resolvedRuntimeSha=String(runtimeCommitSha||resolveEvalRuntimeSha()||'').toLowerCase();
   if(!sha40.test(resolvedRuntimeSha)) throw errorOf('Active Runtime commit SHA is unavailable','EVAL_RUNTIME_SHA_UNAVAILABLE',503);
@@ -364,7 +387,8 @@ export const runEvalReplayManifest=async(manifestId,{
     const [existing]=await connection.execute('SELECT * FROM eval_runs WHERE idempotency_key=? LIMIT 1 FOR UPDATE',[idempotencyKey]);
     if(existing.length){
       const row=existing[0];
-      const same=row.replay_manifest_id===manifestId&&row.execution_project_id===executionProjectId&&row.candidate_runtime_sha===resolvedRuntimeSha;
+      const same=row.replay_manifest_id===manifestId&&row.execution_project_id===executionProjectId&&
+        row.candidate_runtime_sha===resolvedRuntimeSha&&row.execution_mode===executionMode;
       if(!same) throw errorOf('Idempotency key was already used for another eval run','EVAL_RUN_IDEMPOTENCY_CONFLICT',409);
       await connection.commit();
       return {...await getEvalRun(row.id),idempotent:true};
@@ -373,8 +397,8 @@ export const runEvalReplayManifest=async(manifestId,{
     await connection.execute(
       `INSERT INTO eval_runs
        (id,replay_manifest_id,execution_project_id,candidate_runtime_sha,baseline_runtime_sha,execution_mode,status,idempotency_key)
-       VALUES (?,?,?,?,?,'RUNTIME_REPLAY','RUNNING',?)`,
-      [evalRunId,manifestId,executionProjectId,resolvedRuntimeSha,manifest.baselineRuntimeSha||null,idempotencyKey]
+       VALUES (?,?,?,?,?,?,'RUNNING',?)`,
+      [evalRunId,manifestId,executionProjectId,resolvedRuntimeSha,manifest.baselineRuntimeSha||null,executionMode,idempotencyKey]
     );
     await connection.commit();
   }catch(error){await connection.rollback();throw error;}finally{connection.release();}
@@ -384,7 +408,8 @@ export const runEvalReplayManifest=async(manifestId,{
     let passedCases=0,failedCases=0,assertionCount=0,passedAssertions=0,failedAssertions=0;
     for(const evalCase of suiteVersion.cases){
       const result=await executeCase({
-        evalRunId,evalCase,manifest,executionProjectId,transientContexts:contextsByCaseKey?.[evalCase.caseKey]
+        evalRunId,evalCase,manifest,executionProjectId,transientContexts:contextsByCaseKey?.[evalCase.caseKey],
+        executionMode,shadowPolicy
       });
       caseHashes.push({caseKey:result.caseKey,sequenceNo:result.sequenceNo,resultSha256:result.resultSha256,status:result.status});
       if(result.status==='PASS') passedCases++; else failedCases++;
@@ -394,14 +419,14 @@ export const runEvalReplayManifest=async(manifestId,{
     }
     const status=failedCases?'FAIL':'PASS';
     const summary={
-      executionMode:'RUNTIME_REPLAY',providerExecution:true,sourceBodyPersisted:false,
+      executionMode,providerExecution:true,sourceBodyPersisted:false,
       fixtureSha256:manifest.fixtureSha256,manifestSha256:manifest.manifestSha256,
       caseCount:suiteVersion.cases.length,passedCaseCount:passedCases,failedCaseCount:failedCases,
       assertionCount,passedAssertionCount:passedAssertions,failedAssertionCount:failedAssertions
     };
     const resultSha256=sha256({
       replayManifestSha256:manifest.manifestSha256,candidateRuntimeSha:resolvedRuntimeSha,
-      executionProjectId,status,cases:caseHashes
+      executionProjectId,executionMode,status,cases:caseHashes
     });
     await db.execute(
       `UPDATE eval_runs SET status=?,case_count=?,passed_case_count=?,failed_case_count=?,
