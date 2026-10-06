@@ -143,6 +143,10 @@ import {
   createAiPromptVersion,createAiContract,reviseAiContract,evaluateAiContractGate,
   getAiContract,getAiProductState,resolveAiContractScope
 } from './product-ai-contract.mjs';
+import {
+  listProductModules,createEngineeringChangeset,createBuildRecord,createPreviewDeployment,
+  createSmokeEvidence,evaluateEngineeringGate,getEngineeringState,resolveEngineeringProjectScope
+} from './product-engineering-preview.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1400,6 +1404,22 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/runtime/product-modules') {
+    json(res,200,{data:await listProductModules()});
+    return true;
+  }
+
+  const productEngineeringDomainMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-engineering-domain$/);
+  if (req.method === 'GET' && productEngineeringDomainMatch) {
+    const projectId=productEngineeringDomainMatch[1];
+    const scope=await resolveEngineeringProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getEngineeringState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1419,7 +1439,11 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-design-contracts',createDesignContract],
     ['product-technical-contracts',createTechnicalContract],
     ['product-ai-prompt-versions',createAiPromptVersion],
-    ['product-ai-contracts',createAiContract]
+    ['product-ai-contracts',createAiContract],
+    ['product-engineering-changesets',createEngineeringChangeset],
+    ['product-build-records',createBuildRecord],
+    ['product-preview-deployments',createPreviewDeployment],
+    ['product-smoke-evidence',createSmokeEvidence]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1446,6 +1470,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     let data;
     if(gateKey==='G-PD-AI-CONTRACT'){
       data=await evaluateAiContractGate(projectId,body,principal?.identityId||null);
+    }else if(gateKey==='G-PD-ENGINEERING'){
+      data=await evaluateEngineeringGate(projectId,body,principal?.identityId||null);
     }else if(['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey)){
       data=await evaluateProductDeliveryGate(projectId,gateKey,body,principal?.identityId||null);
     }else{
