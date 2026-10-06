@@ -106,7 +106,8 @@ jobs:
           npm run validate:milestone-intelligence
           npm run validate:competitive-approval
           npm run validate:portfolio-closure
-          npm run validate:m27-1-product-discovery-baseline
+          npm run validate:m26-governance-rc
+          npm run validate:product-discovery-baseline
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
           trap - EXIT
