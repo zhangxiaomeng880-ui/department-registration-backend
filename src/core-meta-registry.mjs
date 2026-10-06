@@ -279,6 +279,10 @@ export const createWorkflowTemplate=async input=>{
     'projectTypeKey, templateKey, version and displayName are required','INVALID_WORKFLOW_TEMPLATE'
   );
   rejectSecrets(input);
+  if(input.status&&String(input.status).toUpperCase()!=='DRAFT') throw errorOf(
+    'Workflow templates must be created as DRAFT and promoted through a freeze gate',
+    'WORKFLOW_TEMPLATE_DIRECT_FREEZE_NOT_ALLOWED',409
+  );
   const db=getRuntimePool();
   const [types]=await db.execute(
     'SELECT project_type_key,status FROM project_type_registry WHERE project_type_key=?',[input.projectTypeKey]
@@ -591,6 +595,11 @@ export const freezeWorkflowTemplate=async templateId=>{
       );
     }
     for(const requirement of stage.requirements){
+      if(requirement.routingMode==='DEFERRED') throw errorOf(
+        'Deferred capability contracts cannot be promoted to an execution-ready workflow',
+        'WORKFLOW_DEFERRED_REQUIREMENTS',409,
+        {stageKey:stage.stageKey,requirementKey:requirement.requirementKey,capabilityType:requirement.capabilityType}
+      );
       if(requirement.capabilityKey){
         await assertCapabilityType(requirement.capabilityKey,requirement.capabilityType,db);
         if(!projectBindings.has(requirement.capabilityKey)) throw errorOf(
