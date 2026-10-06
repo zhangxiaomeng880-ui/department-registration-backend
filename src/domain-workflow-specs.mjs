@@ -13,11 +13,12 @@ const sha256=value=>createHash('sha256').update(
   'utf8'
 ).digest('hex');
 const asJson=value=>value==null?null:JSON.stringify(value);
-const agentKey=role=>'AGENT:BUILTIN:'+String(role).toUpperCase()
+const slug=value=>String(value).toUpperCase()
   .replace(/\+/g,' PLUS ')
   .replace(/&/g,' AND ')
   .replace(/[^A-Z0-9]+/g,'_')
   .replace(/^_+|_+$/g,'');
+const agentKey=(role,projectTypeKey)=>`AGENT:BUILTIN:${slug(projectTypeKey)}:${slug(role)}`;
 
 const req=(key,capabilityType,purpose,requirementMode='REQUIRED',traits=[])=>({
   requirementKey:key,capabilityType,routingMode:'DEFERRED',requirementMode,
@@ -374,7 +375,7 @@ const allAgentRoles=spec=>Array.from(new Set(spec.stages.flatMap(item=>[
 ])));
 
 const ensureAgent=async(conn,role,projectTypeKey)=>{
-  const capabilityKey=agentKey(role);
+  const capabilityKey=agentKey(role,projectTypeKey);
   await conn.execute(
     `INSERT INTO capability_registry
       (capability_key,capability_type,display_name,version,status,routable,adapter_key,
@@ -398,7 +399,7 @@ const ensureAgent=async(conn,role,projectTypeKey)=>{
        role_key=VALUES(role_key),policy_mode=VALUES(policy_mode),
        knowledge_scope_json=VALUES(knowledge_scope_json),config_json=VALUES(config_json)`,
     [
-      capabilityKey,agentKey(role).replace('AGENT:BUILTIN:',''),
+      capabilityKey,slug(role),
       asJson({projectTypes:[projectTypeKey]}),
       asJson({builtin:true,directInvocation:false})
     ]
@@ -473,7 +474,7 @@ const ensureSpec=async(conn,spec)=>{
 
   for(const item of spec.stages){
     const stageId=randomUUID();
-    const primaryCapabilityKey=agentKey(item.primaryAgentRole);
+    const primaryCapabilityKey=agentKey(item.primaryAgentRole,spec.projectTypeKey);
     await conn.execute(
       `INSERT INTO workflow_template_stages
         (id,workflow_template_id,milestone_template_id,stage_key,display_name,stage_type,
@@ -498,7 +499,7 @@ const ensureSpec=async(conn,spec)=>{
           (id,workflow_stage_id,agent_capability_key,assignment_role,priority,conditional_json)
          VALUES (?,?,?,'SUPPORTING',?,?)`,
         [
-          randomUUID(),stageId,agentKey(role),assignmentPriority++,
+          randomUUID(),stageId,agentKey(role,spec.projectTypeKey),assignmentPriority++,
           asJson(role==='AI Product / Eval'?{subtype:'AI_APPLICATION'}:null)
         ]
       );
