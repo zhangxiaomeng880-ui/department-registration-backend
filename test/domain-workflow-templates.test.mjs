@@ -126,8 +126,15 @@ r=await request('GET',`/api/runtime/workflow-templates/${productWorkflowId}`);
 assert.equal(r.status,200,JSON.stringify(r.body));
 const pd=r.body.data;
 assert.equal(pd.status,'FROZEN');
+assert.equal(pd.displayName,'产品研发标准工作流');
 assert.equal(pd.milestones.length,9);
 assert.equal(pd.stages.length,19);
+assert.equal(pd.milestones[0].displayName,'项目就绪完成');
+assert.equal(pd.milestones[2].displayName,'产品基线已批准');
+assert.equal(pd.stages[0].displayName,'项目初始化 / 系统就绪');
+assert.equal(pd.stages[1].displayName,'用户发现 / 证据 / 洞察 / 竞品情报');
+assert.equal(pd.stages[7].displayName,'产品设计 / 原型 / 设计契约');
+assert.equal(pd.stages[8].displayName,'技术 / API / 数据 / 集成 / 埋点契约');
 assert.equal(pd.stages[0].stageKey,'PD_00_INIT');
 assert.equal(pd.stages[18].stageKey,'PD_18_KNOWLEDGE');
 assert.equal(pd.stages[0].gatePolicyKey,'G-PD-INIT');
@@ -136,9 +143,40 @@ assert.equal(pd.stages[12].gatePolicyKey,'G-PD-QA');
 assert.equal(pd.stages[14].gatePolicyKey,'G-PD-RELEASE');
 assert.equal(pd.stages[0].config.humanGateRequired,true);
 assert.equal(pd.stages[8].stageKey,'PD_08_CONTRACT');
+assert.deepEqual(pd.stages[8].config.specializedGates,[{
+  gateKey:'G-PD-AI-CONTRACT',displayName:'AI 应用专项契约门禁',requiredForSubtypes:['AI_APPLICATION']
+}]);
 assert.equal(pd.stages[9].stageKey,'PD_09_ENGINEERING');
 assert.equal(pd.stages[9].requirements.some(x=>x.capabilityType==='MCP'),true);
 assert.equal(pd.stages[18].knowledgePolicies.some(x=>x.writebackMode==='PROPOSE'),true);
+
+r=await request('GET','/api/runtime/project-types');
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.find(x=>x.projectTypeKey==='PRODUCT_DEVELOPMENT').displayName,'产品研发');
+
+r=await request('GET','/api/runtime/project-subtypes?projectTypeKey=PRODUCT_DEVELOPMENT');
+assert.equal(r.status,200,JSON.stringify(r.body));
+const productSubtypeNames=Object.fromEntries(r.body.data.map(x=>[x.subtypeKey,x.displayName]));
+assert.equal(productSubtypeNames.FRONTEND_PROTOTYPE,'前端原型');
+assert.equal(productSubtypeNames.FULL_STACK_WEB,'全栈 Web 应用');
+assert.equal(productSubtypeNames.MOBILE_APP,'移动应用');
+assert.equal(productSubtypeNames.BACKEND_API_SERVICE,'后端 API 服务');
+assert.equal(productSubtypeNames.SAAS_PLATFORM,'SaaS 平台');
+assert.equal(productSubtypeNames.AI_APPLICATION,'AI 应用');
+assert.equal(productSubtypeNames.DATA_PRODUCT,'数据产品');
+assert.equal(productSubtypeNames.INTEGRATION_SDK,'集成 / SDK');
+assert.equal(productSubtypeNames.INTERNAL_TOOL,'内部工具');
+
+r=await request('GET','/api/runtime/capabilities?capabilityType=AGENT&status=ACTIVE');
+assert.equal(r.status,200,JSON.stringify(r.body));
+const productAgentNames=Object.fromEntries(
+  r.body.data
+    .filter(x=>x.capabilityKey.startsWith('AGENT:STANDARD:PRODUCT_DEVELOPMENT:'))
+    .map(x=>[x.capabilityKey,x.displayName])
+);
+assert.equal(productAgentNames['AGENT:STANDARD:PRODUCT_DEVELOPMENT:PRODUCT'],'产品经理智能体');
+assert.equal(productAgentNames['AGENT:STANDARD:PRODUCT_DEVELOPMENT:DESIGN'],'产品设计智能体');
+assert.equal(productAgentNames['AGENT:STANDARD:PRODUCT_DEVELOPMENT:QA'],'质量验证智能体');
 
 r=await request('GET',`/api/runtime/workflow-templates/${aigcWorkflowId}`);
 assert.equal(r.status,200,JSON.stringify(r.body));
