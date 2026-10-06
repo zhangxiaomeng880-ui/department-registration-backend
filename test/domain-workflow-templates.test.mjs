@@ -252,7 +252,7 @@ r=await request('POST',`/api/runtime/projects/${productProjectId}/orchestrations
     PD_00_INIT:{
       PRIMARY_MODEL:{
         instructions:'Validate project initialization readiness from the supplied context.',
-        input:'Validate readiness.',
+        input:'SC049 hard lock. Validate readiness from the supplied project context.',
         schema:outputSchema,
         schemaName:'project_initialization_readiness'
       }
