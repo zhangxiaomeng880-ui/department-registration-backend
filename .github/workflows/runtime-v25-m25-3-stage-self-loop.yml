@@ -1,0 +1,110 @@
+name: Runtime v2.5 M25.3 Stage Self-loop Gate
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-v2.5-m25.3-stage-self-loop
+  workflow_dispatch:
+
+jobs:
+  m25-3-stage-self-loop:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: ci
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Apply Runtime migrations twice
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+        run: |
+          npm run migrate:runtime
+          npm run migrate:runtime
+
+      - name: Validate V2.3 through M25.3
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+          MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
+          PORT: 4900
+          RUNTIME_API_BASE_URL: http://127.0.0.1:4900
+          RUNTIME_REQUIRE_AUTH: "true"
+          RUNTIME_API_TOKEN: m253-platform-token
+          RUNTIME_COMMIT_SHA: ${{ github.sha }}
+          RUNTIME_ENABLE_INTERNAL_TEST_ADAPTER: "true"
+          OPENAI_API_KEY: test
+          OPENAI_MODEL: test-model
+          OPENAI_BASE_URL: http://127.0.0.1:4010/v1
+          OPENAI_TIMEOUT_MS: 10000
+        run: |
+          node test/mock-openai-responses-server.mjs > /tmp/m253-mock-openai.log 2>&1 &
+          MOCK_PID=$!
+          node src/server.mjs > /tmp/runtime-v25-m253.log 2>&1 &
+          RUNTIME_PID=$!
+          trap 'kill $RUNTIME_PID $MOCK_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            grep -q 'MOCK_OPENAI_READY' /tmp/m253-mock-openai.log && break
+            sleep 1
+          done
+          grep -q 'MOCK_OPENAI_READY' /tmp/m253-mock-openai.log
+          for i in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:4900/ready >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4900/ready >/dev/null
+          npm run validate:billing-ledger
+          npm run validate:billing-operations
+          npm run validate:collections
+          npm run validate:revenue-analytics
+          npm run validate:financial-adjustments
+          npm run validate:finance-close
+          node test/runtime-v23-commercial-finance-rc-e2e.test.mjs
+          npm run validate:eval-replay-contract
+          npm run validate:eval-runner
+          npm run validate:m242-staging-compat
+          npm run validate:eval-regression-gate
+          npm run validate:m244-staging-compat
+          npm run validate:shadow-eval
+          npm run validate:eval-reliability
+          npm run validate:core-meta-registry
+          npm run validate:capability-runtime
+          npm run validate:stage-self-loop
+          node test/railway-compatibility.test.mjs
+          kill $RUNTIME_PID $MOCK_PID
+          trap - EXIT
+
+      - name: Print Runtime logs on failure
+        if: failure()
+        run: |
+          cat /tmp/runtime-v25-m253.log || true
+          cat /tmp/m253-mock-openai.log || true
