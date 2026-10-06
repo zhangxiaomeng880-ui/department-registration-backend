@@ -611,6 +611,20 @@ export const createProjectVersion=async(projectId,input={})=>{
   return {id,projectId,versionKey:input.versionKey,versionType:type,label:input.label,status};
 };
 
+export const resolveProjectVersionScope=async versionId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT v.id,v.project_id,p.workspace_id,p.tenant_id
+       FROM project_versions v JOIN projects p ON p.id=v.project_id WHERE v.id=?`,
+    [versionId]
+  );
+  if(!rows.length) throw errorOf('Project version not found','PROJECT_VERSION_NOT_FOUND',404);
+  return {
+    versionId:rows[0].id,projectId:rows[0].project_id,
+    workspaceId:rows[0].workspace_id,tenantId:rows[0].tenant_id
+  };
+};
+
 export const updateProjectVersion=async(versionId,input={})=>{
   const db=getRuntimePool();
   const [rows]=await db.execute('SELECT * FROM project_versions WHERE id=?',[versionId]);
