@@ -4,9 +4,36 @@
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
+CREATE TABLE IF NOT EXISTS product_research_studies (
+  id CHAR(36) PRIMARY KEY,
+  project_id CHAR(36) NOT NULL,
+  research_key VARCHAR(128) NOT NULL,
+  objective TEXT NOT NULL,
+  research_question TEXT NOT NULL,
+  method VARCHAR(32) NOT NULL,
+  participant_segment_json JSON NULL,
+  sample_json JSON NOT NULL,
+  recruitment_json JSON NULL,
+  time_range_json JSON NULL,
+  consent_privacy_json JSON NULL,
+  recording_boundary_json JSON NULL,
+  raw_evidence_locator_json JSON NOT NULL,
+  confidence VARCHAR(16) NOT NULL DEFAULT 'MEDIUM',
+  limitation_json JSON NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  evidence_json JSON NULL,
+  created_by_identity_id CHAR(36) NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m271_research_project FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_m271_research_creator FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
+  UNIQUE KEY uq_m271_research_key (project_id,research_key),
+  INDEX idx_m271_research_method (project_id,method,status,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS product_evidence (
   id CHAR(36) PRIMARY KEY,
   project_id CHAR(36) NOT NULL,
+  research_study_id CHAR(36) NULL,
   evidence_key VARCHAR(128) NOT NULL,
   source_type VARCHAR(64) NOT NULL,
   source_ref VARCHAR(1024) NULL,
@@ -24,9 +51,11 @@ CREATE TABLE IF NOT EXISTS product_evidence (
   created_by_identity_id CHAR(36) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_m271_evidence_project FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_m271_evidence_research FOREIGN KEY (research_study_id) REFERENCES product_research_studies(id),
   CONSTRAINT fk_m271_evidence_creator FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m271_evidence_key (project_id,evidence_key),
   INDEX idx_m271_evidence_source (project_id,source_type,status,source_date),
+  INDEX idx_m271_evidence_research (research_study_id),
   INDEX idx_m271_evidence_freshness (project_id,freshness_expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
