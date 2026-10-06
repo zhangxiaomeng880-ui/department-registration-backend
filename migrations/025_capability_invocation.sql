@@ -1,0 +1,56 @@
+-- AI Native Runtime V2.5 M25.2 Unified Capability Routing / Invocation
+-- Migration: 025_capability_invocation.sql
+-- Durable requirement resolution and invocation evidence for MODEL / TOOL / SKILL / MCP capabilities.
+
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+
+CREATE TABLE IF NOT EXISTS capability_invocations (
+  id CHAR(36) PRIMARY KEY,
+  tenant_id CHAR(36) NOT NULL,
+  workspace_id CHAR(36) NOT NULL,
+  project_id CHAR(36) NOT NULL,
+  run_id CHAR(36) NOT NULL,
+  task_id CHAR(36) NOT NULL,
+  project_stage_instance_id CHAR(36) NOT NULL,
+  workflow_stage_id CHAR(36) NOT NULL,
+  requirement_id CHAR(36) NOT NULL,
+  agent_capability_key VARCHAR(320) NULL,
+  capability_type VARCHAR(16) NOT NULL,
+  routing_mode VARCHAR(16) NOT NULL,
+  policy_mode VARCHAR(32) NULL,
+  requested_capability_key VARCHAR(320) NULL,
+  selected_capability_key VARCHAR(320) NOT NULL,
+  adapter_key VARCHAR(128) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'RUNNING',
+  decision_json JSON NOT NULL,
+  input_sha256 CHAR(64) NOT NULL,
+  output_sha256 CHAR(64) NULL,
+  output_evidence_json JSON NULL,
+  tool_execution_id CHAR(36) NULL,
+  usage_ledger_id CHAR(36) NULL,
+  duration_ms BIGINT NULL,
+  error_code VARCHAR(128) NULL,
+  error_category VARCHAR(64) NULL,
+  error_message TEXT NULL,
+  started_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  finished_at TIMESTAMP(6) NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m252_invocation_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
+  CONSTRAINT fk_m252_invocation_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_m252_invocation_project FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_m252_invocation_run FOREIGN KEY (run_id) REFERENCES runs(id),
+  CONSTRAINT fk_m252_invocation_task FOREIGN KEY (task_id) REFERENCES tasks(id),
+  CONSTRAINT fk_m252_invocation_project_stage FOREIGN KEY (project_stage_instance_id) REFERENCES project_stage_instances(id),
+  CONSTRAINT fk_m252_invocation_workflow_stage FOREIGN KEY (workflow_stage_id) REFERENCES workflow_template_stages(id),
+  CONSTRAINT fk_m252_invocation_requirement FOREIGN KEY (requirement_id) REFERENCES stage_capability_requirements(id),
+  CONSTRAINT fk_m252_invocation_agent FOREIGN KEY (agent_capability_key) REFERENCES capability_registry(capability_key),
+  CONSTRAINT fk_m252_invocation_selected_capability FOREIGN KEY (selected_capability_key) REFERENCES capability_registry(capability_key),
+  CONSTRAINT fk_m252_invocation_tool_execution FOREIGN KEY (tool_execution_id) REFERENCES tool_executions(id),
+  CONSTRAINT fk_m252_invocation_usage FOREIGN KEY (usage_ledger_id) REFERENCES usage_ledger(id),
+  INDEX idx_m252_invocation_project_stage (project_id,project_stage_instance_id,created_at),
+  INDEX idx_m252_invocation_run_task (run_id,task_id,created_at),
+  INDEX idx_m252_invocation_capability (selected_capability_key,status,created_at),
+  INDEX idx_m252_invocation_requirement (requirement_id,status,created_at),
+  INDEX idx_m252_invocation_status (status,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
