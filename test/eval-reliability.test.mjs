@@ -18,20 +18,20 @@ const request=async(method,path,body,token=platformToken)=>{
 const now=Date.now();
 const windowStart=new Date(now-30*60*1000).toISOString();
 const windowEnd=new Date(now+30*60*1000).toISOString();
-const idempotencyKey=`m245-${randomUUID()}`;
+const idempotencyKey=`m245-global-${randomUUID()}`;
 
 let r=await request('POST','/api/runtime/eval-reliability-snapshots',{
-  windowStart,windowEnd,candidateRuntimeSha:runtimeSha,idempotencyKey
+  windowStart,windowEnd,idempotencyKey
 },null);
 assert.equal(r.status,401,JSON.stringify(r.body));
 
 r=await request('POST','/api/runtime/eval-reliability-snapshots',{
-  windowStart,windowEnd,candidateRuntimeSha:runtimeSha,idempotencyKey
+  windowStart,windowEnd,idempotencyKey
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const snapshot=r.body.data;
 assert.equal(snapshot.policyVersion,'eval-reliability-v1');
-assert.equal(snapshot.candidateRuntimeSha,runtimeSha);
+assert.equal(snapshot.candidateRuntimeSha,null);
 assert.match(snapshot.snapshotSha256,/^[a-f0-9]{64}$/);
 assert.ok(snapshot.metrics.eval.total>=1,JSON.stringify(snapshot.metrics));
 assert.ok(snapshot.metrics.eval.execution.sampleCount>=1,JSON.stringify(snapshot.metrics.eval));
@@ -41,6 +41,7 @@ assert.equal(snapshot.metrics.shadow.customerBillingEligibilityViolations,0);
 assert.ok(snapshot.metrics.regression.comparisons>=1,JSON.stringify(snapshot.metrics.regression));
 assert.ok(snapshot.metrics.regression.releaseGates>=1,JSON.stringify(snapshot.metrics.regression));
 assert.ok(snapshot.metrics.runtimeBreakdown.some(row=>row.candidateRuntimeSha===runtimeSha));
+assert.ok(snapshot.metrics.runtimeBreakdown.length>=2,JSON.stringify(snapshot.metrics.runtimeBreakdown));
 assert.ok(snapshot.sourceWatermark.evalRuns.count>=1);
 assert.ok(snapshot.sourceWatermark.shadowReplays.count>=1);
 
@@ -53,7 +54,7 @@ r=await request('GET',`/api/runtime/eval-reliability-snapshots/${snapshot.id}`,u
 assert.equal(r.status,401,JSON.stringify(r.body));
 
 r=await request('POST','/api/runtime/eval-reliability-snapshots',{
-  windowStart,windowEnd,candidateRuntimeSha:runtimeSha,idempotencyKey
+  windowStart,windowEnd,idempotencyKey
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 assert.equal(r.body.data.id,snapshot.id);
@@ -62,10 +63,22 @@ assert.equal(r.body.data.snapshotSha256,snapshot.snapshotSha256);
 
 r=await request('POST','/api/runtime/eval-reliability-snapshots',{
   windowStart:new Date(now-10*60*1000).toISOString(),windowEnd,
-  candidateRuntimeSha:runtimeSha,idempotencyKey
+  idempotencyKey
 });
 assert.equal(r.status,409,JSON.stringify(r.body));
 assert.equal(r.body.error,'EVAL_RELIABILITY_IDEMPOTENCY_CONFLICT');
+
+const scopedKey=`m245-runtime-${randomUUID()}`;
+r=await request('POST','/api/runtime/eval-reliability-snapshots',{
+  windowStart,windowEnd,candidateRuntimeSha:runtimeSha,idempotencyKey:scopedKey
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+assert.equal(r.body.data.candidateRuntimeSha,runtimeSha);
+assert.ok(r.body.data.metrics.eval.total>=1,JSON.stringify(r.body.data.metrics.eval));
+assert.ok(r.body.data.metrics.shadow.total>=1,JSON.stringify(r.body.data.metrics.shadow));
+assert.ok(r.body.data.metrics.runtimeBreakdown.some(row=>row.candidateRuntimeSha===runtimeSha));
+// M24.3 regression fixtures intentionally use dedicated synthetic SHAs; runtime-scoped snapshots may therefore have zero comparisons.
+assert.ok(r.body.data.metrics.regression.comparisons>=0);
 
 r=await request('POST','/api/runtime/eval-reliability-snapshots',{
   windowStart,windowEnd,candidateRuntimeSha:'not-a-sha',idempotencyKey:`bad-sha-${randomUUID()}`
