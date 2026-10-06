@@ -1283,6 +1283,20 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const strategicUpdatesMatch=match(url.pathname,/^\/api\/runtime\/strategic-items\/([^/]+)\/governance-updates$/);
+  if (req.method === 'GET' && strategicUpdatesMatch) {
+    const target=await resolveGovernanceTargetScope('STRATEGIC_ITEM',strategicUpdatesMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listGovernanceUpdates({
+      targetType:'STRATEGIC_ITEM',targetId:strategicUpdatesMatch[1],
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
   const projectUpdatesMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/governance-updates$/);
   if (req.method === 'GET' && projectUpdatesMatch) {
     const projectId=projectUpdatesMatch[1];
