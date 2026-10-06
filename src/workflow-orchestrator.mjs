@@ -6,6 +6,7 @@ import { transitionProjectStage } from './stage-runtime.mjs';
 import {
   prepareStageKnowledgeContext,injectKnowledgeContext,queueKnowledgeWritebacks
 } from './knowledge-context-runtime.mjs';
+import { createHumanGateApproval } from './competitive-collaboration.mjs';
 
 const errorOf=(message,code,statusCode=400,details)=>{
   const error=new Error(message);
@@ -451,6 +452,18 @@ const executeCurrentStage=async({
     },
     actorKey
   });
+  let approvalRequest=null;
+  if(humanGateRequired&&!blockingFailure&&transitionInput.transitionType==='ESCALATE'){
+    approvalRequest=await createHumanGateApproval({
+      projectId,stageKey,runId,taskId:task.id,gateKey:stage.gatePolicyKey||stageKey,
+      requestedByIdentityId:null,
+      evidence:{
+        orchestrationSessionId:sessionId,
+        transitionEventId:transition.id,
+        invocationResults
+      }
+    });
+  }
   let writebacks=[];
   if(!blockingFailure&&(transitionInput.transitionType==='PASS'||humanGateRequired)){
     writebacks=await queueKnowledgeWritebacks({
@@ -479,6 +492,9 @@ const executeCurrentStage=async({
     transitionEventId:transition.id,
     decision:{
       requiredInputMissing,requiredFailed,optionalFailed,humanGateRequired,
+      approvalRequest:approvalRequest?{
+        id:approvalRequest.id,requestKey:approvalRequest.requestKey,status:approvalRequest.status
+      }:null,
       knowledgeContext:{
         count:preparedKnowledge.contextCount,
         contextHash:preparedKnowledge.contextHash,
