@@ -122,6 +122,10 @@ import {
   listNotifications,updateNotification,listActivityEvents,
   resolveBenchmarkSubjectScope,resolveBenchmarkSnapshotScope,resolveApprovalScope,resolveNotificationScope
 } from './competitive-collaboration.mjs';
+import {
+  getProjectHealth,refreshProjectHealth,getPortfolioIntelligence,refreshPortfolioIntelligence,
+  getProjectClosureReadiness,completeProject,archiveProject,resolvePortfolioScope
+} from './portfolio-closure-governance.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1153,6 +1157,32 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const portfolioIntelligenceMatch=match(url.pathname,/^\/api\/runtime\/portfolios\/([^/]+)\/intelligence$/);
+  if (req.method === 'GET' && portfolioIntelligenceMatch) {
+    const target=await resolvePortfolioScope(portfolioIntelligenceMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getPortfolioIntelligence(portfolioIntelligenceMatch[1],{
+      asOf:url.searchParams.get('asOf')||new Date()
+    })});
+    return true;
+  }
+
+  const portfolioIntelligenceRefreshMatch=match(url.pathname,/^\/api\/runtime\/portfolios\/([^/]+)\/intelligence\/refresh$/);
+  if (req.method === 'POST' && portfolioIntelligenceRefreshMatch) {
+    const target=await resolvePortfolioScope(portfolioIntelligenceRefreshMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshPortfolioIntelligence(
+      portfolioIntelligenceRefreshMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/runtime/strategy-project-links') {
     const body=await readBody(req);
     const scope=await resolveProjectScope(body.projectId);
@@ -1396,6 +1426,64 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     json(res,201,{data:await linkMilestoneVersion(
       milestoneVersionLinkMatch[1],await readBody(req)
     )});
+    return true;
+  }
+
+  const projectHealthMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/health$/);
+  if (req.method === 'GET' && projectHealthMatch) {
+    const projectId=projectHealthMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectHealth(projectId,{asOf:url.searchParams.get('asOf')||new Date()})});
+    return true;
+  }
+
+  const projectHealthRefreshMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/health\/refresh$/);
+  if (req.method === 'POST' && projectHealthRefreshMatch) {
+    const projectId=projectHealthRefreshMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshProjectHealth(projectId,await readBody(req))});
+    return true;
+  }
+
+  const projectClosureReadinessMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/closure-readiness$/);
+  if (req.method === 'GET' && projectClosureReadinessMatch) {
+    const projectId=projectClosureReadinessMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectClosureReadiness(projectId,{asOf:url.searchParams.get('asOf')||new Date()})});
+    return true;
+  }
+
+  const projectCompleteMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && projectCompleteMatch) {
+    const projectId=projectCompleteMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    const body=await readBody(req);
+    json(res,200,{data:await completeProject(projectId,{
+      ...body,createdByIdentityId:body.createdByIdentityId||principal?.identityId||null
+    })});
+    return true;
+  }
+
+  const projectArchiveMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/archive$/);
+  if (req.method === 'POST' && projectArchiveMatch) {
+    const projectId=projectArchiveMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await archiveProject(projectId,await readBody(req))});
     return true;
   }
 
