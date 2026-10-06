@@ -3,6 +3,9 @@ import { getRuntimePool, createRun, createTask } from './runtime-db.mjs';
 import { getProjectLifecycle, getWorkflowTemplate } from './core-meta-registry.mjs';
 import { invokeStageCapability } from './capability-runtime.mjs';
 import { transitionProjectStage } from './stage-runtime.mjs';
+import {
+  prepareStageKnowledgeContext,injectKnowledgeContext,queueKnowledgeWritebacks
+} from './knowledge-context-runtime.mjs';
 
 const errorOf=(message,code,statusCode=400,details)=>{
   const error=new Error(message);
@@ -79,6 +82,9 @@ const normalizeAttempt=row=>({
   invocationCount:Number(row.invocation_count||0),
   passedInvocationCount:Number(row.passed_invocation_count||0),
   failedInvocationCount:Number(row.failed_invocation_count||0),
+  knowledgeContextCount:Number(row.knowledge_context_count||0),
+  contextHash:row.context_hash||null,
+  writebackCount:Number(row.writeback_count||0),
   gateStatus:row.gate_status||null,
   transitionType:row.transition_type||null,
   transitionEventId:row.transition_event_id||null,
@@ -234,11 +240,13 @@ const finishAttempt=async(attemptId,input)=>{
   await db.execute(
     `UPDATE workflow_orchestration_stage_attempts SET
       status=?,invocation_count=?,passed_invocation_count=?,failed_invocation_count=?,
+      knowledge_context_count=?,context_hash=?,writeback_count=?,
       gate_status=?,transition_type=?,transition_event_id=?,decision_json=?,
       finished_at=CURRENT_TIMESTAMP(6)
       WHERE id=?`,
     [
       input.status,input.invocationCount,input.passedInvocationCount,input.failedInvocationCount,
+      Number(input.knowledgeContextCount||0),input.contextHash||null,Number(input.writebackCount||0),
       input.gateStatus,input.transitionType,input.transitionEventId||null,asJson(input.decision||null),
       attemptId
     ]
@@ -246,7 +254,8 @@ const finishAttempt=async(attemptId,input)=>{
 };
 
 const executeCurrentStage=async({
-  sessionId,runId,projectId,template,lifecycle,stageInputs,actorKey,sessionAttemptNo,retryTaskId=null
+  sessionId,runId,projectId,template,lifecycle,stageInputs,knowledgePackets,actorKey,
+  sessionAttemptNo,retryTaskId=null,projectScope
 })=>{
   const stageKey=lifecycle.project.currentStageKey;
   const stageInstance=lifecycle.stages.find(item=>item.stageKey===stageKey);
@@ -280,6 +289,38 @@ const executeCurrentStage=async({
     sessionId,runId,taskId:task.id,stageInstance,attemptNo:sessionAttemptNo,
     requiredCount:required.length,optionalCount:optional.length
   });
+  let preparedKnowledge;
+  try{
+    preparedKnowledge=await prepareStageKnowledgeContext({
+      runId,taskId:task.id,stage,knowledgePackets
+    });
+  }catch(error){
+    if(['REQUIRED_KNOWLEDGE_CONTEXT_MISSING','REQUIRED_KNOWLEDGE_CONTEXT_EMPTY'].includes(error.code)){
+      const transition=await transitionProjectStage({
+        projectId,runId,taskId:task.id,stageKey,
+        transitionType:'ESCALATE',
+        gateKey:stage.gatePolicyKey||undefined,
+        gateStatus:'HOLD',
+        idempotencyKey:`${sessionId}:${stageKey}:${sessionAttemptNo}:knowledge-hold`,
+        blockingReason:error.message,
+        criteria:{autoOrchestration:true,knowledgeRequired:true,knowledgeReady:false},
+        evidence:{
+          orchestrationSessionId:sessionId,
+          knowledgeErrorCode:error.code,
+          knowledgePolicy:error.details||null
+        },
+        actorKey
+      });
+      await finishAttempt(attemptId,{
+        status:'BLOCKED',invocationCount:0,passedInvocationCount:0,failedInvocationCount:0,
+        knowledgeContextCount:0,contextHash:null,writebackCount:0,
+        gateStatus:'HOLD',transitionType:'ESCALATE',transitionEventId:transition.id,
+        decision:{reasonCode:error.code,knowledgePolicy:error.details||null}
+      });
+      return {transition,invocationCount:0,blocked:true,retryTaskId:null};
+    }
+    throw error;
+  }
 
   if(!requirements.length&&!policy.allowAutoPassWithoutRequirements){
     const transition=await transitionProjectStage({
@@ -295,6 +336,7 @@ const executeCurrentStage=async({
     });
     await finishAttempt(attemptId,{
       status:'BLOCKED',invocationCount:0,passedInvocationCount:0,failedInvocationCount:0,
+      knowledgeContextCount:preparedKnowledge.contextCount,contextHash:preparedKnowledge.contextHash,writebackCount:0,
       gateStatus:'HOLD',transitionType:'ESCALATE',transitionEventId:transition.id,
       decision:{reasonCode:'NO_EXECUTABLE_REQUIREMENTS'}
     });
@@ -302,6 +344,7 @@ const executeCurrentStage=async({
   }
 
   const invocationResults=[];
+  const invocationOutputs=[];
   let requiredInputMissing=false;
   let requiredFailed=false;
   let optionalFailed=false;
@@ -326,10 +369,11 @@ const executeCurrentStage=async({
       continue;
     }
     try{
+      const injectedInput=injectKnowledgeContext(input,requirement,preparedKnowledge);
       const result=await invokeStageCapability({
         projectId,runId,taskId:task.id,stageKey,
         requirementKey:requirement.requirementKey,
-        input
+        input:injectedInput
       });
       const passed=result.invocation.status==='PASS';
       if(!passed&&requirement.requirementMode==='REQUIRED') requiredFailed=true;
@@ -340,6 +384,10 @@ const executeCurrentStage=async({
         status:result.invocation.status,
         invocationId:result.invocation.id,
         selectedCapabilityKey:result.invocation.selectedCapabilityKey
+      });
+      invocationOutputs.push({
+        requirementKey:requirement.requirementKey,
+        output:result.output
       });
     }catch(error){
       if(requirement.requirementMode==='REQUIRED') requiredFailed=true;
@@ -393,6 +441,18 @@ const executeCurrentStage=async({
     },
     actorKey
   });
+  let writebacks=[];
+  if(transitionInput.transitionType==='PASS'){
+    writebacks=await queueKnowledgeWritebacks({
+      project:{
+        id:projectId,
+        tenantId:projectScope.tenantId,
+        workspaceId:projectScope.workspaceId
+      },
+      runId,taskId:task.id,stageInstance,stage,
+      outputs:invocationOutputs,sessionId
+    });
+  }
 
   await finishAttempt(attemptId,{
     status:transitionInput.transitionType==='PASS'
@@ -401,11 +461,22 @@ const executeCurrentStage=async({
         ? 'BLOCKED'
         : transitionInput.transitionType,
     invocationCount,passedInvocationCount,failedInvocationCount,
+    knowledgeContextCount:preparedKnowledge.contextCount,
+    contextHash:preparedKnowledge.contextHash,
+    writebackCount:writebacks.length,
     gateStatus:transitionInput.gateStatus,
     transitionType:transitionInput.transitionType,
     transitionEventId:transition.id,
     decision:{
       requiredInputMissing,requiredFailed,optionalFailed,
+      knowledgeContext:{
+        count:preparedKnowledge.contextCount,
+        contextHash:preparedKnowledge.contextHash,
+        policies:preparedKnowledge.policyContexts
+      },
+      writebacks:writebacks.map(x=>({
+        id:x.id,policyKey:x.policyKey,sourceKey:x.sourceKey,status:x.status,contentSha256:x.contentSha256
+      })),
       invocationResults
     }
   });
@@ -414,7 +485,8 @@ const executeCurrentStage=async({
     transition,
     invocationCount,
     blocked:transitionInput.transitionType==='ESCALATE',
-    retryTaskId:transitionInput.transitionType==='RETRY'?task.id:null
+    retryTaskId:transitionInput.transitionType==='RETRY'?task.id:null,
+    writebackCount:writebacks.length
   };
 };
 
@@ -424,6 +496,7 @@ export const orchestrateProjectWorkflow=async input=>{
   );
   const maxStageTransitions=Math.max(1,Math.min(500,Number(input.maxStageTransitions)||100));
   const stageInputs=input.stageInputs||{};
+  const knowledgePackets=input.knowledgePackets||{};
   const db=getRuntimePool();
 
   const [existing]=await db.execute(
@@ -510,10 +583,11 @@ export const orchestrateProjectWorkflow=async input=>{
 
     const result=await executeCurrentStage({
       sessionId,runId:run.id,projectId:input.projectId,
-      template,lifecycle:current,stageInputs,
+      template,lifecycle:current,stageInputs,knowledgePackets,
       actorKey:input.actorKey||'WORKFLOW_ORCHESTRATOR',
       sessionAttemptNo:attempts,
-      retryTaskId:retryStageKey===stageKey?retryTaskId:null
+      retryTaskId:retryStageKey===stageKey?retryTaskId:null,
+      projectScope:{tenantId:run.tenantId,workspaceId:run.workspaceId}
     });
     totalInvocations+=result.invocationCount;
     retryTaskId=result.retryTaskId||null;
