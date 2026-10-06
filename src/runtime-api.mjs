@@ -76,6 +76,7 @@ import {
   bindProjectWorkflow,getProjectLifecycle
 } from './core-meta-registry.mjs';
 import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
+import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvents } from './stage-runtime.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -852,6 +853,46 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && projectLifecycleMatch) {
     if(!principal?.platformAdmin){ const scope=await resolveProjectScope(projectLifecycleMatch[1]); await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname}); }
     json(res,200,{data:await getProjectLifecycle(projectLifecycleMatch[1])});
+    return true;
+  }
+
+  const projectStageTransitionMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/stage-transitions$/);
+  if (req.method === 'POST' && projectStageTransitionMatch) {
+    const body=await readBody(req);
+    const projectId=projectStageTransitionMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname});
+    }
+    const actorKey=principal?.platformAdmin
+      ? 'PLATFORM_ADMIN'
+      : (principal?.identityId||principal?.credentialId||'SCOPED_IDENTITY');
+    json(res,201,{data:await transitionProjectStage({...body,projectId,actorKey})});
+    return true;
+  }
+
+  if (req.method === 'GET' && projectStageTransitionMatch) {
+    const projectId=projectStageTransitionMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listStageTransitionEvents({
+      projectId,
+      runId:url.searchParams.get('runId')||null,
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const stageTransitionEventMatch=match(url.pathname,/^\/api\/runtime\/stage-transitions\/([^/]+)$/);
+  if (req.method === 'GET' && stageTransitionEventMatch) {
+    const data=await getStageTransitionEvent(stageTransitionEventMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(data.projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data});
     return true;
   }
 
