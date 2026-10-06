@@ -629,7 +629,7 @@ export const bindProjectWorkflow=async(projectId,templateId)=>{
 export const getProjectLifecycle=async projectId=>{
   const db=getRuntimePool();
   const [projects]=await db.execute(
-    `SELECT p.id,p.project_key,p.name,p.project_type,p.status,p.current_workflow_version,
+    `SELECT p.id,p.project_key,p.name,p.project_type,p.project_subtype_key,p.status,p.current_workflow_version,
             p.workflow_template_id,p.current_stage_key,p.meta_model_version,
             t.template_key,t.version AS template_version,t.definition_sha256
        FROM projects p
