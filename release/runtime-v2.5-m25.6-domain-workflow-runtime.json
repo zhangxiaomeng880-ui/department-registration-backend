@@ -1,0 +1,360 @@
+{
+  "milestone": "M25.6",
+  "release": "AI Native Runtime V2.5",
+  "title": "Domain Workflow Templates / Product R&D + AIGC / Execution Ready",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "executionReady": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.6-domain-workflow-templates",
+    "sha": "212feb79e4e2845dd955a8bc085a36fd6eb12346",
+    "predecessorMilestone": "M25.5",
+    "predecessorSha": "7c545e66232189b42f99636baf83c9455684e9e6"
+  },
+  "supersedesSpecificationOnlyBaseline": {
+    "evidenceBranch": "release/ai-native-runtime-v2.5-m25.6-evidence",
+    "evidenceCommit": "716a6acb535efec26307ef7b8ca326eb99c38c17",
+    "evidenceFile": "release/runtime-v2.5-m25.6-domain-workflow-specs.json",
+    "priorRuntimeSha": "17765edad52713af10dc1217ce057cc8721e930d",
+    "priorState": "SPEC_FROZEN / SPEC_ONLY",
+    "currentChange": "The canonical domain specifications remain authoritative, but Runtime now has readiness compilation, subtype validation, logical knowledge bindings, human-gate enforcement and direct executable project binding. The earlier evidence is retained as audit history and is not deleted."
+  },
+  "sourceOfTruth": {
+    "productDevelopment": {
+      "path": "/AI_Native_Project/AI_NATIVE_2.0/knowledge/Product_Development/AI_Native_2.0_产品研发工作流_V1.2_CURRENT.md",
+      "fileId": "file_00000000225081fda8fc1ef483a39042",
+      "libraryFileId": "libfile_15132c5414ac8191b90c54363ea57e12",
+      "version": "V1.2_CURRENT"
+    },
+    "aigc": {
+      "path": "/AI_Native_Project/AI_NATIVE_2.0/knowledge/AIGC_Content_Production/AI_Native_2.0_AIGC工作流升级说明_V2.4_CURRENT.md",
+      "fileId": "file_00000000cb008230b7e9df6ced6043cd",
+      "libraryFileId": "libfile_5eb0dc0887388191a335c2e4aa7ea241",
+      "version": "V2.4_CURRENT"
+    },
+    "master": {
+      "path": "/AI_Native_Project/AI_NATIVE_2.0/knowledge/00_Master/AI_NATIVE_2.0_MASTER_BLUEPRINT_V1.4_FROZEN.md",
+      "fileId": "file_00000000062881fdaec566024f399cc4",
+      "libraryFileId": "libfile_7f61ab6b876881918932d86aa11d4f2a",
+      "version": "V1.4_FROZEN"
+    }
+  },
+  "projectTypeSystem": {
+    "projectTypes": [
+      "PRODUCT_DEVELOPMENT",
+      "AIGC_CONTENT"
+    ],
+    "productSubtypes": [
+      "FRONTEND_PROTOTYPE",
+      "FULL_STACK_WEB",
+      "MOBILE_APP",
+      "BACKEND_API_SERVICE",
+      "SAAS_PLATFORM",
+      "AI_APPLICATION",
+      "DATA_PRODUCT",
+      "INTEGRATION_SDK",
+      "INTERNAL_TOOL"
+    ],
+    "aigcSubtypes": [
+      "NARRATIVE_FILM",
+      "SHORT_DRAMA",
+      "SHORT_VIDEO",
+      "MUSIC",
+      "MV",
+      "AD_CAMPAIGN",
+      "MULTIMODAL_CONTENT"
+    ],
+    "subtypeValidatedAgainstProjectType": true,
+    "subtypePersistedOnProject": true
+  },
+  "productDevelopmentTemplate": {
+    "presetKey": "PRODUCT_DEVELOPMENT_STANDARD",
+    "version": "1.2",
+    "milestoneCount": 9,
+    "stageCount": 19,
+    "milestones": [
+      "PD-M0",
+      "PD-M1",
+      "PD-M2",
+      "PD-M3",
+      "PD-M4",
+      "PD-M5",
+      "PD-M6",
+      "PD-M7",
+      "PD-M8"
+    ],
+    "stages": [
+      "PD_00_INIT",
+      "PD_01_DISCOVERY",
+      "PD_02_OPPORTUNITY",
+      "PD_03_GOAL",
+      "PD_04_PRODUCT",
+      "PD_05_FEASIBILITY",
+      "PD_06_PLAN",
+      "PD_07_DESIGN",
+      "PD_08_CONTRACT",
+      "PD_09_ENGINEERING",
+      "PD_10_BUILD",
+      "PD_11_ACCEPTANCE",
+      "PD_12_QA",
+      "PD_13_RELEASE_READY",
+      "PD_14_RELEASE",
+      "PD_15_POST_RELEASE",
+      "PD_16_OUTCOME",
+      "PD_17_REVIEW",
+      "PD_18_KNOWLEDGE"
+    ],
+    "explicitSeparation": {
+      "milestoneIsOutcomeGovernance": true,
+      "stageIsExecutionOrder": true
+    }
+  },
+  "aigcTemplate": {
+    "presetKey": "AIGC_CONTENT_STANDARD",
+    "version": "2.4",
+    "milestoneCount": 10,
+    "stageCount": 15,
+    "milestones": [
+      "AG-M0",
+      "AG-M1",
+      "AG-M2",
+      "AG-M3",
+      "AG-M4",
+      "AG-M5",
+      "AG-M6",
+      "AG-M7",
+      "AG-M8",
+      "AG-M9"
+    ],
+    "stages": [
+      "AIGC_00_INIT",
+      "AIGC_01_DISCOVERY",
+      "AIGC_02_PLAN",
+      "AIGC_03_SCRIPT",
+      "AIGC_04_BREAKDOWN",
+      "AIGC_05_FORMAT",
+      "AIGC_06_ASSET",
+      "AIGC_07_IMAGE",
+      "AIGC_08_VIDEO_AUDIO",
+      "AIGC_09_EDIT",
+      "AIGC_10_MASTER",
+      "AIGC_11_DERIVATION",
+      "AIGC_12_PUBLISH",
+      "AIGC_13_PERFORMANCE",
+      "AIGC_14_REVIEW"
+    ],
+    "masterSubGates": [
+      "G-AIGC-CREATIVE-ACCEPTANCE",
+      "G-AIGC-PRODUCTION-QA",
+      "G-AIGC-TECHNICAL-QA",
+      "G-AIGC-COMPLIANCE",
+      "G-AIGC-LOCALIZATION-QA"
+    ]
+  },
+  "readinessCompiler": {
+    "failClosed": true,
+    "blockedWhenRequiredCapabilityMissing": true,
+    "capabilityResolutionUses": [
+      "capability type",
+      "ACTIVE/routable status",
+      "model taskTypes",
+      "structured output support",
+      "required policy tags"
+    ],
+    "noFabricatedCapability": true,
+    "autoCreatesStandardStageAgentsOnlyAfterReadiness": true,
+    "autoBindsResolvedCapabilitiesToProjectType": true,
+    "autoGrantsResolvedCapabilitiesToStageAgent": true,
+    "frozenWorkflowProducedOnlyWhenRequiredCapabilitiesReady": true,
+    "compileIdempotent": true
+  },
+  "stageAgentCapabilityContract": {
+    "stagePrimaryAgentExplicit": true,
+    "supportingRolesPreserved": true,
+    "sharedAgentRoleAccumulatesSupportedStages": true,
+    "capabilityRequirementTypes": [
+      "MODEL",
+      "TOOL",
+      "MCP"
+    ],
+    "modelProviderHardcoding": false,
+    "modelSelectionPolicyRouted": true,
+    "taggedToolMcpRequirements": true
+  },
+  "knowledgeBinding": {
+    "logicalDomains": true,
+    "reusableTemplateDoesNotHardcodeProjectSource": true,
+    "projectBindingTable": "project_knowledge_bindings",
+    "runtimeResolution": "logical binding key -> active external knowledge source",
+    "unusedOptionalKnowledgeBindingRequired": false,
+    "sourceBodyPersistence": false,
+    "productExamples": [
+      "PROJECT_CURRENT",
+      "MARKET_RESEARCH",
+      "ENGINEERING_SOURCE",
+      "DESIGN_SOURCE",
+      "RIGHTS_COMPLIANCE",
+      "PERFORMANCE_DATA"
+    ],
+    "aigcExamples": [
+      "PROJECT_CURRENT",
+      "STORY_KNOWLEDGE",
+      "VISUAL_KNOWLEDGE",
+      "AUDIO_KNOWLEDGE",
+      "PRODUCTION_KNOWLEDGE",
+      "DISTRIBUTION_KNOWLEDGE",
+      "PERFORMANCE_KNOWLEDGE",
+      "RIGHTS_COMPLIANCE"
+    ]
+  },
+  "humanGate": {
+    "runtimeEnforced": true,
+    "successfulCapabilitiesDoNotAutoPassHumanGateStage": true,
+    "orchestrationBehavior": "HOLD -> ESCALATE/BLOCKED until explicit approval transition",
+    "explicitPassThenAdvancesStage": true,
+    "verifiedWith": "Product Development PD_00_INIT / G-PD-INIT"
+  },
+  "directProjectCreation": {
+    "supported": true,
+    "inputs": [
+      "projectType",
+      "projectSubtypeKey",
+      "domainPresetKey"
+    ],
+    "domainPresetAndWorkflowTemplateConflictRejected": true,
+    "presetAutomaticallyResolvesFrozenWorkflow": true,
+    "lifecycleMaterializedOnCreate": true
+  },
+  "schema": {
+    "migration": "029_domain_workflow_templates.sql",
+    "migrationsTotal": 30,
+    "newTables": [
+      "project_subtype_registry",
+      "domain_workflow_presets",
+      "domain_workflow_releases",
+      "project_knowledge_bindings"
+    ],
+    "projectExtension": "projects.project_subtype_key",
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=30 skipped=0 total=30",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=30 total=30",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=29 total=30"
+  },
+  "api": {
+    "projectSubtypes": "GET /api/runtime/project-subtypes",
+    "presetSync": "POST /api/runtime/domain-presets/sync",
+    "presetList": "GET /api/runtime/domain-presets",
+    "presetDetail": "GET /api/runtime/domain-presets/:presetKey",
+    "presetReadiness": "GET /api/runtime/domain-presets/:presetKey/readiness",
+    "presetCompile": "POST /api/runtime/domain-presets/:presetKey/compile",
+    "projectKnowledgeBindings": [
+      "POST /api/runtime/projects/:projectId/knowledge-bindings",
+      "GET /api/runtime/projects/:projectId/knowledge-bindings"
+    ],
+    "projectCreate": "POST /api/runtime/projects with domainPresetKey + projectSubtypeKey"
+  },
+  "e2e": {
+    "verifiesBlockedBeforeCapabilities": true,
+    "verifiesReadyAfterCapabilities": true,
+    "verifiesProduct19Stage9MilestoneTemplate": true,
+    "verifiesAigc15Stage10MilestoneTemplate": true,
+    "verifiesSubtypeValidation": true,
+    "verifiesDirectPresetProjectCreation": true,
+    "verifiesLogicalKnowledgeBinding": true,
+    "verifiesTransientKnowledgeInjection": true,
+    "verifiesExistingCommercialModelEntitlement": true,
+    "verifiesHumanGateBlockThenExplicitPass": true,
+    "sourceBodyLeakCheck": true
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.6 Domain Workflow Templates Gate",
+    "acceptedRunId": 37436949145,
+    "headSha": "212feb79e4e2845dd955a8bc085a36fd6eb12346",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "G25_1_CORE_META_REGISTRY_PASS",
+      "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS",
+      "G25_3_STAGE_SELF_LOOP_PASS",
+      "G25_4_WORKFLOW_AUTO_ORCHESTRATION_PASS",
+      "G25_5_KNOWLEDGE_CONTEXT_BACKWRITE_PASS"
+    ],
+    "m256DomainWorkflowTemplates": "G25_6_DOMAIN_WORKFLOW_TEMPLATES_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS",
+    "resolvedValidationHistory": [
+      {
+        "runId": 37435796557,
+        "accepted": false,
+        "reason": "Lifecycle query omitted project_subtype_key; field propagation fixed without changing template semantics."
+      },
+      {
+        "runId": 37435972459,
+        "accepted": false,
+        "reason": "Validation project initially used legacy scope without explicit MODEL_EXECUTION entitlement."
+      },
+      {
+        "runId": 37436316941,
+        "accepted": false,
+        "reason": "Shared historical mock provider still rejected generic model input; commercial entitlement chain was already correct."
+      },
+      {
+        "runId": 37436730678,
+        "accepted": false,
+        "reason": "Diagnostic run proved provider error context_missing from the SC049-specific mock contract."
+      }
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "088471c7-a1c6-43fb-8a15-5391ab9e5ab8",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "212feb79e4e2845dd955a8bc085a36fd6eb12346",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration029Applied": true,
+    "note": "An earlier SPEC_ONLY M25.6 staging candidate had already applied a separate additive domain-spec migration. The accepted execution-ready candidate passes a fresh-database CI without depending on that historical staging-only schema."
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": {
+    "key": "M26",
+    "title": "Strategy / Portfolio / Project / Milestone / Competitive Intelligence",
+    "purpose": "Complete the management plane above executable domain workflows: objectives/initiatives, project and milestone data, forecast/health/progress roll-up, dependencies, updates/staleness, risks, releases/versions and competitive intelligence."
+  },
+  "conclusion": "M25.6 Domain Workflow Templates is STAGING PASS / FROZEN / EXECUTION READY. The canonical Product Development V1.2 and AIGC V2.4 specifications are now compiled into reusable fail-closed Runtime workflows with project subtypes, explicit stage-agent-capability contracts, project-scoped logical knowledge bindings, runtime-enforced human gates and direct domain-preset project creation. The earlier SPEC_ONLY M25.6 evidence remains preserved as historical audit evidence. Production remains unchanged on V2.3."
+}
