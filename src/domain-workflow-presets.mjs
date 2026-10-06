@@ -415,19 +415,22 @@ const agentKeyFor=(projectTypeKey,role)=>`AGENT:STANDARD:${projectTypeKey}:${rol
 
 const ensureStageAgent=async(spec,stage,candidateMap)=>{
   const agentKey=agentKeyFor(spec.projectTypeKey,stage.agentRole);
+  const roleStages=spec.stages.filter(item=>item.agentRole===stage.agentRole);
+  const supportedStages=roleStages.map(item=>item.stageKey);
+  const supportingRoles=[...new Set(roleStages.flatMap(item=>item.supportingRoles||[]))];
   await upsertCapability({
     capabilityKey:agentKey,capabilityType:'AGENT',
     displayName:`${stage.agentRole} Agent`,version:spec.version,status:'ACTIVE',routable:true,
     adapterKey:'agent-runtime',
     metadata:{
       standardDomainAgent:true,presetKey:spec.presetKey,projectTypeKey:spec.projectTypeKey,
-      primaryRole:stage.agentRole,supportedStages:[stage.stageKey],supportingRoles:stage.supportingRoles
+      primaryRole:stage.agentRole,supportedStages,supportingRoles
     }
   });
   await upsertAgentProfile({
     capabilityKey:agentKey,roleKey:stage.agentRole,policyMode:'QUALITY_FIRST',
-    knowledgeScope:{projectTypeKey:spec.projectTypeKey,stageKey:stage.stageKey},
-    config:{standardDomainAgent:true,supportingRoles:stage.supportingRoles}
+    knowledgeScope:{projectTypeKey:spec.projectTypeKey,allowedStages:supportedStages},
+    config:{standardDomainAgent:true,supportingRoles}
   });
   await bindProjectTypeCapability({
     projectTypeKey:spec.projectTypeKey,capabilityKey:agentKey,bindingMode:'DEFAULT',priority:1
