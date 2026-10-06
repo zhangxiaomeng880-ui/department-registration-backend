@@ -84,6 +84,13 @@ export const LEGACY_WORKSPACE_ID='00000000-0000-4000-8000-000000000102';
 
 export const createProject = async input => {
   const db = getRuntimePool();
+  const allowedProjectStatuses=new Set(['DRAFT','READY','ACTIVE','BLOCKED','PAUSED','COMPLETED','ARCHIVED','CANCELLED']);
+  if(input?.status&&!allowedProjectStatuses.has(String(input.status).toUpperCase())){
+    const error=new Error('Invalid project lifecycle status');
+    error.code='INVALID_PROJECT_STATUS';
+    error.statusCode=400;
+    throw error;
+  }
   const id = input.id || randomUUID();
   if (!input.projectKey || !input.name || !input.projectType) {
     const error = new Error('projectKey, name and projectType are required');
@@ -110,11 +117,11 @@ export const createProject = async input => {
       current_workflow_version, current_knowledge_commit_sha
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.status || 'ACTIVE',
+      id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.status ? String(input.status).toUpperCase() : 'ACTIVE',
       input.currentWorkflowVersion || null,input.currentKnowledgeCommitSha || null,
     ]
   );
-  return { id,tenantId,workspaceId,projectKey:input.projectKey,name:input.name,projectType:input.projectType,status:input.status || 'ACTIVE' };
+  return { id,tenantId,workspaceId,projectKey:input.projectKey,name:input.name,projectType:input.projectType,status:input.status ? String(input.status).toUpperCase() : 'ACTIVE' };
 };
 
 export const createRun = async input => {
