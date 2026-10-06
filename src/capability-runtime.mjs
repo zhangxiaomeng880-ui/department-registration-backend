@@ -7,7 +7,7 @@ import {
   authorizeCommercialExecution,commitUsageReservation,releaseUsageReservation
 } from './commercial-control.mjs';
 
-const INVOCABLE_TYPES=new Set(['MODEL','TOOL','SKILL','MCP']);
+const INVOCABLE_TYPES=new Set(['MODEL','TOOL','SKILL','MCP','CONNECTOR']);
 const sha256=value=>createHash('sha256').update(
   typeof value==='string'?value:JSON.stringify(stableValue(value))
 ,'utf8').digest('hex');
@@ -151,6 +151,11 @@ const loadCandidates=async(context,db=getRuntimePool())=>{
 export const resolveStageCapability=async input=>{
   const db=getRuntimePool();
   const context=await loadInvocationContext(input,db);
+  if(context.routing_mode==='DEFERRED') throw errorOf(
+    'Stage capability requirement is a frozen specification contract and has not been realized for execution',
+    'CAPABILITY_REQUIREMENT_DEFERRED',409,
+    {stageKey:context.stage_key,requirementKey:context.requirement_key,capabilityType:context.capability_type}
+  );
   const candidates=await loadCandidates(context,db);
   const constraints=parseJson(context.constraints_json)||{};
   let selected=null,policyMode=null,fallbackChain=[];
