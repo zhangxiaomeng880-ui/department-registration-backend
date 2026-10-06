@@ -27,6 +27,7 @@ const stableValue=value=>{
 const stableJson=value=>JSON.stringify(stableValue(value));
 const sha256=value=>createHash('sha256').update(typeof value==='string'?value:stableJson(value),'utf8').digest('hex');
 const toIso=value=>value==null?null:new Date(value).toISOString();
+const toMysqlTimestamp=value=>new Date(value).toISOString().replace('T',' ').replace('Z','');
 const rate=(n,d)=>d?Number((Number(n)/Number(d)).toFixed(6)):null;
 const number=value=>value==null?null:Number(value);
 const percentile=(values,p)=>{
@@ -54,7 +55,7 @@ const normalizeWindow=({windowStart,windowEnd,candidateRuntimeSha=null}={})=>{
 };
 const whereFor=(alias,scope)=>{
   const sql=[`${alias}.created_at>=?`,`${alias}.created_at<?`];
-  const params=[scope.windowStart,scope.windowEnd];
+  const params=[toMysqlTimestamp(scope.windowStart),toMysqlTimestamp(scope.windowEnd)];
   if(scope.candidateRuntimeSha){
     sql.push(`${alias}.candidate_runtime_sha=?`);
     params.push(scope.candidateRuntimeSha);
@@ -191,7 +192,7 @@ const buildMetrics=async(scope,db)=>{
       WHERE er.created_at>=? AND er.created_at<?
       GROUP BY er.candidate_runtime_sha
       ORDER BY er.candidate_runtime_sha`,
-    [scope.windowStart,scope.windowEnd]
+    [toMysqlTimestamp(scope.windowStart),toMysqlTimestamp(scope.windowEnd)]
   );
 
   const metrics={
@@ -339,7 +340,7 @@ export const createEvalReliabilitySnapshot=async({
       source_watermark_json,snapshot_sha256,idempotency_key)
      VALUES (?,?,?,?,?,?,?,?,?,?)`,
     [
-      id,scope.windowStart,scope.windowEnd,scope.candidateRuntimeSha,POLICY_VERSION,
+      id,toMysqlTimestamp(scope.windowStart),toMysqlTimestamp(scope.windowEnd),scope.candidateRuntimeSha,POLICY_VERSION,
       JSON.stringify(snapshotScope),JSON.stringify(metrics),JSON.stringify(sourceWatermark),
       snapshotSha256,idempotencyKey
     ]
