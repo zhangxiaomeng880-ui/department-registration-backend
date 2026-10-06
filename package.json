@@ -41,7 +41,8 @@
     "validate:stage-self-loop": "node test/stage-self-loop.test.mjs",
     "validate:workflow-auto-orchestration": "node test/workflow-auto-orchestration.test.mjs",
     "validate:knowledge-context-backwrite": "node test/knowledge-context-backwrite.test.mjs",
-    "validate:domain-workflow-templates": "node test/domain-workflow-templates.test.mjs"
+    "validate:domain-workflow-templates": "node test/domain-workflow-templates.test.mjs",
+    "validate:project-governance": "node test/project-governance.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
