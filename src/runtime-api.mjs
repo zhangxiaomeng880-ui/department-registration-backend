@@ -103,7 +103,9 @@ import {
   getPortfolioRoadmap,linkStrategicItemProject,linkPortfolioProject,createProjectBaseline,
   createProjectStructureNode,createProjectIteration,createProjectMilestone,createProjectWorkItem,
   createProjectDependency,createProjectRisk,createProjectIssue,createProjectBlocker,
-  createProjectDecision,createProjectChange,getProjectGovernance
+  createProjectDecision,createProjectChange,getProjectGovernance,
+  updateProjectWorkItem,updateProjectDependency,updateProjectRisk,resolveProjectBlocker,
+  updateProjectMilestonePlan,resolveProjectGovernanceObjectScope
 } from './project-governance.mjs';
 import {
   createGovernanceUpdate,listGovernanceUpdates,resolveGovernanceTargetScope,
@@ -1208,6 +1210,61 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       json(res,201,{data:await handler(projectId,await readBody(req))});
       return true;
     }
+  }
+
+  const workItemPatchMatch=match(url.pathname,/^\/api\/runtime\/work-items\/([^/]+)$/);
+  if (req.method === 'PATCH' && workItemPatchMatch) {
+    const target=await resolveProjectGovernanceObjectScope('WORK_ITEM',workItemPatchMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await updateProjectWorkItem(workItemPatchMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const dependencyPatchMatch=match(url.pathname,/^\/api\/runtime\/dependencies\/([^/]+)$/);
+  if (req.method === 'PATCH' && dependencyPatchMatch) {
+    const target=await resolveProjectGovernanceObjectScope('DEPENDENCY',dependencyPatchMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await updateProjectDependency(dependencyPatchMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const riskPatchMatch=match(url.pathname,/^\/api\/runtime\/risks\/([^/]+)$/);
+  if (req.method === 'PATCH' && riskPatchMatch) {
+    const target=await resolveProjectGovernanceObjectScope('RISK',riskPatchMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await updateProjectRisk(riskPatchMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const blockerResolveMatch=match(url.pathname,/^\/api\/runtime\/blockers\/([^/]+)\/resolve$/);
+  if (req.method === 'POST' && blockerResolveMatch) {
+    const target=await resolveProjectGovernanceObjectScope('BLOCKER',blockerResolveMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await resolveProjectBlocker(blockerResolveMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const milestonePlanMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/plan$/);
+  if (req.method === 'PATCH' && milestonePlanMatch) {
+    const target=await resolveProjectGovernanceObjectScope('MILESTONE',milestonePlanMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await updateProjectMilestonePlan(milestonePlanMatch[1],await readBody(req))});
+    return true;
   }
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/governance-updates') {
