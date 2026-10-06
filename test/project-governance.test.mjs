@@ -245,9 +245,21 @@ assert.equal(r.body.error,'PROJECT_ARCHIVE_CLOSURE_REQUIRED');
 r=await request('PATCH',`/api/runtime/projects/${archiveProjectId}/governance`,{
   status:'ARCHIVED',closure:{finalReview:'PASS',archivePolicy:'RETAIN'}
 });
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'PROJECT_ARCHIVE_REVIEW_REQUIRED');
+
+r=await request('POST',`/api/runtime/projects/${archiveProjectId}/complete`,{
+  finalReview:{status:'PASS',summary:'Governance final review'},
+  archivePolicy:{retention:'RETAIN'},
+  outcome:{result:'PASS'},
+  evidence:{qa:'PASS'}
+});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'COMPLETED');
+
+r=await request('POST',`/api/runtime/projects/${archiveProjectId}/archive`,{});
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.status,'ARCHIVED');
-assert.ok(r.body.data.archivedAt);
 
 r=await request('PATCH',`/api/runtime/projects/${archiveProjectId}/governance`,{status:'ACTIVE'});
 assert.equal(r.status,409,JSON.stringify(r.body));
