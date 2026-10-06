@@ -276,7 +276,13 @@ r=await request('POST',`/api/runtime/projects/${productProjectId}/orchestrations
 assert.equal(r.status,201,JSON.stringify(r.body));
 const session=r.body.data;
 assert.equal(session.status,'BLOCKED');
-assert.equal(session.stageAttempts,1);
+assert.equal(session.stageAttempts,1,JSON.stringify({
+  sessionId:session.id,
+  status:session.status,
+  stageAttempts:session.stageAttempts,
+  capabilityInvocationCount:session.capabilityInvocationCount,
+  attempts:session.attempts
+},null,2));
 assert.equal(session.capabilityInvocationCount,1);
 assert.equal(session.attempts[0].transitionType,'ESCALATE');
 assert.equal(session.attempts[0].gateStatus,'HOLD');
