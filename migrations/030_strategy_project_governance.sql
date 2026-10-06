@@ -23,7 +23,8 @@ ALTER TABLE projects
   ADD COLUMN budget_guardrail_currency CHAR(3) NULL AFTER budget_guardrail_amount,
   ADD COLUMN release_distribution_status VARCHAR(64) NULL AFTER budget_guardrail_currency,
   ADD COLUMN tags_json JSON NULL AFTER release_distribution_status,
-  ADD COLUMN archived_at TIMESTAMP(6) NULL AFTER tags_json,
+  ADD COLUMN closure_json JSON NULL AFTER tags_json,
+  ADD COLUMN archived_at TIMESTAMP(6) NULL AFTER closure_json,
   ADD CONSTRAINT fk_m261_project_owner
     FOREIGN KEY (owner_identity_id) REFERENCES identities(id),
   ADD CONSTRAINT fk_m261_project_manager
