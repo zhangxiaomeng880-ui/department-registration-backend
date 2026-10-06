@@ -96,6 +96,11 @@ const targetScope=async(targetType,targetId,db=getRuntimePool())=>{
   return {type,row,workspaceId:row.workspace_id,projectId:null};
 };
 
+export const resolveGovernanceTargetScope=async(targetType,targetId)=>{
+  const scope=await targetScope(targetType,targetId);
+  return {targetType:scope.type,targetId,workspaceId:scope.workspaceId,projectId:scope.projectId};
+};
+
 export const createGovernanceUpdate=async input=>{
   if(!input?.targetType||!input?.targetId||!input?.updateStatus) throw errorOf(
     'targetType, targetId and updateStatus are required','INVALID_GOVERNANCE_UPDATE'
@@ -574,7 +579,7 @@ export const completeMilestone=async(milestoneId,input={})=>{
   if(milestone.project_id){
     const [rows]=await db.execute(
       `SELECT id FROM project_milestones
-        WHERE project_id=? AND management_status<>'COMPLETED'
+        WHERE project_id=? AND management_status NOT IN ('COMPLETED','CANCELLED')
         ORDER BY sequence_no,id LIMIT 1`,[milestone.project_id]
     );
     await db.execute(
@@ -604,6 +609,40 @@ export const createProjectVersion=async(projectId,input={})=>{
     ]
   );
   return {id,projectId,versionKey:input.versionKey,versionType:type,label:input.label,status};
+};
+
+export const updateProjectVersion=async(versionId,input={})=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM project_versions WHERE id=?',[versionId]);
+  if(!rows.length) throw errorOf('Project version not found','PROJECT_VERSION_NOT_FOUND',404);
+  const current=rows[0];
+  const next=upper(input.status||current.status);
+  if(!VERSION_STATUSES.has(next)) throw errorOf('Invalid project version status','INVALID_PROJECT_VERSION_STATUS');
+  const allowed={
+    DRAFT:new Set(['DRAFT','CANDIDATE','RETIRED']),
+    CANDIDATE:new Set(['CANDIDATE','LOCKED','RETIRED']),
+    LOCKED:new Set(['LOCKED','RELEASED','RETIRED']),
+    RELEASED:new Set(['RELEASED','RETIRED']),
+    RETIRED:new Set(['RETIRED'])
+  };
+  if(!allowed[current.status]?.has(next)) throw errorOf(
+    'Project version lifecycle transition is not allowed','PROJECT_VERSION_TRANSITION_NOT_ALLOWED',409,
+    {from:current.status,to:next}
+  );
+  await db.execute(
+    `UPDATE project_versions SET status=?,
+      evidence_json=COALESCE(?,evidence_json),
+      effective_at=CASE WHEN ? IN ('LOCKED','RELEASED') THEN COALESCE(effective_at,CURRENT_TIMESTAMP(6)) ELSE effective_at END,
+      retired_at=CASE WHEN ?='RETIRED' THEN CURRENT_TIMESTAMP(6) ELSE retired_at END
+      WHERE id=?`,
+    [next,input.evidence===undefined?null:asJson(input.evidence),next,next,versionId]
+  );
+  const [updated]=await db.execute('SELECT * FROM project_versions WHERE id=?',[versionId]);
+  const row=updated[0];
+  return {
+    id:row.id,projectId:row.project_id,versionKey:row.version_key,versionType:row.version_type,
+    label:row.label,status:row.status,effectiveAt:row.effective_at||null,retiredAt:row.retired_at||null
+  };
 };
 
 export const listProjectVersions=async projectId=>{
