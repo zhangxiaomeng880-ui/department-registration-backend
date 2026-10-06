@@ -127,7 +127,7 @@ import {
   getProjectClosureReadiness,completeProject,archiveProject,resolvePortfolioScope
 } from './portfolio-closure-governance.mjs';
 import {
-  createProductEvidence,createProductInsight,createProductOpportunity,createSolutionCandidate,
+  createProductResearchStudy,createProductEvidence,createProductInsight,createProductOpportunity,createSolutionCandidate,
   createProductHypothesis,createProductPrioritization,createProductGoal,createProductBet,
   createProductRequirement,reviseProductRequirement,createProductTraceLink,
   evaluateProductGate,createProductRequirementBaseline,getProductDiscoveryState,
@@ -1369,6 +1369,7 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   }
 
   const productCreateRoutes=[
+    ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
     ['product-insights',createProductInsight],
     ['product-opportunities',createProductOpportunity],
