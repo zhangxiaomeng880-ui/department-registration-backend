@@ -44,7 +44,8 @@
     "validate:domain-workflow-templates": "node test/domain-workflow-templates.test.mjs",
     "validate:project-governance": "node test/project-governance.test.mjs",
     "validate:milestone-intelligence": "node test/milestone-intelligence.test.mjs",
-    "validate:competitive-approval": "node test/competitive-approval.test.mjs"
+    "validate:competitive-approval": "node test/competitive-approval.test.mjs",
+    "validate:portfolio-closure": "node test/portfolio-closure-governance.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
