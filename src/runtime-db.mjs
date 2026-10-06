@@ -104,17 +104,36 @@ export const createProject = async input => {
     const error=new Error('Tenant/workspace scope is not active');error.code='PROJECT_SCOPE_NOT_ACTIVE';error.statusCode=409;throw error;
   }
   const tenantId=scopeRows[0].tenant_id;
+  if(input.projectSubtypeKey){
+    const [subtypeRows]=await db.execute(
+      `SELECT subtype_key,status FROM project_subtype_registry
+        WHERE project_type_key=? AND subtype_key=?`,
+      [input.projectType,input.projectSubtypeKey]
+    );
+    if(!subtypeRows.length){
+      const error=new Error('Project subtype does not belong to project type');
+      error.code='PROJECT_SUBTYPE_MISMATCH';error.statusCode=409;throw error;
+    }
+    if(subtypeRows[0].status!=='ACTIVE'){
+      const error=new Error('Project subtype is not active');
+      error.code='PROJECT_SUBTYPE_NOT_ACTIVE';error.statusCode=409;throw error;
+    }
+  }
   await db.execute(
     `INSERT INTO projects (
-      id, tenant_id, workspace_id, project_key, name, project_type, status,
+      id, tenant_id, workspace_id, project_key, name, project_type, project_subtype_key, status,
       current_workflow_version, current_knowledge_commit_sha
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.status || 'ACTIVE',
-      input.currentWorkflowVersion || null,input.currentKnowledgeCommitSha || null,
+      id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.projectSubtypeKey||null,
+      input.status || 'ACTIVE',input.currentWorkflowVersion || null,input.currentKnowledgeCommitSha || null,
     ]
   );
-  return { id,tenantId,workspaceId,projectKey:input.projectKey,name:input.name,projectType:input.projectType,status:input.status || 'ACTIVE' };
+  return {
+    id,tenantId,workspaceId,projectKey:input.projectKey,name:input.name,
+    projectType:input.projectType,projectSubtypeKey:input.projectSubtypeKey||null,
+    status:input.status || 'ACTIVE'
+  };
 };
 
 export const createRun = async input => {
