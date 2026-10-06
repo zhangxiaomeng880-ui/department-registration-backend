@@ -126,6 +126,13 @@ import {
   getProjectHealth,refreshProjectHealth,getPortfolioIntelligence,refreshPortfolioIntelligence,
   getProjectClosureReadiness,completeProject,archiveProject,resolvePortfolioScope
 } from './portfolio-closure-governance.mjs';
+import {
+  createProductEvidence,createProductInsight,createProductOpportunity,createSolutionCandidate,
+  createProductHypothesis,createProductPrioritization,createProductGoal,createProductBet,
+  createProductRequirement,reviseProductRequirement,createProductTraceLink,
+  evaluateProductGate,createProductRequirementBaseline,getProductDiscoveryState,
+  getProductRequirement,resolveProductProjectScope,resolveProductRequirementScope
+} from './product-development-domain.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1347,6 +1354,888 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       targetId:url.searchParams.get('targetId')||null,
       limit:url.searchParams.get('limit')||100
     })});
+    return true;
+  }
+
+  const productDomainMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-domain$/);
+  if (req.method === 'GET' && productDomainMatch) {
+    const projectId=productDomainMatch[1];
+    const scope=await resolveProductProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getProductDiscoveryState(projectId)});
+    return true;
+  }
+
+  const productCreateRoutes=[
+    ['product-evidence',createProductEvidence],
+    ['product-insights',createProductInsight],
+    ['product-opportunities',createProductOpportunity],
+    ['product-solution-candidates',createSolutionCandidate],
+    ['product-hypotheses',createProductHypothesis],
+    ['product-prioritizations',createProductPrioritization],
+    ['product-goals',createProductGoal],
+    ['product-bets',createProductBet],
+    ['product-requirements',createProductRequirement],
+    ['product-trace-links',createProductTraceLink],
+    ['product-baselines',createProductRequirementBaseline]
+  ];
+  for(const [segment,handler] of productCreateRoutes){
+    const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'
+  if (req.method === 'GET' && milestoneIntelligenceMatch) {
+    const data=await getMilestoneIntelligence(milestoneIntelligenceMatch[1],{
+      asOf:url.searchParams.get('asOf')||new Date()
+    });
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(data.projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data});
+    return true;
+  }
+
+  const milestoneRefreshMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/intelligence\/refresh$/);
+  if (req.method === 'POST' && milestoneRefreshMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneRefreshMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshMilestoneIntelligence(
+      milestoneRefreshMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const milestoneOverrideMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/progress-override$/);
+  if (req.method === 'POST' && milestoneOverrideMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneOverrideMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await overrideMilestoneProgress(
+      milestoneOverrideMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const milestoneCapacityMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/capacity-snapshots$/);
+  if (req.method === 'POST' && milestoneCapacityMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneCapacityMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    const body=await readBody(req);
+    json(res,201,{data:await createCapacitySnapshot({
+      ...body,projectId:target.projectId,targetType:'MILESTONE',targetId:milestoneCapacityMatch[1]
+    })});
+    return true;
+  }
+
+  const milestoneCompleteMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && milestoneCompleteMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneCompleteMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await completeMilestone(
+      milestoneCompleteMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const milestoneVersionLinkMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/version-links$/);
+  if (req.method === 'POST' && milestoneVersionLinkMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneVersionLinkMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,201,{data:await linkMilestoneVersion(
+      milestoneVersionLinkMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const projectHealthMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/health$/);
+  if (req.method === 'GET' && projectHealthMatch) {
+    const projectId=projectHealthMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectHealth(projectId,{asOf:url.searchParams.get('asOf')||new Date()})});
+    return true;
+  }
+
+  const projectHealthRefreshMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/health\/refresh$/);
+  if (req.method === 'POST' && projectHealthRefreshMatch) {
+    const projectId=projectHealthRefreshMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshProjectHealth(projectId,await readBody(req))});
+    return true;
+  }
+
+  const projectClosureReadinessMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/closure-readiness$/);
+  if (req.method === 'GET' && projectClosureReadinessMatch) {
+    const projectId=projectClosureReadinessMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectClosureReadiness(projectId,{asOf:url.searchParams.get('asOf')||new Date()})});
+    return true;
+  }
+
+  const projectCompleteMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && projectCompleteMatch) {
+    const projectId=projectCompleteMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    const body=await readBody(req);
+    json(res,200,{data:await completeProject(projectId,{
+      ...body,createdByIdentityId:body.createdByIdentityId||principal?.identityId||null
+    })});
+    return true;
+  }
+
+  const projectArchiveMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/archive$/);
+  if (req.method === 'POST' && projectArchiveMatch) {
+    const projectId=projectArchiveMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await archiveProject(projectId,await readBody(req))});
+    return true;
+  }
+
+  const projectIntelligenceMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/intelligence$/);
+  if (req.method === 'GET' && projectIntelligenceMatch) {
+    const projectId=projectIntelligenceMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectIntelligence(projectId,{
+      asOf:url.searchParams.get('asOf')||new Date()
+    })});
+    return true;
+  }
+
+  const projectIntelligenceRefreshMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/intelligence\/refresh$/);
+  if (req.method === 'POST' && projectIntelligenceRefreshMatch) {
+    const projectId=projectIntelligenceRefreshMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshProjectIntelligence(projectId,await readBody(req))});
+    return true;
+  }
+
+  const projectCapacityMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/capacity-snapshots$/);
+  if (req.method === 'POST' && projectCapacityMatch) {
+    const projectId=projectCapacityMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    const body=await readBody(req);
+    json(res,201,{data:await createCapacitySnapshot({
+      ...body,projectId,targetType:'PROJECT',targetId:projectId
+    })});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/benchmark-dimensions') {
+    const body=await readBody(req);
+    const scope=await resolveWorkspaceScope(body.workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createBenchmarkDimension(body)});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/benchmark-subjects') {
+    const body=await readBody(req);
+    if(body.projectId){
+      const scope=await resolveProjectScope(body.projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createBenchmarkSubject(body)});
+    return true;
+  }
+
+  const benchmarkSubjectSnapshotMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/snapshots$/);
+  if (req.method === 'POST' && benchmarkSubjectSnapshotMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkSubjectSnapshotMatch[1]);
+    if(!principal?.platformAdmin){
+      if(target.projectId){
+        const scope=await resolveProjectScope(target.projectId);
+        await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+      }else{
+        const scope=await resolveWorkspaceScope(target.workspaceId);
+        await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+      }
+    }
+    json(res,201,{data:await createBenchmarkSnapshot(
+      benchmarkSubjectSnapshotMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const benchmarkObservationMatch=match(url.pathname,/^\/api\/runtime\/benchmark-snapshots\/([^/]+)\/observations$/);
+  if (req.method === 'POST' && benchmarkObservationMatch) {
+    const target=await resolveBenchmarkSnapshotScope(benchmarkObservationMatch[1]);
+    if(!principal?.platformAdmin){
+      if(target.projectId){
+        const scope=await resolveProjectScope(target.projectId);
+        await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+      }else{
+        const scope=await resolveWorkspaceScope(target.workspaceId);
+        await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+      }
+    }
+    json(res,201,{data:await addBenchmarkObservation(
+      benchmarkObservationMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const benchmarkCapabilityRunMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/capability-runs$/);
+  if (req.method === 'POST' && benchmarkCapabilityRunMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkCapabilityRunMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:write':'workspace:write',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createCapabilityBenchmarkRun(
+      benchmarkCapabilityRunMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/market-signals') {
+    const body=await readBody(req);
+    if(body.projectId){
+      const scope=await resolveProjectScope(body.projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createMarketSignal(body)});
+    return true;
+  }
+
+  const benchmarkChangeMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/change-events$/);
+  if (req.method === 'POST' && benchmarkChangeMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkChangeMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:write':'workspace:write',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createCompetitorChangeEvent(
+      benchmarkChangeMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/benchmark-decision-links') {
+    const body=await readBody(req);
+    const scope=await resolveProjectScope(body.projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await linkBenchmarkDecision(body)});
+    return true;
+  }
+
+  const benchmarkSubjectIntelMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/intelligence$/);
+  if (req.method === 'GET' && benchmarkSubjectIntelMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkSubjectIntelMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:read':'workspace:read',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await getBenchmarkSubjectIntelligence(
+      benchmarkSubjectIntelMatch[1],{asOf:url.searchParams.get('asOf')||new Date()}
+    )});
+    return true;
+  }
+
+  const projectCompetitiveMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/competitive-intelligence$/);
+  if (req.method === 'GET' && projectCompetitiveMatch) {
+    const projectId=projectCompetitiveMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectCompetitiveIntelligence(
+      projectId,{asOf:url.searchParams.get('asOf')||new Date()}
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/approval-requests') {
+    const body=await readBody(req);
+    if(body.projectId){
+      const scope=await resolveProjectScope(body.projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createApprovalRequest({
+      ...body,requestedByIdentityId:principal?.platformAdmin
+        ? body.requestedByIdentityId||null
+        : principal?.identityId||null
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/approval-inbox') {
+    const workspaceId=url.searchParams.get('workspaceId');
+    const projectId=url.searchParams.get('projectId')||null;
+    if(projectId){
+      const scope=await resolveProjectScope(projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await listApprovalInbox({
+      workspaceId,projectId,status:url.searchParams.get('status')||'PENDING',
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const approvalDecisionMatch=match(url.pathname,/^\/api\/runtime\/approval-requests\/([^/]+)\/decisions$/);
+  if (req.method === 'POST' && approvalDecisionMatch) {
+    const target=await resolveApprovalScope(approvalDecisionMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:write':'workspace:write',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await decideApproval(
+      approvalDecisionMatch[1],{
+        ...await readBody(req),
+        decidedByIdentityId:principal?.platformAdmin?null:principal?.identityId||null,
+        adminOverride:Boolean(principal?.platformAdmin)
+      }
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/approval-deadlines/refresh') {
+    const body=await readBody(req);
+    const scope=await resolveWorkspaceScope(body.workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await refreshApprovalDeadlines(body)});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/notifications') {
+    const workspaceId=url.searchParams.get('workspaceId');
+    const projectId=url.searchParams.get('projectId')||null;
+    const scope=projectId?await resolveProjectScope(projectId):await resolveWorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:projectId?'project:read':'workspace:read',
+      ...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listNotifications({
+      workspaceId,projectId,recipientIdentityId:url.searchParams.get('recipientIdentityId')||null,
+      status:url.searchParams.get('status')||null,limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const notificationMatch=match(url.pathname,/^\/api\/runtime\/notifications\/([^/]+)$/);
+  if (req.method === 'PATCH' && notificationMatch) {
+    const target=await resolveNotificationScope(notificationMatch[1]);
+    if(!principal?.platformAdmin){
+      const ownNotification=target.recipientIdentityId&&target.recipientIdentityId===principal?.identityId;
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:ownNotification?(target.projectId?'project:read':'workspace:read'):(target.projectId?'project:write':'workspace:write'),
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await updateNotification(notificationMatch[1],await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/activity') {
+    const workspaceId=url.searchParams.get('workspaceId');
+    const projectId=url.searchParams.get('projectId')||null;
+    const scope=projectId?await resolveProjectScope(projectId):await resolveWorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:projectId?'project:read':'workspace:read',
+      ...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listActivityEvents({
+      workspaceId,projectId,limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const projectVersionsMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/versions$/);
+  if (req.method === 'POST' && projectVersionsMatch) {
+    const projectId=projectVersionsMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,201,{data:await createProjectVersion(projectId,await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && projectVersionsMatch) {
+    const projectId=projectVersionsMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listProjectVersions(projectId)});
+    return true;
+  }
+
+  const projectVersionMatch=match(url.pathname,/^\/api\/runtime\/project-versions\/([^/]+)$/);
+  if (req.method === 'PATCH' && projectVersionMatch) {
+    const target=await resolveProjectVersionScope(projectVersionMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await updateProjectVersion(projectVersionMatch[1],await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/projects') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    let workflowTemplateId=body.workflowTemplateId||null;
+    if(body.domainPresetKey){
+      if(workflowTemplateId) throw Object.assign(
+        new Error('Use either domainPresetKey or workflowTemplateId, not both'),
+        {code:'PROJECT_WORKFLOW_SELECTION_CONFLICT',statusCode:409}
+      );
+      workflowTemplateId=await resolveDomainPresetWorkflow({
+        presetKey:body.domainPresetKey,projectTypeKey:body.projectType
+      });
+    }
+    const result=await createProject(body);
+    const data=workflowTemplateId
+      ? {...result,lifecycle:await bindProjectWorkflow(result.id,workflowTemplateId)}
+      : result;
+    json(res,201,{data});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/runs') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveProjectScope(body.projectId); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await createRun(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/tasks') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(body.runId); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await createTask(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/routes') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(body.runId); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await routeAndRecord(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/providers') {
+    requirePlatformAdmin(principal);
+    const result = await upsertProvider(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/models') {
+    requirePlatformAdmin(principal);
+    const result = await upsertModel(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/provider-registry') {
+    requirePlatformAdmin(principal);
+    const result = await listProviderRegistry();
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/pricing-versions') {
+    requirePlatformAdmin(principal);
+    const result = await createPricingVersion(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/pricing-versions') {
+    requirePlatformAdmin(principal);
+    const result = await listPricingVersions({
+      providerKey:url.searchParams.get('providerKey') || null,
+      modelKey:url.searchParams.get('modelKey') || null,
+      serviceTier:url.searchParams.get('serviceTier') || null,
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/quota-policies') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=body.subjectType==='WORKSPACE'?await resolveWorkspaceScope(body.subjectId):{tenantId:body.subjectId,workspaceId:null}; await assertAccess({principal,permission:'quota:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await upsertQuotaPolicy(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/quota-policies') {
+    const requestedWorkspace=url.searchParams.get('workspaceId')||null; const requestedTenant=url.searchParams.get('tenantId')||principal?.tenantId||null;
+    if(!principal?.platformAdmin){ const scope=requestedWorkspace?await resolveWorkspaceScope(requestedWorkspace):{tenantId:requestedTenant,workspaceId:null}; await assertAccess({principal,permission:'quota:read',...scope,method:req.method,path:url.pathname}); }
+    const result = await listQuotaPolicies({
+      tenantId:principal?.platformAdmin?(url.searchParams.get('tenantId') || null):principal.tenantId,
+      workspaceId:principal?.platformAdmin?(url.searchParams.get('workspaceId') || null):(principal.workspaceId || requestedWorkspace),
+      enabledOnly:url.searchParams.get('enabledOnly') === 'true',
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const workspaceMeterMatch = match(url.pathname, /^\/api\/runtime\/workspaces\/([^/]+)\/usage-meter$/);
+  if (req.method === 'GET' && workspaceMeterMatch) {
+    const meterScope=await resolveWorkspaceScope(workspaceMeterMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'usage:read',...meterScope,method:req.method,path:url.pathname});
+    const result = await getUsageMeter({
+      workspaceId:workspaceMeterMatch[1],
+      periodType:url.searchParams.get('periodType') || 'MONTH',
+      at:url.searchParams.get('at') || new Date(),
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const tenantMeterMatch = match(url.pathname, /^\/api\/runtime\/tenants\/([^/]+)\/usage-meter$/);
+  if (req.method === 'GET' && tenantMeterMatch) {
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'usage:read',tenantId:tenantMeterMatch[1],method:req.method,path:url.pathname});
+    const result = await getUsageMeter({
+      tenantId:tenantMeterMatch[1],
+      periodType:url.searchParams.get('periodType') || 'MONTH',
+      at:url.searchParams.get('at') || new Date(),
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const runQuotaMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/quota-evaluate$/);
+  if (req.method === 'POST' && runQuotaMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(runQuotaMatch[1]); await assertAccess({principal,permission:'quota:write',...scope,method:req.method,path:url.pathname}); }
+    const body = await readBody(req);
+    const result = await evaluateRunQuota({
+      runId:runQuotaMatch[1],
+      persist:body.persist !== false,
+      source:body.source || 'RUNTIME_API',
+      at:body.at || new Date(),
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/budget-policies') {
+    requirePlatformAdmin(principal);
+    const result = await upsertProjectBudgetPolicy(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  const providerHealthMatch = match(url.pathname, /^\/api\/runtime\/providers\/([^/]+)\/health$/);
+  if (req.method === 'PATCH' && providerHealthMatch) {
+    requirePlatformAdmin(principal);
+    const result = await setProviderHealth(providerHealthMatch[1], await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/tool-executions') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(body.runId); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await recordToolExecution(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/gate-results') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(body.runId); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await recordGateResult(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/qa-evidence') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(body.runId); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await recordQaEvidence(body);
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/context-packets') {
+    requirePlatformAdmin(principal);
+    const result = createEphemeralContextPacket(await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  const contextMetadataMatch = match(url.pathname, /^\/api\/runtime\/context-packets\/([^/]+)\/metadata$/);
+  if (req.method === 'GET' && contextMetadataMatch) {
+    requirePlatformAdmin(principal);
+    const result = getEphemeralContextPacketMetadata(contextMetadataMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const contextExecuteMatch = match(url.pathname, /^\/api\/runtime\/context-packets\/([^/]+)\/execute$/);
+  if (req.method === 'POST' && contextExecuteMatch) {
+    requirePlatformAdmin(principal);
+    const body = await readBody(req);
+    const packet = consumeEphemeralContextPacket(contextExecuteMatch[1]);
+    const result = await executeScriptContinuityAgent({
+      ...body,
+      query: body.query || packet.query,
+      scope: body.scope || packet.scope,
+      contextPacket: {
+        precedence: packet.precedence,
+        items: packet.items,
+      },
+    });
+    json(res, 200, {
+      data: {
+        ...result,
+        contextPacketId: packet.id,
+        contextPacketConsumed: true,
+        contextPacketHash: packet.contextHash,
+      },
+    });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/agent-executions') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(body.runId); await assertAccess({principal,permission:'agent:execute',...scope,method:req.method,path:url.pathname}); }
+    const result = await executeScriptContinuityAgent(body);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/orchestrate') {
+    requirePlatformAdmin(principal);
+    const result = await orchestrateContextPacket(await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const taskMatch = match(url.pathname, /^\/api\/runtime\/tasks\/([^/]+)$/);
+  if (req.method === 'PATCH' && taskMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveTaskScope(taskMatch[1]); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await updateTask(taskMatch[1], await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const observabilityMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/observability$/);
+  if (req.method === 'GET' && observabilityMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(observabilityMatch[1]); await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname}); }
+    const result = await getRunObservability(observabilityMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const runCostMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/cost-summary$/);
+  if (req.method === 'GET' && runCostMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(runCostMatch[1]); await assertAccess({principal,permission:'usage:read',...scope,method:req.method,path:url.pathname}); }
+    const result = await getRunCostSummary(runCostMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const projectCostMatch = match(url.pathname, /^\/api\/runtime\/projects\/([^/]+)\/cost-summary$/);
+  if (req.method === 'GET' && projectCostMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveProjectScope(projectCostMatch[1]); await assertAccess({principal,permission:'usage:read',...scope,method:req.method,path:url.pathname}); }
+    const result = await getProjectCostSummary(projectCostMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const budgetEvaluateMatch = match(url.pathname, /^\/api\/runtime\/projects\/([^/]+)\/budget-evaluate$/);
+  if (req.method === 'POST' && budgetEvaluateMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveProjectScope(budgetEvaluateMatch[1]); await assertAccess({principal,permission:'quota:write',...scope,method:req.method,path:url.pathname}); }
+    const body = await readBody(req);
+    const result = await evaluateBudgetPolicy({
+      projectId:budgetEvaluateMatch[1],
+      runId:body.runId || null,
+    });
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const knowledgeMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/knowledge-contexts$/);
+  if (req.method === 'POST' && knowledgeMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(knowledgeMatch[1]); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await addKnowledgeContexts(knowledgeMatch[1], await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+  if (req.method === 'GET' && knowledgeMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(knowledgeMatch[1]); await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname}); }
+    const items = await listKnowledgeContexts(knowledgeMatch[1]);
+    const fingerprint = await getKnowledgeContextFingerprint(knowledgeMatch[1]);
+    json(res, 200, { data: { runId: knowledgeMatch[1], fingerprint, items } });
+    return true;
+  }
+
+  const checkpointMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/checkpoints$/);
+  if (req.method === 'POST' && checkpointMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(checkpointMatch[1]); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await saveCheckpoint(checkpointMatch[1], await readBody(req));
+    json(res, 201, { data: result });
+    return true;
+  }
+
+  const latestMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/checkpoints\/latest$/);
+  if (req.method === 'GET' && latestMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(latestMatch[1]); await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname}); }
+    const result = await getLatestCheckpoint(latestMatch[1]);
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  const resumeMatch = match(url.pathname, /^\/api\/runtime\/runs\/([^/]+)\/resume$/);
+  if (req.method === 'POST' && resumeMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveRunScope(resumeMatch[1]); await assertAccess({principal,permission:'run:write',...scope,method:req.method,path:url.pathname}); }
+    const result = await resumeRun(resumeMatch[1], await readBody(req));
+    json(res, 200, { data: result });
+    return true;
+  }
+
+  json(res, 404, { error: 'RUNTIME_ROUTE_NOT_FOUND' });
+  return true;
+};
+));
+    if(req.method==='POST'&&m){
+      const projectId=m[1];
+      const scope=await resolveProductProjectScope(projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+      json(res,201,{data:await handler(projectId,await readBody(req),principal?.identityId||null)});
+      return true;
+    }
+  }
+
+  const productGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-gates\/([^/]+)\/evaluate$/);
+  if (req.method === 'POST' && productGateMatch) {
+    const projectId=productGateMatch[1],gateKey=decodeURIComponent(productGateMatch[2]);
+    const scope=await resolveProductProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateProductGate(
+      projectId,gateKey,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const productRequirementMatch=match(url.pathname,/^\/api\/runtime\/product-requirements\/([^/]+)$/);
+  if (req.method === 'GET' && productRequirementMatch) {
+    const target=await resolveProductRequirementScope(productRequirementMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...target,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getProductRequirement(productRequirementMatch[1])});
+    return true;
+  }
+
+  const productRequirementVersionMatch=match(url.pathname,/^\/api\/runtime\/product-requirements\/([^/]+)\/versions$/);
+  if (req.method === 'POST' && productRequirementVersionMatch) {
+    const target=await resolveProductRequirementScope(productRequirementVersionMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...target,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await reviseProductRequirement(
+      productRequirementVersionMatch[1],await readBody(req),principal?.identityId||null
+    )});
     return true;
   }
 
