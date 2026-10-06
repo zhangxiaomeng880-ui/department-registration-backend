@@ -395,7 +395,11 @@ const executeCurrentStage=async({
   });
 
   await finishAttempt(attemptId,{
-    status:transitionInput.transitionType==='ESCALATE'?'BLOCKED':'PASS',
+    status:transitionInput.transitionType==='PASS'
+      ? 'PASS'
+      : transitionInput.transitionType==='ESCALATE'
+        ? 'BLOCKED'
+        : transitionInput.transitionType,
     invocationCount,passedInvocationCount,failedInvocationCount,
     gateStatus:transitionInput.gateStatus,
     transitionType:transitionInput.transitionType,
