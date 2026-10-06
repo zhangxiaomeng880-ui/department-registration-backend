@@ -70,6 +70,12 @@ import {
 } from './eval-shadow.mjs';
 import { createEvalReliabilitySnapshot,getEvalReliabilitySnapshot } from './eval-reliability.mjs';
 import {
+  upsertProjectType,listProjectTypes,upsertCapability,listCapabilities,upsertAgentProfile,
+  grantAgentCapability,bindProjectTypeCapability,createWorkflowTemplate,addWorkflowMilestone,
+  addWorkflowStage,addStageCapabilityRequirement,freezeWorkflowTemplate,getWorkflowTemplate,
+  bindProjectWorkflow,getProjectLifecycle
+} from './core-meta-registry.mjs';
+import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
   getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
@@ -745,11 +751,117 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/runtime/project-types') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await upsertProjectType(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/project-types') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listProjectTypes({status:url.searchParams.get('status')||null})});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/capabilities') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await upsertCapability(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/capabilities') {
+    requirePlatformAdmin(principal);
+    const routable=url.searchParams.get('routable');
+    json(res,200,{data:await listCapabilities({
+      capabilityType:url.searchParams.get('capabilityType')||null,
+      status:url.searchParams.get('status')||null,
+      routable:routable==null?null:routable==='true'
+    })});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/agent-profiles') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await upsertAgentProfile(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/agent-capability-grants') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await grantAgentCapability(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/project-type-capabilities') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await bindProjectTypeCapability(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/workflow-templates') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createWorkflowTemplate(await readBody(req))});
+    return true;
+  }
+
+  const workflowMilestoneMatch=match(url.pathname,/^\/api\/runtime\/workflow-templates\/([^/]+)\/milestones$/);
+  if (req.method === 'POST' && workflowMilestoneMatch) {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await addWorkflowMilestone(workflowMilestoneMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const workflowStageMatch=match(url.pathname,/^\/api\/runtime\/workflow-templates\/([^/]+)\/stages$/);
+  if (req.method === 'POST' && workflowStageMatch) {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await addWorkflowStage(workflowStageMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const stageRequirementMatch=match(url.pathname,/^\/api\/runtime\/workflow-stages\/([^/]+)\/requirements$/);
+  if (req.method === 'POST' && stageRequirementMatch) {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await addStageCapabilityRequirement(stageRequirementMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const workflowFreezeMatch=match(url.pathname,/^\/api\/runtime\/workflow-templates\/([^/]+)\/freeze$/);
+  if (req.method === 'POST' && workflowFreezeMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await freezeWorkflowTemplate(workflowFreezeMatch[1])});
+    return true;
+  }
+
+  const workflowTemplateMatch=match(url.pathname,/^\/api\/runtime\/workflow-templates\/([^/]+)$/);
+  if (req.method === 'GET' && workflowTemplateMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getWorkflowTemplate(workflowTemplateMatch[1])});
+    return true;
+  }
+
+  const projectWorkflowBindMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/workflow-bind$/);
+  if (req.method === 'POST' && projectWorkflowBindMatch) {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){ const scope=await resolveProjectScope(projectWorkflowBindMatch[1]); await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname}); }
+    json(res,200,{data:await bindProjectWorkflow(projectWorkflowBindMatch[1],body.workflowTemplateId)});
+    return true;
+  }
+
+  const projectLifecycleMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/lifecycle$/);
+  if (req.method === 'GET' && projectLifecycleMatch) {
+    if(!principal?.platformAdmin){ const scope=await resolveProjectScope(projectLifecycleMatch[1]); await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname}); }
+    json(res,200,{data:await getProjectLifecycle(projectLifecycleMatch[1])});
+    return true;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/runtime/projects') {
     const body=await readBody(req);
     if(!principal?.platformAdmin){ const scope=await resolveWorkspaceScope(body.workspaceId); await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname}); }
     const result = await createProject(body);
-    json(res, 201, { data: result });
+    const data=body.workflowTemplateId
+      ? {...result,lifecycle:await bindProjectWorkflow(result.id,body.workflowTemplateId)}
+      : result;
+    json(res, 201, { data });
     return true;
   }
 
