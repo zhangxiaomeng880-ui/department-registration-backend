@@ -72,6 +72,13 @@ const normalizeRequirement=row=>({
   capabilityType:row.capability_type,capabilityKey:row.capability_key||null,routingMode:row.routing_mode,
   requirementMode:row.requirement_mode,priority:Number(row.priority),constraints:parseJson(row.constraints_json)
 });
+const normalizeKnowledgePolicy=row=>({
+  id:row.id,workflowStageId:row.workflow_stage_id,policyKey:row.policy_key,sourceKey:row.source_key,
+  queryTemplate:row.query_template,contextRole:row.context_role,required:Boolean(row.required),
+  maxItems:Number(row.max_items),allowedStatuses:parseJson(row.allowed_statuses_json)||[],
+  injectionMode:row.injection_mode,writebackMode:row.writeback_mode,
+  writebackTargetPath:row.writeback_target_path||null,config:parseJson(row.config_json)
+});
 
 export const upsertProjectType=async input=>{
   if(!input?.projectTypeKey||!input?.displayName) throw errorOf(
@@ -363,6 +370,48 @@ export const addStageCapabilityRequirement=async(stageId,input)=>{
   return normalizeRequirement(rows[0]);
 };
 
+export const addStageKnowledgePolicy=async(stageId,input)=>{
+  if(!input?.policyKey||!input?.sourceKey||!input?.queryTemplate) throw errorOf(
+    'policyKey, sourceKey and queryTemplate are required','INVALID_STAGE_KNOWLEDGE_POLICY'
+  );
+  rejectSecrets(input);
+  const allowedStatuses=Array.isArray(input.allowedStatuses)&&input.allowedStatuses.length
+    ? input.allowedStatuses.map(value=>String(value).toUpperCase())
+    : ['CURRENT','FACT','RULE','FINAL'];
+  const injectionMode=String(input.injectionMode||'APPEND_CONTEXT').toUpperCase();
+  const writebackMode=String(input.writebackMode||'NONE').toUpperCase();
+  if(!['APPEND_CONTEXT','STRUCTURED_CONTEXT'].includes(injectionMode)) throw errorOf(
+    'Unsupported knowledge injectionMode','INVALID_KNOWLEDGE_INJECTION_MODE'
+  );
+  if(!['NONE','PROPOSE'].includes(writebackMode)) throw errorOf(
+    'Unsupported knowledge writebackMode','INVALID_KNOWLEDGE_WRITEBACK_MODE'
+  );
+  const db=getRuntimePool();
+  const [stages]=await db.execute(
+    `SELECT s.id,t.status AS template_status FROM workflow_template_stages s
+       JOIN workflow_templates t ON t.id=s.workflow_template_id WHERE s.id=?`,[stageId]
+  );
+  if(!stages.length) throw errorOf('Workflow stage not found','WORKFLOW_STAGE_NOT_FOUND',404);
+  if(stages[0].template_status!=='DRAFT') throw errorOf(
+    'Frozen workflow template is immutable','WORKFLOW_TEMPLATE_IMMUTABLE',409
+  );
+  const id=input.id||randomUUID();
+  await db.execute(
+    `INSERT INTO stage_knowledge_policies
+      (id,workflow_stage_id,policy_key,source_key,query_template,context_role,required,max_items,
+       allowed_statuses_json,injection_mode,writeback_mode,writeback_target_path,config_json)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      id,stageId,input.policyKey,input.sourceKey,input.queryTemplate,input.contextRole||'REFERENCE',
+      input.required===false?0:1,Math.max(1,Math.min(24,Number(input.maxItems)||12)),
+      asJson(allowedStatuses),injectionMode,writebackMode,input.writebackTargetPath||null,
+      asJson(input.config||null)
+    ]
+  );
+  const [rows]=await db.execute('SELECT * FROM stage_knowledge_policies WHERE id=?',[id]);
+  return normalizeKnowledgePolicy(rows[0]);
+};
+
 export const getWorkflowTemplate=async templateId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute('SELECT * FROM workflow_templates WHERE id=?',[templateId]);
@@ -374,23 +423,35 @@ export const getWorkflowTemplate=async templateId=>{
     'SELECT * FROM workflow_template_stages WHERE workflow_template_id=? ORDER BY sequence_no,id',[templateId]
   );
   const stageIds=stageRows.map(x=>x.id);
-  let requirementRows=[];
+  let requirementRows=[],knowledgePolicyRows=[];
   if(stageIds.length){
     const placeholders=stageIds.map(()=>'?').join(',');
     [requirementRows]=await db.execute(
       `SELECT * FROM stage_capability_requirements WHERE workflow_stage_id IN (${placeholders})
        ORDER BY workflow_stage_id,priority,requirement_key`,stageIds
     );
+    [knowledgePolicyRows]=await db.execute(
+      `SELECT * FROM stage_knowledge_policies WHERE workflow_stage_id IN (${placeholders})
+       ORDER BY workflow_stage_id,policy_key`,stageIds
+    );
   }
-  const byStage=new Map();
+  const byStage=new Map(),knowledgeByStage=new Map();
   for(const row of requirementRows){
     if(!byStage.has(row.workflow_stage_id)) byStage.set(row.workflow_stage_id,[]);
     byStage.get(row.workflow_stage_id).push(normalizeRequirement(row));
   }
+  for(const row of knowledgePolicyRows){
+    if(!knowledgeByStage.has(row.workflow_stage_id)) knowledgeByStage.set(row.workflow_stage_id,[]);
+    knowledgeByStage.get(row.workflow_stage_id).push(normalizeKnowledgePolicy(row));
+  }
   return {
     ...normalizeWorkflow(rows[0]),
     milestones:milestoneRows.map(normalizeMilestone),
-    stages:stageRows.map(row=>({...normalizeStage(row),requirements:byStage.get(row.id)||[]}))
+    stages:stageRows.map(row=>({
+      ...normalizeStage(row),
+      requirements:byStage.get(row.id)||[],
+      knowledgePolicies:knowledgeByStage.get(row.id)||[]
+    }))
   };
 };
 
@@ -472,6 +533,12 @@ export const freezeWorkflowTemplate=async templateId=>{
       requirements:x.requirements.map(r=>({
         requirementKey:r.requirementKey,capabilityType:r.capabilityType,capabilityKey:r.capabilityKey,
         routingMode:r.routingMode,requirementMode:r.requirementMode,priority:r.priority,constraints:r.constraints
+      })),
+      knowledgePolicies:(x.knowledgePolicies||[]).map(k=>({
+        policyKey:k.policyKey,sourceKey:k.sourceKey,queryTemplate:k.queryTemplate,contextRole:k.contextRole,
+        required:k.required,maxItems:k.maxItems,allowedStatuses:k.allowedStatuses,
+        injectionMode:k.injectionMode,writebackMode:k.writebackMode,
+        writebackTargetPath:k.writebackTargetPath,config:k.config
       }))
     }))
   };
