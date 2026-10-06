@@ -239,6 +239,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   title VARCHAR(255) NOT NULL,
   body_text TEXT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'UNREAD',
+  dedupe_key VARCHAR(191) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   read_at TIMESTAMP(6) NULL,
   dismissed_at TIMESTAMP(6) NULL,
@@ -246,6 +247,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   CONSTRAINT fk_m263_notification_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
   CONSTRAINT fk_m263_notification_project FOREIGN KEY (project_id) REFERENCES projects(id),
   CONSTRAINT fk_m263_notification_recipient FOREIGN KEY (recipient_identity_id) REFERENCES identities(id),
+  UNIQUE KEY uq_m263_notification_dedupe (dedupe_key),
   INDEX idx_m263_notification_inbox (workspace_id,recipient_identity_id,status,created_at),
   INDEX idx_m263_notification_project (project_id,created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
