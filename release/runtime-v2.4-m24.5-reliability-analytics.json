@@ -1,0 +1,143 @@
+{
+  "milestone": "M24.5",
+  "release": "AI Native Runtime V2.4",
+  "title": "Reliability Analytics",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.4-m24.5-reliability-analytics",
+    "sha": "85d66fd5a42901da895173a76446f0439b4db63c",
+    "predecessorMilestone": "M24.4",
+    "predecessorSha": "d82d76ac4312200946430bad3f00a370851cc15a"
+  },
+  "scope": {
+    "readOnlyAnalytics": true,
+    "newModelExecution": false,
+    "businessSideEffects": false,
+    "access": "platform administrator only",
+    "snapshotPolicyVersion": "eval-reliability-v1",
+    "maxWindowDays": 90,
+    "supportedScopes": [
+      "global time window",
+      "candidate Runtime SHA within time window"
+    ]
+  },
+  "metrics": {
+    "eval": [
+      "run pass/fail/other counts and pass rate",
+      "case pass/fail counts and pass rate",
+      "assertion pass/fail counts and pass rate",
+      "top case errors",
+      "top assertion failure codes",
+      "execution duration p50/p95/max",
+      "estimated cost p50/p95/max and currencies"
+    ],
+    "regression": [
+      "comparison PASS/BLOCK counts",
+      "release gate PASS/BLOCK counts",
+      "blocker totals and top blocker codes",
+      "case regressions/improvements",
+      "assertion regressions/improvements",
+      "assertion-set/router/evidence drift counts"
+    ],
+    "shadow": [
+      "shadow PASS/FAIL/ERROR/in-progress counts",
+      "terminal pass rate",
+      "terminal Eval Run linkage coverage",
+      "production source-body read violations",
+      "customer billing eligibility violations"
+    ],
+    "runtimeBreakdown": [
+      "per candidate Runtime SHA run totals",
+      "pass/fail/other counts",
+      "pass rate",
+      "failed cases",
+      "failed assertions"
+    ]
+  },
+  "integrity": {
+    "immutableSnapshotTable": "eval_reliability_snapshots",
+    "snapshotSha256": true,
+    "sourceWatermark": true,
+    "idempotencyConflictDetection": true,
+    "duplicateSnapshotDeduplication": true,
+    "apiUsesIso8601": true,
+    "mysqlTimestampSerialization": "UTC-compatible MySQL TIMESTAMP parameter normalization"
+  },
+  "schema": {
+    "migration": "023_eval_reliability_analytics.sql",
+    "migrationsTotal": 24,
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=24 skipped=0 total=24",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=24 total=24",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=23 total=24"
+  },
+  "api": {
+    "createSnapshot": "POST /api/runtime/eval-reliability-snapshots",
+    "snapshotDetail": "GET /api/runtime/eval-reliability-snapshots/:snapshotId",
+    "authorization": "platform administrator",
+    "unauthenticatedContract": "401"
+  },
+  "ci": {
+    "workflow": "Runtime v2.4 M24.5 Reliability Analytics Gate",
+    "runId": 37423297195,
+    "headSha": "85d66fd5a42901da895173a76446f0439b4db63c",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "v23BillingLedgerRegression": "G22_5_BILLING_LEDGER_PASS",
+    "v23BillingOperationsRegression": "G23_1_BILLING_OPERATIONS_PASS",
+    "v23CollectionsRegression": "G23_2_COLLECTIONS_PASS",
+    "v23RevenueAnalyticsRegression": "G23_3_REVENUE_ANALYTICS_PASS",
+    "v23FinancialAdjustmentsRegression": "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+    "v23FinanceCloseRegression": "G23_5_FINANCE_CLOSE_PASS",
+    "v23CommercialFinanceRcE2E": "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+    "m241EvalReplayContract": "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+    "m242EvalRunnerAssertionEngine": "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+    "m242StagingSchemaCompatibility": "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "m243RegressionGate": "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+    "m244StagingSchemaCompatibility": "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+    "m244ProductionSafeShadowEval": "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+    "m245ReliabilityAnalytics": "G24_5_RELIABILITY_ANALYTICS_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "7d556109-e4ef-49d1-b4f8-4f2a943b4f72",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "85d66fd5a42901da895173a76446f0439b4db63c",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration023Applied": true
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true
+  },
+  "evidenceStrategy": {
+    "evidenceBranch": "release/ai-native-runtime-v2.4-m24.5-evidence",
+    "reason": "Keep evidence-only commits separate from the Railway-linked runtime candidate branch to avoid an unnecessary staging redeploy."
+  },
+  "nextMilestone": "M24.6 Reliability RC Freeze",
+  "conclusion": "M24.5 Reliability Analytics is STAGING PASS / FROZEN. It provides hash-verifiable reliability snapshots over Eval, Regression Gate and Shadow Eval evidence, supports both global and Runtime-SHA-scoped windows, surfaces failure/drift/latency/cost/safety indicators, adds no new model execution or business side effects, and is deployed successfully in Staging. Production remains on V2.3."
+}
