@@ -80,3 +80,20 @@ VALUES
   ('AIGC_CONTENT','MV','MV / Music Video','ACTIVE',JSON_OBJECT('domain','AIGC')),
   ('AIGC_CONTENT','AD_CAMPAIGN','Ad / Campaign Creative','ACTIVE',JSON_OBJECT('domain','AIGC')),
   ('AIGC_CONTENT','MULTIMODAL_CONTENT','Multimodal Content','ACTIVE',JSON_OBJECT('domain','AIGC'));
+
+
+CREATE TABLE IF NOT EXISTS project_knowledge_bindings (
+  project_id CHAR(36) NOT NULL,
+  binding_key VARCHAR(128) NOT NULL,
+  source_key VARCHAR(128) NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  config_json JSON NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (project_id,binding_key),
+  CONSTRAINT fk_m256_project_knowledge_project
+    FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_m256_project_knowledge_source
+    FOREIGN KEY (source_key) REFERENCES knowledge_sources(source_key),
+  INDEX idx_m256_project_knowledge_source (source_key,status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
