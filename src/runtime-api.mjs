@@ -147,6 +147,11 @@ import {
   listProductModules,createEngineeringChangeset,createBuildRecord,createPreviewDeployment,
   createSmokeEvidence,evaluateEngineeringGate,getEngineeringState,resolveEngineeringProjectScope
 } from './product-engineering-preview.mjs';
+import {
+  createAcceptanceRun,evaluateAcceptanceGate,createQaPlan,createQaExecution,
+  createQaRetest,createQaRegression,evaluateQaGate,getProductQualityState,
+  resolveQualityProjectScope,resolveQaDefectScope
+} from './product-acceptance-qa.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1420,6 +1425,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const productQualityDomainMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-quality-domain$/);
+  if (req.method === 'GET' && productQualityDomainMatch) {
+    const projectId=productQualityDomainMatch[1];
+    const scope=await resolveQualityProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getProductQualityState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1443,7 +1459,11 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-engineering-changesets',createEngineeringChangeset],
     ['product-build-records',createBuildRecord],
     ['product-preview-deployments',createPreviewDeployment],
-    ['product-smoke-evidence',createSmokeEvidence]
+    ['product-smoke-evidence',createSmokeEvidence],
+    ['product-acceptance-runs',createAcceptanceRun],
+    ['product-qa-plans',createQaPlan],
+    ['product-qa-executions',createQaExecution],
+    ['product-qa-regressions',createQaRegression]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1472,12 +1492,27 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       data=await evaluateAiContractGate(projectId,body,principal?.identityId||null);
     }else if(gateKey==='G-PD-ENGINEERING'){
       data=await evaluateEngineeringGate(projectId,body,principal?.identityId||null);
+    }else if(gateKey==='G-PD-ACCEPTANCE'){
+      data=await evaluateAcceptanceGate(projectId,body,principal?.identityId||null);
+    }else if(gateKey==='G-PD-QA'){
+      data=await evaluateQaGate(projectId,body,principal?.identityId||null);
     }else if(['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey)){
       data=await evaluateProductDeliveryGate(projectId,gateKey,body,principal?.identityId||null);
     }else{
       data=await evaluateProductGate(projectId,gateKey,body,principal?.identityId||null);
     }
     json(res,200,{data});
+    return true;
+  }
+
+  const qaDefectRetestMatch=match(url.pathname,/^\/api\/runtime\/qa-defects\/([^/]+)\/retests$/);
+  if (req.method === 'POST' && qaDefectRetestMatch) {
+    const defectId=qaDefectRetestMatch[1];
+    const scope=await resolveQaDefectScope(defectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createQaRetest(defectId,await readBody(req),principal?.identityId||null)});
     return true;
   }
 
