@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { bootstrapBuiltinDomainWorkflowSpecs } from '../src/domain-workflow-specs.mjs';
+import { getRuntimePool } from '../src/runtime-db.mjs';
 
 const baseUrl=process.env.RUNTIME_API_BASE_URL||'http://127.0.0.1:4800';
 const token=process.env.RUNTIME_API_TOKEN||'m256-token';
@@ -128,4 +129,5 @@ r=await request('POST',`/api/runtime/workflow-templates/${templateId}/freeze`,{}
 assert.equal(r.status,409,JSON.stringify(r.body));
 assert.equal(r.body.error,'WORKFLOW_DEFERRED_REQUIREMENTS');
 
+await getRuntimePool().end();
 console.log('G25_6_DOMAIN_WORKFLOW_SPECS_PASS');
