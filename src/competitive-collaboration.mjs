@@ -125,12 +125,12 @@ export const resolveApprovalScope=async approvalId=>{
 export const resolveNotificationScope=async notificationId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute(
-    'SELECT id,tenant_id,workspace_id,project_id FROM notifications WHERE id=?',[notificationId]
+    'SELECT id,tenant_id,workspace_id,project_id,recipient_identity_id FROM notifications WHERE id=?',[notificationId]
   );
   if(!rows.length) throw errorOf('Notification not found','NOTIFICATION_NOT_FOUND',404);
   return {
     notificationId,tenantId:rows[0].tenant_id,workspaceId:rows[0].workspace_id,
-    projectId:rows[0].project_id||null
+    projectId:rows[0].project_id||null,recipientIdentityId:rows[0].recipient_identity_id||null
   };
 };
 
