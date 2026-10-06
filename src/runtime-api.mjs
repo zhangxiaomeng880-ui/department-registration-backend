@@ -114,6 +114,14 @@ import {
   updateProjectVersion,resolveProjectVersionScope,linkMilestoneVersion,
   getProjectIntelligence,refreshProjectIntelligence
 } from './milestone-intelligence.mjs';
+import {
+  createBenchmarkDimension,createBenchmarkSubject,createBenchmarkSnapshot,addBenchmarkObservation,
+  createCapabilityBenchmarkRun,createMarketSignal,createCompetitorChangeEvent,linkBenchmarkDecision,
+  getBenchmarkSubjectIntelligence,getProjectCompetitiveIntelligence,
+  createApprovalRequest,decideApproval,refreshApprovalDeadlines,listApprovalInbox,
+  listNotifications,updateNotification,listActivityEvents,
+  resolveBenchmarkSubjectScope,resolveBenchmarkSnapshotScope,resolveApprovalScope,resolveNotificationScope
+} from './competitive-collaboration.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1425,6 +1433,283 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     const body=await readBody(req);
     json(res,201,{data:await createCapacitySnapshot({
       ...body,projectId,targetType:'PROJECT',targetId:projectId
+    })});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/benchmark-dimensions') {
+    const body=await readBody(req);
+    const scope=await resolveWorkspaceScope(body.workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createBenchmarkDimension(body)});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/benchmark-subjects') {
+    const body=await readBody(req);
+    if(body.projectId){
+      const scope=await resolveProjectScope(body.projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createBenchmarkSubject(body)});
+    return true;
+  }
+
+  const benchmarkSubjectSnapshotMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/snapshots$/);
+  if (req.method === 'POST' && benchmarkSubjectSnapshotMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkSubjectSnapshotMatch[1]);
+    if(!principal?.platformAdmin){
+      if(target.projectId){
+        const scope=await resolveProjectScope(target.projectId);
+        await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+      }else{
+        const scope=await resolveWorkspaceScope(target.workspaceId);
+        await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+      }
+    }
+    json(res,201,{data:await createBenchmarkSnapshot(
+      benchmarkSubjectSnapshotMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const benchmarkObservationMatch=match(url.pathname,/^\/api\/runtime\/benchmark-snapshots\/([^/]+)\/observations$/);
+  if (req.method === 'POST' && benchmarkObservationMatch) {
+    const target=await resolveBenchmarkSnapshotScope(benchmarkObservationMatch[1]);
+    if(!principal?.platformAdmin){
+      if(target.projectId){
+        const scope=await resolveProjectScope(target.projectId);
+        await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+      }else{
+        const scope=await resolveWorkspaceScope(target.workspaceId);
+        await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+      }
+    }
+    json(res,201,{data:await addBenchmarkObservation(
+      benchmarkObservationMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const benchmarkCapabilityRunMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/capability-runs$/);
+  if (req.method === 'POST' && benchmarkCapabilityRunMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkCapabilityRunMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:write':'workspace:write',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createCapabilityBenchmarkRun(
+      benchmarkCapabilityRunMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/market-signals') {
+    const body=await readBody(req);
+    if(body.projectId){
+      const scope=await resolveProjectScope(body.projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createMarketSignal(body)});
+    return true;
+  }
+
+  const benchmarkChangeMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/change-events$/);
+  if (req.method === 'POST' && benchmarkChangeMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkChangeMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:write':'workspace:write',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createCompetitorChangeEvent(
+      benchmarkChangeMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/benchmark-decision-links') {
+    const body=await readBody(req);
+    const scope=await resolveProjectScope(body.projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await linkBenchmarkDecision(body)});
+    return true;
+  }
+
+  const benchmarkSubjectIntelMatch=match(url.pathname,/^\/api\/runtime\/benchmark-subjects\/([^/]+)\/intelligence$/);
+  if (req.method === 'GET' && benchmarkSubjectIntelMatch) {
+    const target=await resolveBenchmarkSubjectScope(benchmarkSubjectIntelMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:read':'workspace:read',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await getBenchmarkSubjectIntelligence(
+      benchmarkSubjectIntelMatch[1],{asOf:url.searchParams.get('asOf')||new Date()}
+    )});
+    return true;
+  }
+
+  const projectCompetitiveMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/competitive-intelligence$/);
+  if (req.method === 'GET' && projectCompetitiveMatch) {
+    const projectId=projectCompetitiveMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectCompetitiveIntelligence(
+      projectId,{asOf:url.searchParams.get('asOf')||new Date()}
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/approval-requests') {
+    const body=await readBody(req);
+    if(body.projectId){
+      const scope=await resolveProjectScope(body.projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,201,{data:await createApprovalRequest({
+      ...body,requestedByIdentityId:principal?.platformAdmin
+        ? body.requestedByIdentityId||null
+        : principal?.identityId||null
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/approval-inbox') {
+    const workspaceId=url.searchParams.get('workspaceId');
+    const projectId=url.searchParams.get('projectId')||null;
+    if(projectId){
+      const scope=await resolveProjectScope(projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+      });
+    }else{
+      const scope=await resolveWorkspaceScope(workspaceId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await listApprovalInbox({
+      workspaceId,projectId,status:url.searchParams.get('status')||'PENDING',
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const approvalDecisionMatch=match(url.pathname,/^\/api\/runtime\/approval-requests\/([^/]+)\/decisions$/);
+  if (req.method === 'POST' && approvalDecisionMatch) {
+    const target=await resolveApprovalScope(approvalDecisionMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:target.projectId?'project:write':'workspace:write',
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await decideApproval(
+      approvalDecisionMatch[1],{
+        ...await readBody(req),
+        decidedByIdentityId:principal?.platformAdmin?null:principal?.identityId||null,
+        adminOverride:Boolean(principal?.platformAdmin)
+      }
+    )});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/approval-deadlines/refresh') {
+    const body=await readBody(req);
+    const scope=await resolveWorkspaceScope(body.workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await refreshApprovalDeadlines(body)});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/notifications') {
+    const workspaceId=url.searchParams.get('workspaceId');
+    const projectId=url.searchParams.get('projectId')||null;
+    const scope=projectId?await resolveProjectScope(projectId):await resolveWorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:projectId?'project:read':'workspace:read',
+      ...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listNotifications({
+      workspaceId,projectId,recipientIdentityId:url.searchParams.get('recipientIdentityId')||null,
+      status:url.searchParams.get('status')||null,limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const notificationMatch=match(url.pathname,/^\/api\/runtime\/notifications\/([^/]+)$/);
+  if (req.method === 'PATCH' && notificationMatch) {
+    const target=await resolveNotificationScope(notificationMatch[1]);
+    if(!principal?.platformAdmin){
+      const ownNotification=target.recipientIdentityId&&target.recipientIdentityId===principal?.identityId;
+      const scope=target.projectId
+        ? await resolveProjectScope(target.projectId)
+        : await resolveWorkspaceScope(target.workspaceId);
+      await assertAccess({
+        principal,permission:ownNotification?(target.projectId?'project:read':'workspace:read'):(target.projectId?'project:write':'workspace:write'),
+        ...scope,method:req.method,path:url.pathname
+      });
+    }
+    json(res,200,{data:await updateNotification(notificationMatch[1],await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/activity') {
+    const workspaceId=url.searchParams.get('workspaceId');
+    const projectId=url.searchParams.get('projectId')||null;
+    const scope=projectId?await resolveProjectScope(projectId):await resolveWorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:projectId?'project:read':'workspace:read',
+      ...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listActivityEvents({
+      workspaceId,projectId,limit:url.searchParams.get('limit')||100
     })});
     return true;
   }
