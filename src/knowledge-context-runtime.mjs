@@ -48,15 +48,15 @@ export const prepareStageKnowledgeContext=async({
   const policyContexts=[];
   const db=getRuntimePool();
   for(const policy of policies){
-    const resolvedSourceKey=await resolveProjectSourceKey(projectId,policy.sourceKey,db);
     const raw=knowledgePackets?.[stage.stageKey]?.[policy.policyKey];
     if(!raw){
       if(policy.required) throw errorOf(
         'Required knowledge context is missing','REQUIRED_KNOWLEDGE_CONTEXT_MISSING',409,
-        {stageKey:stage.stageKey,policyKey:policy.policyKey,sourceKey:resolvedSourceKey,bindingKey:policy.sourceKey}
+        {stageKey:stage.stageKey,policyKey:policy.policyKey,bindingKey:policy.sourceKey}
       );
       continue;
     }
+    const resolvedSourceKey=await resolveProjectSourceKey(projectId,policy.sourceKey,db);
     if(!Array.isArray(raw.items)||!raw.items.length){
       if(policy.required) throw errorOf(
         'Required knowledge context contains no items','REQUIRED_KNOWLEDGE_CONTEXT_EMPTY',409,
