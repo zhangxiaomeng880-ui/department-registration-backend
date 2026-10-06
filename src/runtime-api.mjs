@@ -2206,7 +2206,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   const productGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-gates\/([^/]+)\/evaluate$/);
   if (req.method === 'POST' && productGateMatch) {
-    const projectId=productGateMatch[1],gateKey=decodeURIComponent(productGateMatch[2]);
+    const projectId=productGateMatch[1];
+    const gateKey=decodeURIComponent(productGateMatch[2]);
     const scope=await resolveProductProjectScope(projectId);
     if(!principal?.platformAdmin) await assertAccess({
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
