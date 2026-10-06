@@ -139,6 +139,10 @@ import {
   evaluateProductDeliveryGate,getProductDeliveryState,getDesignContract,getTechnicalContract,
   resolveDesignContractScope,resolveTechnicalContractScope
 } from './product-development-delivery.mjs';
+import {
+  createAiPromptVersion,createAiContract,reviseAiContract,evaluateAiContractGate,
+  getAiContract,getAiProductState,resolveAiContractScope
+} from './product-ai-contract.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1385,6 +1389,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const productAiDomainMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-ai-domain$/);
+  if (req.method === 'GET' && productAiDomainMatch) {
+    const projectId=productAiDomainMatch[1];
+    const scope=await resolveProductProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAiProductState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1402,7 +1417,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-architecture-decisions',createArchitectureDecision],
     ['product-delivery-plans',createProductDeliveryPlan],
     ['product-design-contracts',createDesignContract],
-    ['product-technical-contracts',createTechnicalContract]
+    ['product-technical-contracts',createTechnicalContract],
+    ['product-ai-prompt-versions',createAiPromptVersion],
+    ['product-ai-contracts',createAiContract]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1426,10 +1443,15 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     const body=await readBody(req);
-    const m272Gate=['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey);
-    json(res,200,{data:await (m272Gate?evaluateProductDeliveryGate:evaluateProductGate)(
-      projectId,gateKey,body,principal?.identityId||null
-    )});
+    let data;
+    if(gateKey==='G-PD-AI-CONTRACT'){
+      data=await evaluateAiContractGate(projectId,body,principal?.identityId||null);
+    }else if(['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey)){
+      data=await evaluateProductDeliveryGate(projectId,gateKey,body,principal?.identityId||null);
+    }else{
+      data=await evaluateProductGate(projectId,gateKey,body,principal?.identityId||null);
+    }
+    json(res,200,{data});
     return true;
   }
 
@@ -1495,6 +1517,28 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     });
     json(res,201,{data:await reviseTechnicalContract(
       technicalContractVersionMatch[1],await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const aiContractMatch=match(url.pathname,/^\/api\/runtime\/product-ai-contracts\/([^/]+)$/);
+  if (req.method === 'GET' && aiContractMatch) {
+    const target=await resolveAiContractScope(aiContractMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...target,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAiContract(aiContractMatch[1])});
+    return true;
+  }
+
+  const aiContractVersionMatch=match(url.pathname,/^\/api\/runtime\/product-ai-contracts\/([^/]+)\/versions$/);
+  if (req.method === 'POST' && aiContractVersionMatch) {
+    const target=await resolveAiContractScope(aiContractVersionMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...target,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await reviseAiContract(
+      aiContractVersionMatch[1],await readBody(req),principal?.identityId||null
     )});
     return true;
   }
