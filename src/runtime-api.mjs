@@ -84,6 +84,11 @@ import {
   decideKnowledgeWriteback,getKnowledgeWriteback,listKnowledgeWritebacks
 } from './knowledge-context-runtime.mjs';
 import {
+  syncStandardDomainPresets,listProjectSubtypes,listDomainWorkflowPresets,getDomainWorkflowPreset,
+  getDomainPresetReadiness,compileDomainWorkflowPreset,resolveDomainPresetWorkflow,
+  bindProjectKnowledgeSource,listProjectKnowledgeBindings
+} from './domain-workflow-presets.mjs';
+import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
   getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
@@ -759,6 +764,50 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/runtime/project-subtypes') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listProjectSubtypes({
+      projectTypeKey:url.searchParams.get('projectTypeKey')||null,
+      status:url.searchParams.get('status')||'ACTIVE'
+    })});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/domain-presets/sync') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await syncStandardDomainPresets()});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/domain-presets') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listDomainWorkflowPresets({
+      projectTypeKey:url.searchParams.get('projectTypeKey')||null
+    })});
+    return true;
+  }
+
+  const domainPresetMatch=match(url.pathname,/^\/api\/runtime\/domain-presets\/([^/]+)$/);
+  if (req.method === 'GET' && domainPresetMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getDomainWorkflowPreset(domainPresetMatch[1])});
+    return true;
+  }
+
+  const domainPresetReadinessMatch=match(url.pathname,/^\/api\/runtime\/domain-presets\/([^/]+)\/readiness$/);
+  if (req.method === 'GET' && domainPresetReadinessMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getDomainPresetReadiness(domainPresetReadinessMatch[1])});
+    return true;
+  }
+
+  const domainPresetCompileMatch=match(url.pathname,/^\/api\/runtime\/domain-presets\/([^/]+)\/compile$/);
+  if (req.method === 'POST' && domainPresetCompileMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await compileDomainWorkflowPreset(domainPresetCompileMatch[1])});
+    return true;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/runtime/project-types') {
     requirePlatformAdmin(principal);
     json(res,201,{data:await upsertProjectType(await readBody(req))});
@@ -866,6 +915,28 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && projectLifecycleMatch) {
     if(!principal?.platformAdmin){ const scope=await resolveProjectScope(projectLifecycleMatch[1]); await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname}); }
     json(res,200,{data:await getProjectLifecycle(projectLifecycleMatch[1])});
+    return true;
+  }
+
+  const projectKnowledgeBindingMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/knowledge-bindings$/);
+  if (req.method === 'POST' && projectKnowledgeBindingMatch) {
+    const projectId=projectKnowledgeBindingMatch[1];
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,201,{data:await bindProjectKnowledgeSource({...body,projectId})});
+    return true;
+  }
+
+  if (req.method === 'GET' && projectKnowledgeBindingMatch) {
+    const projectId=projectKnowledgeBindingMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listProjectKnowledgeBindings(projectId)});
     return true;
   }
 
@@ -1004,9 +1075,19 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && url.pathname === '/api/runtime/projects') {
     const body=await readBody(req);
     if(!principal?.platformAdmin){ const scope=await resolveWorkspaceScope(body.workspaceId); await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname}); }
+    let workflowTemplateId=body.workflowTemplateId||null;
+    if(body.domainPresetKey){
+      if(workflowTemplateId) throw Object.assign(
+        new Error('Use either domainPresetKey or workflowTemplateId, not both'),
+        {code:'PROJECT_WORKFLOW_SELECTION_CONFLICT',statusCode:409}
+      );
+      workflowTemplateId=await resolveDomainPresetWorkflow({
+        presetKey:body.domainPresetKey,projectTypeKey:body.projectType
+      });
+    }
     const result = await createProject(body);
-    const data=body.workflowTemplateId
-      ? {...result,lifecycle:await bindProjectWorkflow(result.id,body.workflowTemplateId)}
+    const data=workflowTemplateId
+      ? {...result,lifecycle:await bindProjectWorkflow(result.id,workflowTemplateId)}
       : result;
     json(res, 201, { data });
     return true;
