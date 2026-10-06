@@ -14,19 +14,46 @@ const errorOf=(message,code,statusCode=400,details)=>{
   const error=new Error(message);error.code=code;error.statusCode=statusCode;if(details) error.details=details;return error;
 };
 
+const resolveProjectSourceKey=async(projectId,bindingOrSourceKey,db=getRuntimePool())=>{
+  const [bindings]=await db.execute(
+    `SELECT b.source_key,s.status AS source_status
+       FROM project_knowledge_bindings b
+       JOIN knowledge_sources s ON s.source_key=b.source_key
+      WHERE b.project_id=? AND b.binding_key=? AND b.status='ACTIVE' LIMIT 1`,
+    [projectId,bindingOrSourceKey]
+  );
+  if(bindings.length){
+    if(bindings[0].source_status!=='ACTIVE') throw errorOf(
+      'Bound knowledge source is not active','KNOWLEDGE_SOURCE_NOT_ACTIVE',409,
+      {projectId,bindingKey:bindingOrSourceKey}
+    );
+    return bindings[0].source_key;
+  }
+  const [sources]=await db.execute(
+    'SELECT source_key,status FROM knowledge_sources WHERE source_key=?',[bindingOrSourceKey]
+  );
+  if(sources.length&&sources[0].status==='ACTIVE') return sources[0].source_key;
+  throw errorOf(
+    'Project knowledge binding is missing','PROJECT_KNOWLEDGE_BINDING_MISSING',409,
+    {projectId,bindingKey:bindingOrSourceKey}
+  );
+};
+
 export const prepareStageKnowledgeContext=async({
-  runId,taskId,stage,knowledgePackets={}
+  projectId,runId,taskId,stage,knowledgePackets={}
 }={})=>{
   const policies=stage?.knowledgePolicies||[];
   if(!policies.length) return {contextCount:0,contextHash:null,contextText:null,policyContexts:[]};
 
   const policyContexts=[];
+  const db=getRuntimePool();
   for(const policy of policies){
+    const resolvedSourceKey=await resolveProjectSourceKey(projectId,policy.sourceKey,db);
     const raw=knowledgePackets?.[stage.stageKey]?.[policy.policyKey];
     if(!raw){
       if(policy.required) throw errorOf(
         'Required knowledge context is missing','REQUIRED_KNOWLEDGE_CONTEXT_MISSING',409,
-        {stageKey:stage.stageKey,policyKey:policy.policyKey,sourceKey:policy.sourceKey}
+        {stageKey:stage.stageKey,policyKey:policy.policyKey,sourceKey:resolvedSourceKey,bindingKey:policy.sourceKey}
       );
       continue;
     }
@@ -53,7 +80,10 @@ export const prepareStageKnowledgeContext=async({
     const query=raw.query||policy.queryTemplate;
     const packetMeta=createEphemeralContextPacket({
       query,
-      scope:{stageKey:stage.stageKey,policyKey:policy.policyKey,sourceKey:policy.sourceKey},
+      scope:{
+        stageKey:stage.stageKey,policyKey:policy.policyKey,
+        sourceKey:resolvedSourceKey,sourceBindingKey:policy.sourceKey
+      },
       items:raw.items,
       ttlSeconds:120
     });
@@ -79,13 +109,14 @@ export const prepareStageKnowledgeContext=async({
     });
 
     const retrieval=await recordKnowledgeRetrieval({
-      sourceKey:policy.sourceKey,
+      sourceKey:resolvedSourceKey,
       runId,taskId,query,
       retrievalMode:'WORKFLOW_AUTO_CONTEXT',
       status:'PASS',
       contextHash:packet.contextHash,
       policy:{
         stageKey:stage.stageKey,policyKey:policy.policyKey,contextRole:policy.contextRole,
+        sourceBindingKey:policy.sourceKey,resolvedSourceKey,
         allowedStatuses:policy.allowedStatuses,injectionMode:policy.injectionMode
       },
       items:packet.items.map((item,index)=>({
@@ -103,7 +134,7 @@ export const prepareStageKnowledgeContext=async({
     });
 
     policyContexts.push({
-      policy,
+      policy:{...policy,resolvedSourceKey},
       query,
       contextHash:packet.contextHash,
       retrievalId:retrieval.id,
@@ -114,7 +145,7 @@ export const prepareStageKnowledgeContext=async({
   if(!policyContexts.length) return {contextCount:0,contextHash:null,contextText:null,policyContexts:[]};
   const contextHash=sha256(policyContexts.map(x=>x.contextHash).join('|'));
   const contextText=policyContexts.map(entry=>{
-    const header=`[KNOWLEDGE:${entry.policy.policyKey} source=${entry.policy.sourceKey} role=${entry.policy.contextRole}]`;
+    const header=`[KNOWLEDGE:${entry.policy.policyKey} source=${entry.policy.resolvedSourceKey} role=${entry.policy.contextRole}]`;
     const body=entry.items.map(item=>{
       const loc=item.lineStart==null?'':` lines=${item.lineStart}-${item.lineEnd??item.lineStart}`;
       return `SOURCE file=${item.sourceFileId} version=${item.sourceVersion||''}${loc}\n${item.sourceText}`;
@@ -128,7 +159,8 @@ export const prepareStageKnowledgeContext=async({
     contextText,
     policyContexts:policyContexts.map(entry=>({
       policyKey:entry.policy.policyKey,
-      sourceKey:entry.policy.sourceKey,
+      sourceKey:entry.policy.resolvedSourceKey,
+      sourceBindingKey:entry.policy.sourceKey,
       contextRole:entry.policy.contextRole,
       contextHash:entry.contextHash,
       retrievalId:entry.retrievalId,
@@ -181,6 +213,7 @@ export const queueKnowledgeWritebacks=async({
   for(const candidate of candidates){
     const policy=policies.get(candidate.policyKey);
     if(!policy||policy.writebackMode!=='PROPOSE') continue;
+    const resolvedSourceKey=await resolveProjectSourceKey(project.id,policy.sourceKey,db);
     const payloadHash=sha256(JSON.stringify(candidate.payload));
     const idempotencyKey=`${sessionId}:${stage.stageKey}:${candidate.policyKey}:${payloadHash}`;
     const id=randomUUID();
@@ -193,7 +226,7 @@ export const queueKnowledgeWritebacks=async({
        ON DUPLICATE KEY UPDATE id=id`,
       [
         id,project.tenantId,project.workspaceId,project.id,runId,taskId,stageInstance.id,
-        policy.id,policy.sourceKey,policy.writebackTargetPath||null,asJson(candidate.payload),
+        policy.id,resolvedSourceKey,policy.writebackTargetPath||null,asJson(candidate.payload),
         payloadHash,candidate.expectedSourceVersion||null,idempotencyKey
       ]
     );
@@ -201,7 +234,7 @@ export const queueKnowledgeWritebacks=async({
       'SELECT * FROM knowledge_writeback_queue WHERE idempotency_key=? LIMIT 1',[idempotencyKey]
     );
     queued.push({
-      id:rows[0].id,policyKey:policy.policyKey,sourceKey:policy.sourceKey,
+      id:rows[0].id,policyKey:policy.policyKey,sourceKey:resolvedSourceKey,sourceBindingKey:policy.sourceKey,
       targetPath:policy.writebackTargetPath||null,status:rows[0].status,
       contentSha256:rows[0].content_sha256,requirementKey:candidate.requirementKey
     });
