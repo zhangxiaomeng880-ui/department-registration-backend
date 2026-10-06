@@ -342,7 +342,7 @@ const applyEscalate=async(conn,context,gateResultId,input)=>{
 };
 
 const applyRollback=async(conn,context,gateResultId,input)=>{
-  const {project,run,stage}=context;
+  const {project,run,stage,task}=context;
   const [targets]=await conn.execute(
     `SELECT * FROM project_stage_instances
       WHERE project_id=? AND stage_key=? FOR UPDATE`,
@@ -407,6 +407,14 @@ const applyRollback=async(conn,context,gateResultId,input)=>{
       finished_at=NULL WHERE id=?`,
     [run.id]
   );
+  if(task){
+    await conn.execute(
+      `UPDATE tasks SET status='CANCELLED',error_code='STAGE_ROLLBACK',
+        error_category='STAGE_RUNTIME',error_message='Task cancelled because the project stage rolled back',
+        finished_at=CURRENT_TIMESTAMP(6) WHERE id=?`,
+      [task.id]
+    );
+  }
   return {toStage:target,projectCompleted:false};
 };
 
