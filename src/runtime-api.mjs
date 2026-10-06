@@ -78,6 +78,9 @@ import {
 import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
 import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvents } from './stage-runtime.mjs';
 import {
+  orchestrateProjectWorkflow,getWorkflowOrchestrationSession,listWorkflowOrchestrationSessions
+} from './workflow-orchestrator.mjs';
+import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
   getBillingDispute,listBillingDisputes,resolveBillingDisputeScope
@@ -888,6 +891,44 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   const stageTransitionEventMatch=match(url.pathname,/^\/api\/runtime\/stage-transitions\/([^/]+)$/);
   if (req.method === 'GET' && stageTransitionEventMatch) {
     const data=await getStageTransitionEvent(stageTransitionEventMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(data.projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data});
+    return true;
+  }
+
+  const projectOrchestrationMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/orchestrations$/);
+  if (req.method === 'POST' && projectOrchestrationMatch) {
+    const projectId=projectOrchestrationMatch[1];
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'agent:execute',...scope,method:req.method,path:url.pathname});
+    }
+    const actorKey=principal?.platformAdmin
+      ? 'PLATFORM_ADMIN'
+      : (principal?.identityId||principal?.credentialId||'SCOPED_IDENTITY');
+    json(res,201,{data:await orchestrateProjectWorkflow({...body,projectId,actorKey})});
+    return true;
+  }
+
+  if (req.method === 'GET' && projectOrchestrationMatch) {
+    const projectId=projectOrchestrationMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listWorkflowOrchestrationSessions({
+      projectId,limit:url.searchParams.get('limit')||50
+    })});
+    return true;
+  }
+
+  const orchestrationSessionMatch=match(url.pathname,/^\/api\/runtime\/orchestrations\/([^/]+)$/);
+  if (req.method === 'GET' && orchestrationSessionMatch) {
+    const data=await getWorkflowOrchestrationSession(orchestrationSessionMatch[1]);
     if(!principal?.platformAdmin){
       const scope=await resolveProjectScope(data.projectId);
       await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
