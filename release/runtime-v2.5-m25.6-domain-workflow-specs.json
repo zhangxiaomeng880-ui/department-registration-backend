@@ -1,0 +1,311 @@
+{
+  "milestone": "M25.6",
+  "release": "AI Native Runtime V2.5",
+  "title": "Domain Workflow Template Specs / Product Development + AIGC",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.6-domain-template-specs",
+    "sha": "17765edad52713af10dc1217ce057cc8721e930d",
+    "predecessorMilestone": "M25.5",
+    "predecessorSha": "7c545e66232189b42f99636baf83c9455684e9e6"
+  },
+  "sourceOfTruth": {
+    "master": {
+      "path": "/AI_Native_Project/AI_NATIVE_2.0/knowledge/00_Master/AI_NATIVE_2.0_MASTER_BLUEPRINT_V1.4_FROZEN.md",
+      "fileId": "file_00000000062881fdaec566024f399cc4",
+      "libraryFileId": "libfile_7f61ab6b876881918932d86aa11d4f2a",
+      "version": "V1.4_FROZEN"
+    },
+    "productDevelopment": {
+      "path": "/AI_Native_Project/AI_NATIVE_2.0/knowledge/Product_Development/AI_Native_2.0_产品研发工作流_V1.2_CURRENT.md",
+      "fileId": "file_00000000225081fda8fc1ef483a39042",
+      "libraryFileId": "libfile_15132c5414ac8191b90c54363ea57e12",
+      "version": "V1.2_CURRENT"
+    },
+    "aigc": {
+      "path": "/AI_Native_Project/AI_NATIVE_2.0/knowledge/AIGC_Content_Production/AI_Native_2.0_AIGC工作流升级说明_V2.4_CURRENT.md",
+      "fileId": "file_00000000cb008230b7e9df6ced6043cd",
+      "libraryFileId": "libfile_5eb0dc0887388191a335c2e4aa7ea241",
+      "version": "V2.4_CURRENT"
+    }
+  },
+  "architectureCorrections": {
+    "milestoneIsNotStage": true,
+    "milestoneStageBinding": "DECOUPLED_PENDING_M26",
+    "domainStageMilestoneTemplateId": "NULL by design",
+    "reason": [
+      "Milestones represent outcome/governance targets; Stages represent execution order.",
+      "Canonical AIGC AG-M3 Master Asset System Ready and AG-M4 Storyboard/Shot/Production Plan Ready do not map linearly to Stage order.",
+      "M25.6 therefore freezes the domain specification without creating a false one-to-one milestone-stage binding."
+    ],
+    "domainTemplateState": {
+      "status": "SPEC_FROZEN",
+      "executionReadiness": "SPEC_ONLY",
+      "bindableToExecutableProject": false,
+      "executionPromotionDependency": [
+        "M26 milestone governance",
+        "M27 Product Development capability realization",
+        "M28 AIGC capability realization"
+      ]
+    }
+  },
+  "capabilityRegistry": {
+    "types": [
+      "AGENT",
+      "MODEL",
+      "TOOL",
+      "SKILL",
+      "MCP",
+      "CONNECTOR"
+    ],
+    "connectorAddedAsFirstClassType": true,
+    "connectorInvocationVerified": true,
+    "deferredRoutingMode": true,
+    "deferredMeaning": "Frozen required capability contract with no fabricated runtime implementation.",
+    "deferredFailClosedError": "CAPABILITY_REQUIREMENT_DEFERRED",
+    "executionReadyFreezeRejectsDeferred": true
+  },
+  "stageAgentModel": {
+    "firstClassAssignments": true,
+    "assignmentRoles": [
+      "PRIMARY",
+      "SUPPORTING"
+    ],
+    "conditionalAssignments": true,
+    "projectTypeScopedBuiltinAgentKeys": true,
+    "agentKeyPattern": "AGENT:BUILTIN:<PROJECT_TYPE>:<ROLE>",
+    "reason": "Same role labels across Product Development and AIGC must not overwrite domain-specific Agent profiles."
+  },
+  "gateModel": {
+    "firstClassMultiGateContracts": true,
+    "requiredAndConditionalGates": true,
+    "aggregateGateSupport": true,
+    "productConditionalAiApplicationGate": "G-PD-AI-CONTRACT",
+    "aigcMasterGates": [
+      "G-AIGC-CREATIVE-ACCEPTANCE",
+      "G-AIGC-PRODUCTION-QA",
+      "G-AIGC-TECHNICAL-QA",
+      "G-AIGC-COMPLIANCE",
+      "G-AIGC-LOCALIZATION-QA",
+      "G-AIGC-MASTER"
+    ],
+    "aigcMasterAggregateRule": "G-AIGC-MASTER requires all applicable required sub-gates to pass."
+  },
+  "productDevelopmentDomain": {
+    "templateKey": "product-development-standard",
+    "version": "1.2.0",
+    "templateClass": "DOMAIN_STANDARD",
+    "status": "SPEC_FROZEN",
+    "executionReadiness": "SPEC_ONLY",
+    "milestoneCount": 9,
+    "stageCount": 19,
+    "milestones": [
+      "PD-M0",
+      "PD-M1",
+      "PD-M2",
+      "PD-M3",
+      "PD-M4",
+      "PD-M5",
+      "PD-M6",
+      "PD-M7",
+      "PD-M8"
+    ],
+    "stages": [
+      "PD-00-INIT",
+      "PD-01-DISCOVERY",
+      "PD-02-PRIORITY",
+      "PD-03-GOAL",
+      "PD-04-PRODUCT",
+      "PD-05-FEASIBILITY",
+      "PD-06-PLAN",
+      "PD-07-DESIGN",
+      "PD-08-CONTRACT",
+      "PD-09-ENGINEERING",
+      "PD-10-PREVIEW",
+      "PD-11-ACCEPTANCE",
+      "PD-12-QA",
+      "PD-13-RELEASE-READY",
+      "PD-14-RELEASE",
+      "PD-15-POST-RELEASE",
+      "PD-16-OUTCOME",
+      "PD-17-REVIEW",
+      "PD-18-KNOWLEDGE"
+    ],
+    "stageContract": "Input → Readiness → Input Verification → Plan → Execute → Output → Output Verification → Gate → Approval(optional) → Handoff → State Update → Checkpoint",
+    "conditionalAiApplicationContract": true,
+    "humanGateBoundaries": [
+      "prioritization/product bet",
+      "product baseline lock",
+      "major feasibility/architecture",
+      "release readiness",
+      "release/rollout",
+      "outcome decision",
+      "knowledge/backlog governance"
+    ]
+  },
+  "aigcDomain": {
+    "templateKey": "aigc-content-production-standard",
+    "version": "2.4.0",
+    "templateClass": "DOMAIN_STANDARD",
+    "status": "SPEC_FROZEN",
+    "executionReadiness": "SPEC_ONLY",
+    "milestoneCount": 10,
+    "stageCount": 15,
+    "milestones": [
+      "AG-M0",
+      "AG-M1",
+      "AG-M2",
+      "AG-M3",
+      "AG-M4",
+      "AG-M5",
+      "AG-M6",
+      "AG-M7",
+      "AG-M8",
+      "AG-M9"
+    ],
+    "stages": [
+      "AG-00-INIT",
+      "AG-01-DISCOVERY",
+      "AG-02-PLAN",
+      "AG-03-SCRIPT",
+      "AG-04-BREAKDOWN",
+      "AG-05-FORMAT",
+      "AG-06-ASSET",
+      "AG-07-IMAGE",
+      "AG-08-PRODUCTION",
+      "AG-09-EDIT",
+      "AG-10-MASTER",
+      "AG-11-DERIVATION",
+      "AG-12-PUBLISH",
+      "AG-13-PERFORMANCE",
+      "AG-14-REVIEW"
+    ],
+    "knowledgeDomains": [
+      "Story",
+      "Visual",
+      "Audio",
+      "Production",
+      "Distribution",
+      "Performance",
+      "Rights / Compliance"
+    ],
+    "stageContract": "Input → Readiness → Preflight → Execute → Candidate/Output → Verification → Selection/Lock → Gate → Handoff → Checkpoint",
+    "externalSideEffectHumanGate": "Release / Distribution / Publishing",
+    "reviewKnowledgeWriteback": true
+  },
+  "schema": {
+    "migration": "029_domain_workflow_template_specs.sql",
+    "migrationsTotal": 30,
+    "workflowTemplateExtensions": [
+      "template_class",
+      "execution_readiness",
+      "source_spec_key",
+      "source_spec_version"
+    ],
+    "newTables": [
+      "stage_agent_assignments",
+      "stage_gate_contracts"
+    ],
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=30 skipped=0 total=30",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=30 total=30",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=29 total=30"
+  },
+  "bootstrap": {
+    "startupBootstrap": true,
+    "idempotent": true,
+    "sourceSpecDriftFailClosed": true,
+    "driftError": "BUILTIN_DOMAIN_TEMPLATE_DRIFT",
+    "externalDirectPrefreezeForbidden": true,
+    "directPrefreezeError": "WORKFLOW_TEMPLATE_DIRECT_FREEZE_NOT_ALLOWED",
+    "specOnlyProjectBindingForbidden": true,
+    "specOnlyBindingError": "WORKFLOW_TEMPLATE_NOT_EXECUTION_READY"
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.6 Domain Workflow Specs Gate",
+    "acceptedRunId": 37436506598,
+    "headSha": "17765edad52713af10dc1217ce057cc8721e930d",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "G25_1_CORE_META_REGISTRY_PASS",
+      "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS",
+      "G25_3_STAGE_SELF_LOOP_PASS",
+      "G25_4_WORKFLOW_AUTO_ORCHESTRATION_PASS",
+      "G25_5_KNOWLEDGE_CONTEXT_BACKWRITE_PASS"
+    ],
+    "domainWorkflowSpecs": "G25_6_DOMAIN_WORKFLOW_SPECS_PASS",
+    "connectorInvocation": "G25_6_CONNECTOR_INVOCATION_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS",
+    "supersededValidationRun": {
+      "runId": 37435831105,
+      "accepted": false,
+      "reason": "QA harness opened the shared MySQL pool directly and did not close it. Production/runtime logic was not weakened; the validation harness was repaired and the exact repaired SHA passed the full chain."
+    }
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "07924fe3-3f87-498d-b28a-6c1a2d387e07",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "17765edad52713af10dc1217ce057cc8721e930d",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "activeServiceIssues": false,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration029Applied": true,
+    "priorDeploymentCutover": {
+      "priorDeploymentId": "db28b1cf-2468-4764-8dee-20159caa6722",
+      "finalStatus": "REMOVED",
+      "termination": "Railway replacement SIGTERM; not an active runtime failure"
+    }
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": {
+    "key": "M26",
+    "title": "Strategy / Portfolio / Project / Milestone / Competitive Intelligence",
+    "purpose": "Implement true milestone outcome governance, roll-up, forecast, health, dependency, project update/staleness and competitive intelligence objects before domain specs are promoted to execution-ready."
+  },
+  "followingMilestones": [
+    "M27 Product Development Domain E2E",
+    "M28 AIGC Domain E2E",
+    "M29 Data / Eval / Automation / Self-loop",
+    "M30 Private Workspace / Platform Operations Hardening / AI Native 2.0 FINAL"
+  ],
+  "conclusion": "M25.6 Domain Workflow Template Specs is STAGING PASS / FROZEN. Canonical Product Development V1.2 and AIGC V2.4 are now represented as immutable SPEC_FROZEN domain-standard templates with independent milestone templates, exact stage ordering, stage-agent assignments, multi-gate contracts, deferred capability contracts, knowledge policies and source-spec drift protection. They are intentionally SPEC_ONLY and cannot be bound as executable workflows until milestone governance and real domain capabilities are realized. CONNECTOR is now a first-class unified capability type and invocation is verified. Production remains unchanged on V2.3."
+}
