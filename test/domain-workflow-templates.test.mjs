@@ -158,9 +158,28 @@ assert.equal(aigc.stages[12].config.humanGateRequired,true);
 assert.equal(aigc.stages[7].requirements[0].constraints.requiredPolicyTags.domainCapability,'IMAGE_GENERATION');
 assert.ok(aigc.stages[14].knowledgePolicies.some(x=>x.writebackMode==='PROPOSE'));
 
+// Create an entitled tenant/workspace so MODEL stages pass through the existing commercial control plane.
+const planKey=`M256_PLAN_${suffix}`;
+r=await request('POST','/api/runtime/plans',{planKey,name:'M25.6 Domain Template Plan'});
+assert.equal(r.status,201,JSON.stringify(r.body));
+r=await request('POST','/api/runtime/plan-entitlements',{
+  planKey,entitlementKey:'MODEL_EXECUTION',enabled:true
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+r=await request('POST','/api/runtime/tenants',{
+  tenantKey:`m256-${suffix}`,name:'M25.6 Tenant',planKey
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const tenantId=r.body.data.id;
+r=await request('POST','/api/runtime/workspaces',{
+  tenantId,workspaceKey:'main',name:'Main'
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const workspaceId=r.body.data.id;
+
 // Create projects directly from standard presets + validated subtypes.
 r=await request('POST','/api/runtime/projects',{
-  projectKey:`m256-pd-${suffix}`,name:'M25.6 Product Project',
+  workspaceId,projectKey:`m256-pd-${suffix}`,name:'M25.6 Product Project',
   projectType:'PRODUCT_DEVELOPMENT',projectSubtypeKey:'AI_APPLICATION',
   domainPresetKey:'PRODUCT_DEVELOPMENT_STANDARD'
 });
@@ -173,7 +192,7 @@ assert.equal(r.body.data.lifecycle.project.currentStageKey,'PD_00_INIT');
 assert.equal(r.body.data.lifecycle.stages.length,19);
 
 r=await request('POST','/api/runtime/projects',{
-  projectKey:`m256-aigc-${suffix}`,name:'M25.6 AIGC Project',
+  workspaceId,projectKey:`m256-aigc-${suffix}`,name:'M25.6 AIGC Project',
   projectType:'AIGC_CONTENT',projectSubtypeKey:'SHORT_DRAMA',
   domainPresetKey:'AIGC_CONTENT_STANDARD'
 });
@@ -184,7 +203,7 @@ assert.equal(r.body.data.lifecycle.template.id,aigcWorkflowId);
 assert.equal(r.body.data.lifecycle.stages.length,15);
 
 r=await request('POST','/api/runtime/projects',{
-  projectKey:`m256-bad-subtype-${suffix}`,name:'Bad subtype',
+  workspaceId,projectKey:`m256-bad-subtype-${suffix}`,name:'Bad subtype',
   projectType:'PRODUCT_DEVELOPMENT',projectSubtypeKey:'SHORT_DRAMA'
 });
 assert.equal(r.status,409,JSON.stringify(r.body));
