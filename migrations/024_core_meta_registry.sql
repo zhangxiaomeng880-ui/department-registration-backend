@@ -31,7 +31,7 @@ FROM projects
 WHERE project_type IS NOT NULL AND project_type<>'';
 
 CREATE TABLE IF NOT EXISTS capability_registry (
-  capability_key VARCHAR(384) PRIMARY KEY,
+  capability_key VARCHAR(320) PRIMARY KEY,
   capability_type VARCHAR(16) NOT NULL,
   display_name VARCHAR(255) NOT NULL,
   version VARCHAR(64) NOT NULL DEFAULT '1',
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS capability_registry (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS model_capability_bindings (
-  capability_key VARCHAR(384) PRIMARY KEY,
+  capability_key VARCHAR(320) PRIMARY KEY,
   provider_key VARCHAR(128) NOT NULL,
   model_key VARCHAR(128) NOT NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -83,7 +83,7 @@ SELECT CONCAT('MODEL:',provider_key,':',model_key),provider_key,model_key
 FROM model_registry;
 
 CREATE TABLE IF NOT EXISTS agent_profiles (
-  capability_key VARCHAR(384) PRIMARY KEY,
+  capability_key VARCHAR(320) PRIMARY KEY,
   role_key VARCHAR(128) NOT NULL,
   policy_mode VARCHAR(32) NULL,
   knowledge_scope_json JSON NULL,
@@ -96,8 +96,8 @@ CREATE TABLE IF NOT EXISTS agent_profiles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS agent_capability_grants (
-  agent_capability_key VARCHAR(384) NOT NULL,
-  child_capability_key VARCHAR(384) NOT NULL,
+  agent_capability_key VARCHAR(320) NOT NULL,
+  child_capability_key VARCHAR(320) NOT NULL,
   requirement_mode VARCHAR(16) NOT NULL DEFAULT 'ALLOWED',
   priority INT NOT NULL DEFAULT 100,
   constraints_json JSON NULL,
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS agent_capability_grants (
 
 CREATE TABLE IF NOT EXISTS project_type_capability_bindings (
   project_type_key VARCHAR(128) NOT NULL,
-  capability_key VARCHAR(384) NOT NULL,
+  capability_key VARCHAR(320) NOT NULL,
   binding_mode VARCHAR(16) NOT NULL DEFAULT 'ALLOWED',
   priority INT NOT NULL DEFAULT 100,
   constraints_json JSON NULL,
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS workflow_template_stages (
   display_name VARCHAR(255) NOT NULL,
   stage_type VARCHAR(64) NOT NULL DEFAULT 'EXECUTION',
   sequence_no INT NOT NULL,
-  default_agent_capability_key VARCHAR(384) NULL,
+  default_agent_capability_key VARCHAR(320) NULL,
   gate_policy_key VARCHAR(128) NULL,
   config_json JSON NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS stage_capability_requirements (
   workflow_stage_id CHAR(36) NOT NULL,
   requirement_key VARCHAR(128) NOT NULL,
   capability_type VARCHAR(16) NOT NULL,
-  capability_key VARCHAR(384) NULL,
+  capability_key VARCHAR(320) NULL,
   routing_mode VARCHAR(16) NOT NULL DEFAULT 'POLICY',
   requirement_mode VARCHAR(16) NOT NULL DEFAULT 'REQUIRED',
   priority INT NOT NULL DEFAULT 100,
@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS project_stage_instances (
   display_name VARCHAR(255) NOT NULL,
   sequence_no INT NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-  agent_capability_key VARCHAR(384) NULL,
+  agent_capability_key VARCHAR(320) NULL,
   gate_policy_key VARCHAR(128) NULL,
   state_json JSON NULL,
   started_at TIMESTAMP(6) NULL,
