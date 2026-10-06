@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 
-const CAPABILITY_TYPES=new Set(['MODEL','TOOL','SKILL','MCP','AGENT']);
+const CAPABILITY_TYPES=new Set(['MODEL','TOOL','SKILL','MCP','CONNECTOR','AGENT']);
 const CAPABILITY_STATUSES=new Set(['ACTIVE','DISABLED','DEPRECATED']);
-const WORKFLOW_STATUSES=new Set(['DRAFT','FROZEN','DEPRECATED']);
-const ROUTING_MODES=new Set(['FIXED','POLICY']);
+const WORKFLOW_STATUSES=new Set(['DRAFT','SPEC_FROZEN','FROZEN','DEPRECATED']);
+const ROUTING_MODES=new Set(['FIXED','POLICY','DEFERRED']);
 const REQUIREMENT_MODES=new Set(['REQUIRED','OPTIONAL']);
 const BINDING_MODES=new Set(['ALLOWED','DEFAULT']);
 const secretPattern=/(api[_-]?key|secret|token|password|credential|authorization)/i;
@@ -52,7 +52,12 @@ const normalizeCapability=row=>({
 });
 const normalizeWorkflow=row=>({
   id:row.id,projectTypeKey:row.project_type_key,templateKey:row.template_key,version:row.version,
-  displayName:row.display_name,description:row.description||null,status:row.status,
+  displayName:row.display_name,description:row.description||null,
+  templateClass:row.template_class||'CUSTOM',status:row.status,
+  executionReadiness:row.execution_readiness||(
+    row.status==='FROZEN'?'EXECUTION_READY':row.status==='SPEC_FROZEN'?'SPEC_ONLY':'BUILDING'
+  ),
+  sourceSpecKey:row.source_spec_key||null,sourceSpecVersion:row.source_spec_version||null,
   definitionSha256:row.definition_sha256||null,metadata:parseJson(row.metadata_json),
   createdAt:row.created_at,frozenAt:row.frozen_at||null,updatedAt:row.updated_at
 });
@@ -78,6 +83,17 @@ const normalizeKnowledgePolicy=row=>({
   maxItems:Number(row.max_items),allowedStatuses:parseJson(row.allowed_statuses_json)||[],
   injectionMode:row.injection_mode,writebackMode:row.writeback_mode,
   writebackTargetPath:row.writeback_target_path||null,config:parseJson(row.config_json)
+});
+const normalizeStageAgentAssignment=row=>({
+  id:row.id,workflowStageId:row.workflow_stage_id,agentCapabilityKey:row.agent_capability_key,
+  assignmentRole:row.assignment_role,priority:Number(row.priority),
+  conditional:parseJson(row.conditional_json)
+});
+const normalizeStageGateContract=row=>({
+  id:row.id,workflowStageId:row.workflow_stage_id,gateKey:row.gate_key,
+  gateRole:row.gate_role,required:Boolean(row.required),aggregationMode:row.aggregation_mode,
+  sequenceNo:Number(row.sequence_no),appliesWhen:parseJson(row.applies_when_json),
+  contract:parseJson(row.contract_json)
 });
 
 export const upsertProjectType=async input=>{
@@ -272,10 +288,12 @@ export const createWorkflowTemplate=async input=>{
   const id=input.id||randomUUID();
   await db.execute(
     `INSERT INTO workflow_templates
-      (id,project_type_key,template_key,version,display_name,description,status,metadata_json)
-     VALUES (?,?,?,?,?,?,?,?)`,
+      (id,project_type_key,template_key,version,display_name,description,template_class,status,
+       execution_readiness,source_spec_key,source_spec_version,metadata_json)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id,input.projectTypeKey,input.templateKey,input.version,input.displayName,input.description||null,
-     input.status||'DRAFT',asJson(input.metadata||null)]
+     input.templateClass||'CUSTOM',input.status||'DRAFT',input.executionReadiness||'BUILDING',
+     input.sourceSpecKey||null,input.sourceSpecVersion||null,asJson(input.metadata||null)]
   );
   const [rows]=await db.execute('SELECT * FROM workflow_templates WHERE id=?',[id]);
   return normalizeWorkflow(rows[0]);
@@ -417,6 +435,76 @@ export const addStageKnowledgePolicy=async(stageId,input)=>{
   return normalizeKnowledgePolicy(rows[0]);
 };
 
+export const addStageAgentAssignment=async(stageId,input)=>{
+  if(!input?.agentCapabilityKey||!input?.assignmentRole) throw errorOf(
+    'agentCapabilityKey and assignmentRole are required','INVALID_STAGE_AGENT_ASSIGNMENT'
+  );
+  const role=String(input.assignmentRole).toUpperCase();
+  if(!['PRIMARY','SUPPORTING'].includes(role)) throw errorOf(
+    'assignmentRole must be PRIMARY or SUPPORTING','INVALID_STAGE_AGENT_ROLE'
+  );
+  rejectSecrets(input);
+  const db=getRuntimePool();
+  const [stages]=await db.execute(
+    `SELECT s.id,t.status AS template_status FROM workflow_template_stages s
+       JOIN workflow_templates t ON t.id=s.workflow_template_id WHERE s.id=?`,[stageId]
+  );
+  if(!stages.length) throw errorOf('Workflow stage not found','WORKFLOW_STAGE_NOT_FOUND',404);
+  if(stages[0].template_status!=='DRAFT') throw errorOf(
+    'Frozen workflow template is immutable','WORKFLOW_TEMPLATE_IMMUTABLE',409
+  );
+  await assertCapabilityType(input.agentCapabilityKey,'AGENT',db);
+  const id=input.id||randomUUID();
+  await db.execute(
+    `INSERT INTO stage_agent_assignments
+      (id,workflow_stage_id,agent_capability_key,assignment_role,priority,conditional_json)
+     VALUES (?,?,?,?,?,?)`,
+    [id,stageId,input.agentCapabilityKey,role,Number(input.priority??100),asJson(input.conditional||null)]
+  );
+  const [rows]=await db.execute('SELECT * FROM stage_agent_assignments WHERE id=?',[id]);
+  return normalizeStageAgentAssignment(rows[0]);
+};
+
+export const addStageGateContract=async(stageId,input)=>{
+  if(!input?.gateKey) throw errorOf('gateKey is required','INVALID_STAGE_GATE_CONTRACT');
+  rejectSecrets(input);
+  const db=getRuntimePool();
+  const [stages]=await db.execute(
+    `SELECT s.id,t.status AS template_status FROM workflow_template_stages s
+       JOIN workflow_templates t ON t.id=s.workflow_template_id WHERE s.id=?`,[stageId]
+  );
+  if(!stages.length) throw errorOf('Workflow stage not found','WORKFLOW_STAGE_NOT_FOUND',404);
+  if(stages[0].template_status!=='DRAFT') throw errorOf(
+    'Frozen workflow template is immutable','WORKFLOW_TEMPLATE_IMMUTABLE',409
+  );
+  const id=input.id||randomUUID();
+  await db.execute(
+    `INSERT INTO stage_gate_contracts
+      (id,workflow_stage_id,gate_key,gate_role,required,aggregation_mode,sequence_no,
+       applies_when_json,contract_json)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [
+      id,stageId,input.gateKey,input.gateRole||'PRIMARY',input.required===false?0:1,
+      input.aggregationMode||'ALL_REQUIRED_PASS',Number(input.sequenceNo??1),
+      asJson(input.appliesWhen||null),asJson(input.contract||null)
+    ]
+  );
+  const [rows]=await db.execute('SELECT * FROM stage_gate_contracts WHERE id=?',[id]);
+  return normalizeStageGateContract(rows[0]);
+};
+
+export const listWorkflowTemplates=async({projectTypeKey=null,status=null,templateClass=null}={})=>{
+  const db=getRuntimePool(),where=[],params=[];
+  if(projectTypeKey){where.push('project_type_key=?');params.push(projectTypeKey);}
+  if(status){where.push('status=?');params.push(status);}
+  if(templateClass){where.push('template_class=?');params.push(templateClass);}
+  const [rows]=await db.execute(
+    `SELECT * FROM workflow_templates ${where.length?'WHERE '+where.join(' AND '):''}
+      ORDER BY project_type_key,template_key,version`,params
+  );
+  return rows.map(normalizeWorkflow);
+};
+
 export const getWorkflowTemplate=async templateId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute('SELECT * FROM workflow_templates WHERE id=?',[templateId]);
@@ -428,7 +516,7 @@ export const getWorkflowTemplate=async templateId=>{
     'SELECT * FROM workflow_template_stages WHERE workflow_template_id=? ORDER BY sequence_no,id',[templateId]
   );
   const stageIds=stageRows.map(x=>x.id);
-  let requirementRows=[],knowledgePolicyRows=[];
+  let requirementRows=[],knowledgePolicyRows=[],agentAssignmentRows=[],gateContractRows=[];
   if(stageIds.length){
     const placeholders=stageIds.map(()=>'?').join(',');
     [requirementRows]=await db.execute(
@@ -439,8 +527,17 @@ export const getWorkflowTemplate=async templateId=>{
       `SELECT * FROM stage_knowledge_policies WHERE workflow_stage_id IN (${placeholders})
        ORDER BY workflow_stage_id,policy_key`,stageIds
     );
+    [agentAssignmentRows]=await db.execute(
+      `SELECT * FROM stage_agent_assignments WHERE workflow_stage_id IN (${placeholders})
+       ORDER BY workflow_stage_id,
+         CASE assignment_role WHEN 'PRIMARY' THEN 0 ELSE 1 END,priority,agent_capability_key`,stageIds
+    );
+    [gateContractRows]=await db.execute(
+      `SELECT * FROM stage_gate_contracts WHERE workflow_stage_id IN (${placeholders})
+       ORDER BY workflow_stage_id,sequence_no,gate_key`,stageIds
+    );
   }
-  const byStage=new Map(),knowledgeByStage=new Map();
+  const byStage=new Map(),knowledgeByStage=new Map(),agentsByStage=new Map(),gatesByStage=new Map();
   for(const row of requirementRows){
     if(!byStage.has(row.workflow_stage_id)) byStage.set(row.workflow_stage_id,[]);
     byStage.get(row.workflow_stage_id).push(normalizeRequirement(row));
@@ -449,11 +546,21 @@ export const getWorkflowTemplate=async templateId=>{
     if(!knowledgeByStage.has(row.workflow_stage_id)) knowledgeByStage.set(row.workflow_stage_id,[]);
     knowledgeByStage.get(row.workflow_stage_id).push(normalizeKnowledgePolicy(row));
   }
+  for(const row of agentAssignmentRows){
+    if(!agentsByStage.has(row.workflow_stage_id)) agentsByStage.set(row.workflow_stage_id,[]);
+    agentsByStage.get(row.workflow_stage_id).push(normalizeStageAgentAssignment(row));
+  }
+  for(const row of gateContractRows){
+    if(!gatesByStage.has(row.workflow_stage_id)) gatesByStage.set(row.workflow_stage_id,[]);
+    gatesByStage.get(row.workflow_stage_id).push(normalizeStageGateContract(row));
+  }
   return {
     ...normalizeWorkflow(rows[0]),
     milestones:milestoneRows.map(normalizeMilestone),
     stages:stageRows.map(row=>({
       ...normalizeStage(row),
+      agentAssignments:agentsByStage.get(row.id)||[],
+      gateContracts:gatesByStage.get(row.id)||[],
       requirements:byStage.get(row.id)||[],
       knowledgePolicies:knowledgeByStage.get(row.id)||[]
     }))
@@ -535,6 +642,15 @@ export const freezeWorkflowTemplate=async templateId=>{
       milestoneKey:x.milestoneTemplateId?milestoneKeyById.get(x.milestoneTemplateId)||null:null,
       defaultAgentCapabilityKey:x.defaultAgentCapabilityKey,
       gatePolicyKey:x.gatePolicyKey,config:x.config,
+      agentAssignments:(x.agentAssignments||[]).map(a=>({
+        agentCapabilityKey:a.agentCapabilityKey,assignmentRole:a.assignmentRole,
+        priority:a.priority,conditional:a.conditional
+      })),
+      gateContracts:(x.gateContracts||[]).map(g=>({
+        gateKey:g.gateKey,gateRole:g.gateRole,required:g.required,
+        aggregationMode:g.aggregationMode,sequenceNo:g.sequenceNo,
+        appliesWhen:g.appliesWhen,contract:g.contract
+      })),
       requirements:x.requirements.map(r=>({
         requirementKey:r.requirementKey,capabilityType:r.capabilityType,capabilityKey:r.capabilityKey,
         routingMode:r.routingMode,requirementMode:r.requirementMode,priority:r.priority,constraints:r.constraints
@@ -549,7 +665,8 @@ export const freezeWorkflowTemplate=async templateId=>{
   };
   const definitionSha256=sha256(hashMaterial);
   await db.execute(
-    `UPDATE workflow_templates SET status='FROZEN',definition_sha256=?,frozen_at=CURRENT_TIMESTAMP(6)
+    `UPDATE workflow_templates SET status='FROZEN',execution_readiness='EXECUTION_READY',
+      definition_sha256=?,frozen_at=CURRENT_TIMESTAMP(6)
       WHERE id=? AND status='DRAFT'`,
     [definitionSha256,templateId]
   );
@@ -567,7 +684,11 @@ export const bindProjectWorkflow=async(projectId,templateId)=>{
     const [templates]=await conn.execute('SELECT * FROM workflow_templates WHERE id=? FOR UPDATE',[templateId]);
     if(!templates.length) throw errorOf('Workflow template not found','WORKFLOW_TEMPLATE_NOT_FOUND',404);
     const template=templates[0];
-    if(template.status!=='FROZEN') throw errorOf('Project can only bind a frozen workflow template','WORKFLOW_TEMPLATE_NOT_FROZEN',409);
+    if(template.status!=='FROZEN'||template.execution_readiness!=='EXECUTION_READY') throw errorOf(
+      'Project can only bind an execution-ready frozen workflow template',
+      'WORKFLOW_TEMPLATE_NOT_EXECUTION_READY',409,
+      {status:template.status,executionReadiness:template.execution_readiness}
+    );
     if(project.project_type!==template.project_type_key) throw errorOf(
       'Project type does not match workflow template','PROJECT_WORKFLOW_TYPE_MISMATCH',409,
       {projectType:project.project_type,templateProjectType:template.project_type_key}
