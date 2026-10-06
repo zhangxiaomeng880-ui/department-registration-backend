@@ -46,7 +46,8 @@
     "validate:milestone-intelligence": "node test/milestone-intelligence.test.mjs",
     "validate:competitive-approval": "node test/competitive-approval.test.mjs",
     "validate:portfolio-closure": "node test/portfolio-closure-governance.test.mjs",
-    "validate:m26-governance-rc": "node test/m26-governance-rc-e2e.test.mjs"
+    "validate:m26-governance-rc": "node test/m26-governance-rc-e2e.test.mjs",
+    "validate:product-discovery-baseline": "node test/product-discovery-baseline.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
