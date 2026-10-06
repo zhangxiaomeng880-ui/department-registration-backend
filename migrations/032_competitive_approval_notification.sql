@@ -28,6 +28,23 @@ CREATE TABLE IF NOT EXISTS benchmark_subjects (
   INDEX idx_m263_benchmark_project (project_id,benchmark_type,status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS benchmark_dimensions (
+  id CHAR(36) PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  benchmark_type VARCHAR(32) NOT NULL,
+  dimension_key VARCHAR(128) NOT NULL,
+  display_name VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  unit VARCHAR(64) NULL,
+  comparison_direction VARCHAR(32) NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m263_dimension_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  UNIQUE KEY uq_m263_dimension (workspace_id,benchmark_type,dimension_key),
+  INDEX idx_m263_dimension_type (workspace_id,benchmark_type,status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS benchmark_snapshots (
   id CHAR(36) PRIMARY KEY,
   subject_id CHAR(36) NOT NULL,
@@ -62,6 +79,66 @@ CREATE TABLE IF NOT EXISTS benchmark_observations (
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_m263_observation_snapshot FOREIGN KEY (snapshot_id) REFERENCES benchmark_snapshots(id),
   INDEX idx_m263_observation_dimension (snapshot_id,dimension_key,observation_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS creative_references (
+  id CHAR(36) PRIMARY KEY,
+  subject_id CHAR(36) NOT NULL,
+  snapshot_id CHAR(36) NOT NULL,
+  usage_role VARCHAR(64) NOT NULL,
+  rights_status VARCHAR(64) NOT NULL,
+  forbidden_copying BOOLEAN NOT NULL DEFAULT TRUE,
+  reference_scope_json JSON NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m263_creative_subject FOREIGN KEY (subject_id) REFERENCES benchmark_subjects(id),
+  CONSTRAINT fk_m263_creative_snapshot FOREIGN KEY (snapshot_id) REFERENCES benchmark_snapshots(id),
+  UNIQUE KEY uq_m263_creative_snapshot (snapshot_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS capability_benchmark_runs (
+  id CHAR(36) PRIMARY KEY,
+  subject_id CHAR(36) NOT NULL,
+  snapshot_id CHAR(36) NOT NULL,
+  capability_key VARCHAR(320) NOT NULL,
+  eval_run_id CHAR(36) NULL,
+  quality_score DECIMAL(12,4) NULL,
+  latency_ms BIGINT NULL,
+  cost_amount DECIMAL(18,8) NULL,
+  cost_currency CHAR(3) NULL,
+  reliability_score DECIMAL(12,4) NULL,
+  reference_support_json JSON NULL,
+  rights_terms_json JSON NULL,
+  evidence_json JSON NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m263_cap_run_subject FOREIGN KEY (subject_id) REFERENCES benchmark_subjects(id),
+  CONSTRAINT fk_m263_cap_run_snapshot FOREIGN KEY (snapshot_id) REFERENCES benchmark_snapshots(id),
+  CONSTRAINT fk_m263_cap_run_capability FOREIGN KEY (capability_key) REFERENCES capability_registry(capability_key),
+  CONSTRAINT fk_m263_cap_run_eval FOREIGN KEY (eval_run_id) REFERENCES eval_runs(id),
+  INDEX idx_m263_cap_run (capability_key,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS market_signals (
+  id CHAR(36) PRIMARY KEY,
+  workspace_id CHAR(36) NOT NULL,
+  project_id CHAR(36) NULL,
+  subject_id CHAR(36) NULL,
+  signal_key VARCHAR(128) NOT NULL,
+  signal_type VARCHAR(64) NOT NULL,
+  summary TEXT NOT NULL,
+  source_provider VARCHAR(128) NOT NULL,
+  source_ref VARCHAR(1024) NOT NULL,
+  observed_at TIMESTAMP(6) NOT NULL,
+  as_of_date DATE NOT NULL,
+  confidence VARCHAR(16) NOT NULL,
+  expires_at TIMESTAMP(6) NOT NULL,
+  evidence_json JSON NOT NULL,
+  status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m263_signal_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+  CONSTRAINT fk_m263_signal_project FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_m263_signal_subject FOREIGN KEY (subject_id) REFERENCES benchmark_subjects(id),
+  UNIQUE KEY uq_m263_signal_key (workspace_id,signal_key),
+  INDEX idx_m263_signal_freshness (workspace_id,status,expires_at,observed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS competitor_change_events (
