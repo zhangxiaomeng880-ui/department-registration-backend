@@ -72,7 +72,7 @@ import { createEvalReliabilitySnapshot,getEvalReliabilitySnapshot } from './eval
 import {
   upsertProjectType,listProjectTypes,upsertCapability,listCapabilities,upsertAgentProfile,
   grantAgentCapability,bindProjectTypeCapability,createWorkflowTemplate,addWorkflowMilestone,
-  addWorkflowStage,addStageCapabilityRequirement,freezeWorkflowTemplate,getWorkflowTemplate,
+  addWorkflowStage,addStageCapabilityRequirement,addStageKnowledgePolicy,freezeWorkflowTemplate,getWorkflowTemplate,
   bindProjectWorkflow,getProjectLifecycle
 } from './core-meta-registry.mjs';
 import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
@@ -80,6 +80,9 @@ import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvent
 import {
   orchestrateProjectWorkflow,getWorkflowOrchestrationSession,listWorkflowOrchestrationSessions
 } from './workflow-orchestrator.mjs';
+import {
+  decideKnowledgeWriteback,getKnowledgeWriteback,listKnowledgeWritebacks
+} from './knowledge-context-runtime.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -830,6 +833,13 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const stageKnowledgePolicyMatch=match(url.pathname,/^\/api\/runtime\/workflow-stages\/([^/]+)\/knowledge-policies$/);
+  if (req.method === 'POST' && stageKnowledgePolicyMatch) {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await addStageKnowledgePolicy(stageKnowledgePolicyMatch[1],await readBody(req))});
+    return true;
+  }
+
   const workflowFreezeMatch=match(url.pathname,/^\/api\/runtime\/workflow-templates\/([^/]+)\/freeze$/);
   if (req.method === 'POST' && workflowFreezeMatch) {
     requirePlatformAdmin(principal);
@@ -929,6 +939,39 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   const orchestrationSessionMatch=match(url.pathname,/^\/api\/runtime\/orchestrations\/([^/]+)$/);
   if (req.method === 'GET' && orchestrationSessionMatch) {
     const data=await getWorkflowOrchestrationSession(orchestrationSessionMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(data.projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data});
+    return true;
+  }
+
+  const projectKnowledgeWritebackMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/knowledge-writebacks$/);
+  if (req.method === 'GET' && projectKnowledgeWritebackMatch) {
+    const projectId=projectKnowledgeWritebackMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listKnowledgeWritebacks({
+      projectId,status:url.searchParams.get('status')||null,limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const knowledgeWritebackDecisionMatch=match(url.pathname,/^\/api\/runtime\/knowledge-writebacks\/([^/]+)\/decision$/);
+  if (req.method === 'POST' && knowledgeWritebackDecisionMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await decideKnowledgeWriteback(
+      knowledgeWritebackDecisionMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const knowledgeWritebackMatch=match(url.pathname,/^\/api\/runtime\/knowledge-writebacks\/([^/]+)$/);
+  if (req.method === 'GET' && knowledgeWritebackMatch) {
+    const data=await getKnowledgeWriteback(knowledgeWritebackMatch[1]);
     if(!principal?.platformAdmin){
       const scope=await resolveProjectScope(data.projectId);
       await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
