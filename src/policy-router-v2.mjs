@@ -130,11 +130,15 @@ export const selectProviderModel = async input => {
   const allowedProviders = Array.isArray(input?.allowedProviderKeys)
     ? new Set(input.allowedProviderKeys)
     : null;
+  const allowedModelPairs = Array.isArray(input?.allowedModelPairs)
+    ? new Set(input.allowedModelPairs.map(item => `${item.providerKey}::${item.modelKey}`))
+    : null;
 
   let candidates = (await listRoutingCandidates()).filter(candidate => {
     if (!candidate.providerEnabled || !candidate.modelEnabled) return false;
     if (candidate.healthStatus === 'DOWN' || candidate.healthStatus === 'UNKNOWN') return false;
     if (allowedProviders && !allowedProviders.has(candidate.providerKey)) return false;
+    if (allowedModelPairs && !allowedModelPairs.has(`${candidate.providerKey}::${candidate.modelKey}`)) return false;
     if (!supportsTask(candidate, taskType)) return false;
     if (requiredStructuredOutput && !supportsStructured(candidate)) return false;
     return true;
