@@ -9,6 +9,9 @@ const WORK_ITEM_TYPES=new Set([
   'REQUIREMENT','FEATURE','TASK','BUG','IMPROVEMENT','EXPERIMENT',
   'RESEARCH','CONTENT_ITEM','OPERATIONS_ITEM','TECH_DEBT'
 ]);
+const WORK_ITEM_STATUSES=new Set(['PLANNED','READY','IN_PROGRESS','BLOCKED','PAUSED','COMPLETED','CANCELLED']);
+const DEPENDENCY_STATUSES=new Set(['ACTIVE','BLOCKED','RESOLVED','COMPLETED','CANCELLED','INACTIVE']);
+const RISK_STATUSES=new Set(['OPEN','MITIGATING','ACCEPTED','RESOLVED','CLOSED']);
 const DEPENDENCY_TYPES=new Set(['BLOCKS','REQUIRES','PRODUCES','VALIDATES','SUPERSEDES','RELATED']);
 const STRUCTURE_TYPES=new Set(['BUSINESS_DOMAIN','MODULE','EPIC']);
 const PRIORITIES=new Set(['LOW','MEDIUM','HIGH','CRITICAL']);
@@ -478,6 +481,47 @@ export const createProjectMilestone=async(projectId,input)=>{
   };
 };
 
+export const updateProjectMilestonePlan=async(milestoneId,input={})=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM project_milestones WHERE id=?',[milestoneId]);
+  if(!rows.length) throw errorOf('Milestone not found','MILESTONE_NOT_FOUND',404);
+  const sets=[],values=[];
+  const assign=(column,value)=>{sets.push(`${column}=?`);values.push(value);};
+  if(input.status!==undefined){
+    const status=validateMilestoneStatus(input.status);
+    if(status==='COMPLETED') throw errorOf(
+      'Use the milestone completion gate to complete a milestone',
+      'MILESTONE_COMPLETION_GATE_REQUIRED',409
+    );
+    assign('management_status',status);
+  }
+  if(input.objective!==undefined) assign('objective',input.objective||null);
+  if(input.plannedStart!==undefined) assign('planned_start',dateOrNull(input.plannedStart));
+  if(input.plannedEnd!==undefined) assign('planned_end',dateOrNull(input.plannedEnd));
+  if(input.exitCriteria!==undefined) assign('exit_criteria_json',asJson(input.exitCriteria));
+  if(input.requiredDeliverables!==undefined) assign('required_deliverables_json',asJson(input.requiredDeliverables));
+  if(input.requiredGates!==undefined) assign('required_gates_json',asJson(input.requiredGates));
+  if(input.version!==undefined) assign('milestone_version',input.version||null);
+  if(input.updateCadenceDays!==undefined){
+    const cadence=input.updateCadenceDays==null?null:Number(input.updateCadenceDays);
+    if(cadence!=null&&(!Number.isInteger(cadence)||cadence<1||cadence>365)) throw errorOf(
+      'updateCadenceDays must be an integer between 1 and 365','INVALID_UPDATE_CADENCE'
+    );
+    assign('update_cadence_days',cadence);
+  }
+  if(sets.length){
+    values.push(milestoneId);
+    await db.execute(`UPDATE project_milestones SET ${sets.join(',')} WHERE id=?`,values);
+  }
+  const [updated]=await db.execute('SELECT * FROM project_milestones WHERE id=?',[milestoneId]);
+  const row=updated[0];
+  return {
+    id:row.id,projectId:row.project_id,milestoneKey:row.milestone_key,
+    managementStatus:row.management_status,plannedStart:row.planned_start||null,
+    plannedEnd:row.planned_end||null,updateCadenceDays:row.update_cadence_days==null?null:Number(row.update_cadence_days)
+  };
+};
+
 export const createProjectWorkItem=async(projectId,input)=>{
   if(!input?.itemKey||!input?.itemType||!input?.title) throw errorOf(
     'itemKey, itemType and title are required','INVALID_WORK_ITEM'
@@ -498,7 +542,7 @@ export const createProjectWorkItem=async(projectId,input)=>{
     [
       id,projectId,input.structureNodeId||null,input.milestoneId||null,input.iterationId||null,
       input.itemKey,type,input.title,input.stageKey||null,input.ownerIdentityId||null,
-      validatePriority(input.priority),upper(input.status||'PLANNED'),
+      validatePriority(input.priority),validateEnum(input.status||'PLANNED',WORK_ITEM_STATUSES,'INVALID_WORK_ITEM_STATUS','work item status'),
       input.estimateHours==null?null:Number(input.estimateHours),Number(input.actualWorkMinutes||0),
       Number(input.waitingMinutes||0),Number(input.blockedMinutes||0),
       asJson(input.acceptanceCriteria||null),asJson(input.evidence||null),asJson(input.metadata||null)
@@ -507,6 +551,41 @@ export const createProjectWorkItem=async(projectId,input)=>{
   return {
     id,projectId,itemKey:input.itemKey,itemType:type,
     title:input.title,status:upper(input.status||'PLANNED')
+  };
+};
+
+export const updateProjectWorkItem=async(workItemId,input={})=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM project_work_items WHERE id=?',[workItemId]);
+  if(!rows.length) throw errorOf('Work item not found','WORK_ITEM_NOT_FOUND',404);
+  const sets=[],values=[];
+  const assign=(column,value)=>{sets.push(`${column}=?`);values.push(value);};
+  if(input.status!==undefined) assign(
+    'status',validateEnum(input.status,WORK_ITEM_STATUSES,'INVALID_WORK_ITEM_STATUS','work item status')
+  );
+  if(input.priority!==undefined) assign('priority',validatePriority(input.priority));
+  if(input.estimateHours!==undefined) assign('estimate_hours',input.estimateHours==null?null:Number(input.estimateHours));
+  if(input.actualWorkMinutes!==undefined) assign('actual_work_minutes',Math.max(0,Number(input.actualWorkMinutes)||0));
+  if(input.waitingMinutes!==undefined) assign('waiting_minutes',Math.max(0,Number(input.waitingMinutes)||0));
+  if(input.blockedMinutes!==undefined) assign('blocked_minutes',Math.max(0,Number(input.blockedMinutes)||0));
+  if(input.milestoneId!==undefined) assign('milestone_id',input.milestoneId||null);
+  if(input.iterationId!==undefined) assign('iteration_id',input.iterationId||null);
+  if(input.stageKey!==undefined) assign('stage_key',input.stageKey||null);
+  if(input.acceptanceCriteria!==undefined) assign('acceptance_criteria_json',asJson(input.acceptanceCriteria));
+  if(input.evidence!==undefined) assign('evidence_json',asJson(input.evidence));
+  if(input.metadata!==undefined) assign('metadata_json',asJson(input.metadata));
+  if(sets.length){
+    values.push(workItemId);
+    await db.execute(`UPDATE project_work_items SET ${sets.join(',')} WHERE id=?`,values);
+  }
+  const [updated]=await db.execute('SELECT * FROM project_work_items WHERE id=?',[workItemId]);
+  const row=updated[0];
+  return {
+    id:row.id,projectId:row.project_id,itemKey:row.item_key,itemType:row.item_type,
+    title:row.title,status:row.status,priority:row.priority,
+    estimateHours:row.estimate_hours==null?null:Number(row.estimate_hours),
+    actualWorkMinutes:Number(row.actual_work_minutes||0),
+    waitingMinutes:Number(row.waiting_minutes||0),blockedMinutes:Number(row.blocked_minutes||0)
   };
 };
 
@@ -537,6 +616,27 @@ export const createProjectDependency=async(projectId,input)=>{
   return {id,projectId,dependencyType:type,criticalPath:input.criticalPath===true};
 };
 
+export const updateProjectDependency=async(dependencyId,input={})=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM project_dependencies WHERE id=?',[dependencyId]);
+  if(!rows.length) throw errorOf('Dependency not found','PROJECT_DEPENDENCY_NOT_FOUND',404);
+  const sets=[],values=[];
+  const assign=(column,value)=>{sets.push(`${column}=?`);values.push(value);};
+  if(input.status!==undefined) assign(
+    'status',validateEnum(input.status,DEPENDENCY_STATUSES,'INVALID_DEPENDENCY_STATUS','dependency status')
+  );
+  if(input.criticalPath!==undefined) assign('critical_path',input.criticalPath===true?1:0);
+  if(input.externalReference!==undefined) assign('external_reference_json',asJson(input.externalReference));
+  if(input.evidence!==undefined) assign('evidence_json',asJson(input.evidence));
+  if(sets.length){
+    values.push(dependencyId);
+    await db.execute(`UPDATE project_dependencies SET ${sets.join(',')} WHERE id=?`,values);
+  }
+  const [updated]=await db.execute('SELECT * FROM project_dependencies WHERE id=?',[dependencyId]);
+  const row=updated[0];
+  return {id:row.id,projectId:row.project_id,status:row.status,criticalPath:Boolean(row.critical_path)};
+};
+
 export const createProjectRisk=async(projectId,input)=>{
   if(!input?.riskKey||!input?.title||!input?.probability||!input?.impact) throw errorOf(
     'riskKey, title, probability and impact are required','INVALID_PROJECT_RISK'
@@ -556,6 +656,29 @@ export const createProjectRisk=async(projectId,input)=>{
     ]
   );
   return {id,projectId,riskKey:input.riskKey,status:upper(input.status||'OPEN')};
+};
+
+export const updateProjectRisk=async(riskId,input={})=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM project_risks WHERE id=?',[riskId]);
+  if(!rows.length) throw errorOf('Risk not found','PROJECT_RISK_NOT_FOUND',404);
+  const sets=[],values=[];
+  const assign=(column,value)=>{sets.push(`${column}=?`);values.push(value);};
+  if(input.status!==undefined) assign(
+    'status',validateEnum(input.status,RISK_STATUSES,'INVALID_RISK_STATUS','risk status')
+  );
+  if(input.probability!==undefined) assign('probability',upper(input.probability));
+  if(input.impact!==undefined) assign('impact',upper(input.impact));
+  if(input.mitigation!==undefined) assign('mitigation',input.mitigation||null);
+  if(input.contingency!==undefined) assign('contingency',input.contingency||null);
+  if(input.evidence!==undefined) assign('evidence_json',asJson(input.evidence));
+  if(sets.length){
+    values.push(riskId);
+    await db.execute(`UPDATE project_risks SET ${sets.join(',')} WHERE id=?`,values);
+  }
+  const [updated]=await db.execute('SELECT * FROM project_risks WHERE id=?',[riskId]);
+  const row=updated[0];
+  return {id:row.id,projectId:row.project_id,riskKey:row.risk_key,status:row.status,probability:row.probability,impact:row.impact};
 };
 
 export const createProjectIssue=async(projectId,input)=>{
@@ -601,6 +724,24 @@ export const createProjectBlocker=async(projectId,input)=>{
   return {id,projectId,blockerKey:input.blockerKey,status:upper(input.status||'OPEN')};
 };
 
+export const resolveProjectBlocker=async(blockerId,input={})=>{
+  if(!input.evidence) throw errorOf(
+    'Resolving a blocker requires evidence','BLOCKER_RESOLUTION_EVIDENCE_REQUIRED',409
+  );
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM project_blockers WHERE id=?',[blockerId]);
+  if(!rows.length) throw errorOf('Blocker not found','PROJECT_BLOCKER_NOT_FOUND',404);
+  if(rows[0].status!=='OPEN') throw errorOf(
+    'Only an OPEN blocker may be resolved','BLOCKER_NOT_OPEN',409,{status:rows[0].status}
+  );
+  await db.execute(
+    `UPDATE project_blockers SET status='RESOLVED',resolved_at=CURRENT_TIMESTAMP(6),
+      evidence_json=? WHERE id=?`,
+    [asJson(input.evidence),blockerId]
+  );
+  return {id:blockerId,projectId:rows[0].project_id,blockerKey:rows[0].blocker_key,status:'RESOLVED'};
+};
+
 export const createProjectDecision=async(projectId,input)=>{
   if(!input?.decisionKey||!input?.title||!input?.context||!input?.decision) throw errorOf(
     'decisionKey, title, context and decision are required','INVALID_PROJECT_DECISION'
@@ -642,6 +783,23 @@ export const createProjectChange=async(projectId,input)=>{
     ]
   );
   return {id,projectId,changeKey:input.changeKey};
+};
+
+export const resolveProjectGovernanceObjectScope=async(objectType,id)=>{
+  const type=upper(objectType);
+  const tables={
+    WORK_ITEM:'project_work_items',
+    DEPENDENCY:'project_dependencies',
+    RISK:'project_risks',
+    BLOCKER:'project_blockers',
+    MILESTONE:'project_milestones'
+  };
+  const table=tables[type];
+  if(!table) throw errorOf('Unsupported governance object type','INVALID_GOVERNANCE_OBJECT_TYPE');
+  const db=getRuntimePool();
+  const [rows]=await db.execute(`SELECT project_id FROM ${table} WHERE id=?`,[id]);
+  if(!rows.length) throw errorOf('Governance object not found','GOVERNANCE_OBJECT_NOT_FOUND',404,{objectType:type,id});
+  return {objectType:type,id,projectId:rows[0].project_id};
 };
 
 const list=async(db,sql,params=[])=> (await db.execute(sql,params))[0];
