@@ -75,6 +75,7 @@ import {
   addWorkflowStage,addStageCapabilityRequirement,freezeWorkflowTemplate,getWorkflowTemplate,
   bindProjectWorkflow,getProjectLifecycle
 } from './core-meta-registry.mjs';
+import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
 import {
   createInvoiceAdjustment,recordPaymentRefund,listInvoiceAdjustments,listInvoiceRefunds,
   getInvoiceFinancialSummary,openBillingDispute,recordBillingDisputeAction,
@@ -851,6 +852,27 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'GET' && projectLifecycleMatch) {
     if(!principal?.platformAdmin){ const scope=await resolveProjectScope(projectLifecycleMatch[1]); await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname}); }
     json(res,200,{data:await getProjectLifecycle(projectLifecycleMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/capability-invocations') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(body.projectId);
+      await assertAccess({principal,permission:'agent:execute',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,201,{data:await invokeStageCapability(body)});
+    return true;
+  }
+
+  const capabilityInvocationMatch=match(url.pathname,/^\/api\/runtime\/capability-invocations\/([^/]+)$/);
+  if (req.method === 'GET' && capabilityInvocationMatch) {
+    const data=await getCapabilityInvocation(capabilityInvocationMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(data.projectId);
+      await assertAccess({principal,permission:'run:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data});
     return true;
   }
 
