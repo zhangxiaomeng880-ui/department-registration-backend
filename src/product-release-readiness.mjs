@@ -551,8 +551,8 @@ export const evaluateReleaseReadyGate=async(projectId,input={},actorId=null)=>{
       if(rc.regression_run_id!==qe.regressionRunId)reasons.push('RELEASE_CANDIDATE_REGRESSION_STALE');
     }
     const [versions]=await db.execute('SELECT * FROM project_versions WHERE id=?',[rc.release_version_id]);
-    if(!versions.length||versions[0].status!=='LOCKED'||versions[0].version_type!=='RELEASE_DISTRIBUTION')
-      reasons.push('RELEASE_VERSION_NOT_LOCKED');
+    if(!versions.length||!['LOCKED','RELEASED'].includes(versions[0].status)||versions[0].version_type!=='RELEASE_DISTRIBUTION')
+      reasons.push('RELEASE_VERSION_NOT_LOCKED_OR_RELEASED');
     const [manifests]=await db.execute(
       'SELECT * FROM product_release_evidence_manifests WHERE release_candidate_id=?',[rc.id]
     );
