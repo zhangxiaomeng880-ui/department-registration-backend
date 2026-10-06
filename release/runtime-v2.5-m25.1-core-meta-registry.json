@@ -1,0 +1,165 @@
+{
+  "milestone": "M25.1",
+  "release": "AI Native Runtime V2.5",
+  "title": "Core Meta Registry Foundation",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.1-core-meta-registry",
+    "sha": "c31eaea5edc4e95fd191c4ecd420af234b06ad5d",
+    "baseReliabilityRcSha": "85d66fd5a42901da895173a76446f0439b4db63c"
+  },
+  "scope": {
+    "metaModelVersion": "core-meta-v1",
+    "projectTypes": [
+      "PRODUCT_DEVELOPMENT",
+      "AIGC_CONTENT"
+    ],
+    "capabilityTypes": [
+      "MODEL",
+      "TOOL",
+      "SKILL",
+      "MCP",
+      "AGENT"
+    ],
+    "durableEntities": [
+      "Project Type Registry",
+      "Capability Registry",
+      "Model Capability Binding",
+      "Agent Profile",
+      "Agent Capability Grant",
+      "Project Type Capability Binding",
+      "Workflow Template",
+      "Workflow Milestone Template",
+      "Workflow Stage Template",
+      "Stage Capability Requirement",
+      "Project Milestone",
+      "Project Stage Instance"
+    ],
+    "backwardCompatibility": "Legacy projects remain valid until explicitly bound to a frozen workflow template."
+  },
+  "executionContract": {
+    "fixedAndPolicyRouting": true,
+    "projectTypeCapabilityMatrixEnforcedAtFreeze": true,
+    "defaultAgentMustBeAgentCapability": true,
+    "fixedCapabilityTypeMustMatch": true,
+    "fixedCapabilityMustBeAllowedForProjectType": true,
+    "fixedCapabilityMustBeGrantedToDefaultAgentWhenAgentExists": true,
+    "policyRequirementMustResolveAtLeastOneAllowedActiveRoutableCandidate": true,
+    "frozenWorkflowImmutable": true,
+    "deterministicDefinitionSha256": true,
+    "projectWorkflowTypeMustMatch": true,
+    "projectBindingCreatesDurableMilestoneAndStageInstances": true,
+    "firstMilestoneStatus": "ACTIVE",
+    "firstStageStatus": "ACTIVE",
+    "remainingLifecycleStatus": "PENDING"
+  },
+  "modelIntegration": {
+    "existingProviderModelRegistryPreserved": true,
+    "unifiedCapabilityKeyFormat": "MODEL:<providerKey>:<modelKey>",
+    "modelUpsertAutoSyncsUnifiedCapability": true,
+    "existingModelsBackfilledByMigration": true
+  },
+  "security": {
+    "adminOnlyRegistryMutation": true,
+    "scopedProjectLifecycleReadWriteUsesExistingRBAC": true,
+    "secretCredentialFieldPersistenceRejected": true,
+    "secretGuardError": "CORE_META_SECRET_NOT_ALLOWED"
+  },
+  "schema": {
+    "migration": "024_core_meta_registry.sql",
+    "migrationsTotal": 25,
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=25 skipped=0 total=25",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=25 total=25",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=24 total=25",
+    "capabilityKeyWidth": "VARCHAR(320) to remain safely within InnoDB composite index limits"
+  },
+  "api": {
+    "projectTypes": [
+      "POST /api/runtime/project-types",
+      "GET /api/runtime/project-types"
+    ],
+    "capabilities": [
+      "POST /api/runtime/capabilities",
+      "GET /api/runtime/capabilities",
+      "POST /api/runtime/agent-profiles",
+      "POST /api/runtime/agent-capability-grants",
+      "POST /api/runtime/project-type-capabilities"
+    ],
+    "workflow": [
+      "POST /api/runtime/workflow-templates",
+      "POST /api/runtime/workflow-templates/:id/milestones",
+      "POST /api/runtime/workflow-templates/:id/stages",
+      "POST /api/runtime/workflow-stages/:id/requirements",
+      "POST /api/runtime/workflow-templates/:id/freeze",
+      "GET /api/runtime/workflow-templates/:id"
+    ],
+    "projectLifecycle": [
+      "POST /api/runtime/projects/:id/workflow-bind",
+      "GET /api/runtime/projects/:id/lifecycle",
+      "POST /api/runtime/projects with optional workflowTemplateId"
+    ]
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.1 Core Meta Registry Gate",
+    "runId": 37425126166,
+    "headSha": "c31eaea5edc4e95fd191c4ecd420af234b06ad5d",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "priorRegressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS"
+    ],
+    "m251CoreMetaRegistry": "G25_1_CORE_META_REGISTRY_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "0ec3be6b-0b2e-4483-9bab-e0d6acc30661",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "c31eaea5edc4e95fd191c4ecd420af234b06ad5d",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / 1 of 1"
+    },
+    "migration024Applied": true,
+    "pendingFunctionalChanges": false,
+    "note": "Railway reports a historical staged patch with zero changes; it carries no functional change."
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M25.2 Unified Capability Routing / Invocation",
+  "conclusion": "M25.1 Core Meta Registry Foundation is STAGING PASS / FROZEN. Project Type, Workflow/Milestone/Stage and the unified MODEL/TOOL/SKILL/MCP/AGENT capability model are now first-class durable Runtime entities. Workflow freeze enforces the project-type / agent / capability matrix, Model Registry is synchronized into the unified Capability Registry, and project binding materializes durable lifecycle state. Production remains on V2.3."
+}
