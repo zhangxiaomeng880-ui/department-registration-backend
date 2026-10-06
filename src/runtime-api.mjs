@@ -1191,8 +1191,24 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['changes',createProjectChange]
   ];
   for(const [segment,handler] of governanceCreateRoutes){
-    const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'
-    if(!principal?.platformAdmin){ const scope=await resolveWorkspaceScope(body.workspaceId); await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname}); }
+    const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
+    if(req.method==='POST'&&m){
+      const projectId=m[1];
+      const scope=await resolveProjectScope(projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+      json(res,201,{data:await handler(projectId,await readBody(req))});
+      return true;
+    }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/projects') {
+    const body=await readBody(req);
+    if(!principal?.platformAdmin){
+      const scope=await resolveWorkspaceScope(body.workspaceId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
     let workflowTemplateId=body.workflowTemplateId||null;
     if(body.domainPresetKey){
       if(workflowTemplateId) throw Object.assign(
@@ -1203,11 +1219,11 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
         presetKey:body.domainPresetKey,projectTypeKey:body.projectType
       });
     }
-    const result = await createProject(body);
+    const result=await createProject(body);
     const data=workflowTemplateId
       ? {...result,lifecycle:await bindProjectWorkflow(result.id,workflowTemplateId)}
       : result;
-    json(res, 201, { data });
+    json(res,201,{data});
     return true;
   }
 
