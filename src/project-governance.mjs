@@ -92,6 +92,9 @@ export const updateProjectGovernance=async(projectId,input={})=>{
 
   if(input.status!==undefined){
     const status=validateProjectStatus(input.status);
+    if(status==='COMPLETED') throw errorOf(
+      'Project completion must pass the closure gate','PROJECT_COMPLETION_GATE_REQUIRED',409
+    );
     if(status==='ARCHIVED'){
       const baselineId=input.currentBaselineId??current.current_baseline_id;
       const closure=input.closure??parseJson(current.closure_json);
@@ -100,6 +103,16 @@ export const updateProjectGovernance=async(projectId,input={})=>{
       );
       if(!closure||typeof closure!=='object'||Object.keys(closure).length===0) throw errorOf(
         'Project archive requires closure evidence','PROJECT_ARCHIVE_CLOSURE_REQUIRED',409
+      );
+      const [reviews]=await db.execute(
+        'SELECT id,final_baseline_id FROM project_closure_reviews WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT 1',
+        [projectId]
+      );
+      if(!reviews.length) throw errorOf(
+        'Project archive requires an immutable closure review','PROJECT_ARCHIVE_REVIEW_REQUIRED',409
+      );
+      if(reviews[0].final_baseline_id!==baselineId) throw errorOf(
+        'Project archive baseline must match closure review','PROJECT_ARCHIVE_BASELINE_MISMATCH',409
       );
       assign('archived_at',new Date());
     }else if(current.status==='ARCHIVED'){
