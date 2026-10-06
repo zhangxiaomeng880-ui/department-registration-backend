@@ -105,6 +105,13 @@ import {
   createProjectDependency,createProjectRisk,createProjectIssue,createProjectBlocker,
   createProjectDecision,createProjectChange,getProjectGovernance
 } from './project-governance.mjs';
+import {
+  createGovernanceUpdate,listGovernanceUpdates,resolveGovernanceTargetScope,
+  createCapacitySnapshot,getMilestoneIntelligence,refreshMilestoneIntelligence,
+  overrideMilestoneProgress,completeMilestone,createProjectVersion,listProjectVersions,
+  updateProjectVersion,resolveProjectVersionScope,linkMilestoneVersion,
+  getProjectIntelligence,refreshProjectIntelligence
+} from './milestone-intelligence.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1201,6 +1208,186 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       json(res,201,{data:await handler(projectId,await readBody(req))});
       return true;
     }
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/governance-updates') {
+    const body=await readBody(req);
+    const target=await resolveGovernanceTargetScope(body.targetType,body.targetId);
+    if(!principal?.platformAdmin){
+      if(target.projectId){
+        const scope=await resolveProjectScope(target.projectId);
+        await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+      }else{
+        const scope=await resolveWorkspaceScope(target.workspaceId);
+        await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+      }
+    }
+    json(res,201,{data:await createGovernanceUpdate(body)});
+    return true;
+  }
+
+  const projectUpdatesMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/governance-updates$/);
+  if (req.method === 'GET' && projectUpdatesMatch) {
+    const projectId=projectUpdatesMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listGovernanceUpdates({
+      projectId,targetType:url.searchParams.get('targetType')||null,
+      targetId:url.searchParams.get('targetId')||null,
+      limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
+  const milestoneIntelligenceMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/intelligence$/);
+  if (req.method === 'GET' && milestoneIntelligenceMatch) {
+    const data=await getMilestoneIntelligence(milestoneIntelligenceMatch[1],{
+      asOf:url.searchParams.get('asOf')||new Date()
+    });
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(data.projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data});
+    return true;
+  }
+
+  const milestoneRefreshMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/intelligence\/refresh$/);
+  if (req.method === 'POST' && milestoneRefreshMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneRefreshMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshMilestoneIntelligence(
+      milestoneRefreshMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const milestoneOverrideMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/progress-override$/);
+  if (req.method === 'POST' && milestoneOverrideMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneOverrideMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await overrideMilestoneProgress(
+      milestoneOverrideMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const milestoneCapacityMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/capacity-snapshots$/);
+  if (req.method === 'POST' && milestoneCapacityMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneCapacityMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    const body=await readBody(req);
+    json(res,201,{data:await createCapacitySnapshot({
+      ...body,projectId:target.projectId,targetType:'MILESTONE',targetId:milestoneCapacityMatch[1]
+    })});
+    return true;
+  }
+
+  const milestoneCompleteMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && milestoneCompleteMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneCompleteMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await completeMilestone(
+      milestoneCompleteMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const milestoneVersionLinkMatch=match(url.pathname,/^\/api\/runtime\/milestones\/([^/]+)\/version-links$/);
+  if (req.method === 'POST' && milestoneVersionLinkMatch) {
+    const target=await resolveGovernanceTargetScope('MILESTONE',milestoneVersionLinkMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,201,{data:await linkMilestoneVersion(
+      milestoneVersionLinkMatch[1],await readBody(req)
+    )});
+    return true;
+  }
+
+  const projectIntelligenceMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/intelligence$/);
+  if (req.method === 'GET' && projectIntelligenceMatch) {
+    const projectId=projectIntelligenceMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await getProjectIntelligence(projectId,{
+      asOf:url.searchParams.get('asOf')||new Date()
+    })});
+    return true;
+  }
+
+  const projectIntelligenceRefreshMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/intelligence\/refresh$/);
+  if (req.method === 'POST' && projectIntelligenceRefreshMatch) {
+    const projectId=projectIntelligenceRefreshMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await refreshProjectIntelligence(projectId,await readBody(req))});
+    return true;
+  }
+
+  const projectCapacityMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/capacity-snapshots$/);
+  if (req.method === 'POST' && projectCapacityMatch) {
+    const projectId=projectCapacityMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    const body=await readBody(req);
+    json(res,201,{data:await createCapacitySnapshot({
+      ...body,projectId,targetType:'PROJECT',targetId:projectId
+    })});
+    return true;
+  }
+
+  const projectVersionsMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/versions$/);
+  if (req.method === 'POST' && projectVersionsMatch) {
+    const projectId=projectVersionsMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,201,{data:await createProjectVersion(projectId,await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && projectVersionsMatch) {
+    const projectId=projectVersionsMatch[1];
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(projectId);
+      await assertAccess({principal,permission:'project:read',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await listProjectVersions(projectId)});
+    return true;
+  }
+
+  const projectVersionMatch=match(url.pathname,/^\/api\/runtime\/project-versions\/([^/]+)$/);
+  if (req.method === 'PATCH' && projectVersionMatch) {
+    const target=await resolveProjectVersionScope(projectVersionMatch[1]);
+    if(!principal?.platformAdmin){
+      const scope=await resolveProjectScope(target.projectId);
+      await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    }
+    json(res,200,{data:await updateProjectVersion(projectVersionMatch[1],await readBody(req))});
+    return true;
   }
 
   if (req.method === 'POST' && url.pathname === '/api/runtime/projects') {
