@@ -378,6 +378,11 @@ export const addStageKnowledgePolicy=async(stageId,input)=>{
   const allowedStatuses=Array.isArray(input.allowedStatuses)&&input.allowedStatuses.length
     ? input.allowedStatuses.map(value=>String(value).toUpperCase())
     : ['CURRENT','FACT','RULE','FINAL'];
+  const executableStatuses=new Set(['CURRENT','FACT','RULE','FINAL']);
+  if(allowedStatuses.some(status=>!executableStatuses.has(status))) throw errorOf(
+    'Stage knowledge policy contains a source status that is not allowed for automatic execution',
+    'KNOWLEDGE_POLICY_STATUS_NOT_EXECUTABLE',409,{allowedStatuses}
+  );
   const injectionMode=String(input.injectionMode||'APPEND_CONTEXT').toUpperCase();
   const writebackMode=String(input.writebackMode||'NONE').toUpperCase();
   if(!['APPEND_CONTEXT','STRUCTURED_CONTEXT'].includes(injectionMode)) throw errorOf(
