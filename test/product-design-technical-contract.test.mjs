@@ -208,7 +208,7 @@ expectStatus(r,201);const contractWorkId=r.body.data.id;
 
 r=await request('POST',`/api/runtime/projects/${projectId}/dependencies`,{
   sourceType:'WORK_ITEM',sourceId:contractWorkId,targetType:'WORK_ITEM',targetId:designWorkId,
-  dependencyType:'DEPENDS_ON',criticalPath:true,evidence:{reason:'contract follows design'}
+  dependencyType:'REQUIRES',criticalPath:true,evidence:{reason:'contract follows design'}
 });
 expectStatus(r,201);const dependencyId=r.body.data.id;
 
