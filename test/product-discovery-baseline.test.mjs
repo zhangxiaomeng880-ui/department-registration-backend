@@ -54,9 +54,24 @@ assert.equal(r.body.data.status,'HOLD');
 assert.ok(r.body.data.reasonCodes.includes('EVIDENCE_REQUIRED'));
 assert.ok(r.body.data.reasonCodes.includes('COMPETITIVE_SNAPSHOT_REQUIRED'));
 
-// Evidence -> Insight -> Opportunity.
+// Research Study -> Evidence -> Insight -> Opportunity.
+r=await request('POST',`/api/runtime/projects/${projectId}/product-research-studies`,{
+  researchKey:'RS-1',
+  objective:'Understand why project blocker triage is slow.',
+  researchQuestion:'What information is missing when operators investigate a blocker?',
+  method:'INTERVIEW',
+  participantSegment:{role:'operator'},sample:{count:5},
+  recruitment:{source:'internal-project-operators'},
+  timeRange:{from:'2026-10-01',to:'2026-10-06'},
+  consentPrivacy:{consent:'RECORDED',pii:'MINIMIZED'},
+  recordingBoundary:{audio:false,notes:true},
+  rawEvidenceLocator:{type:'research-notes',ref:'research://m271/rs-1'},
+  confidence:'HIGH',limitation:{sample:'small'}
+});
+expectStatus(r,201);const researchStudyId=r.body.data.id;
+
 r=await request('POST',`/api/runtime/projects/${projectId}/product-evidence`,{
-  evidenceKey:'EV-USER-1',sourceType:'USER_FEEDBACK',
+  researchStudyId,evidenceKey:'EV-USER-1',sourceType:'USER_FEEDBACK',
   sourceRef:'support://feedback/1',sourceDate:'2026-10-06',
   segment:{role:'operator'},context:{flow:'project-review'},
   observation:'Users cannot quickly see why a project is blocked.',
@@ -97,6 +112,13 @@ r=await request('POST',`/api/runtime/benchmark-subjects/${subjectId}/snapshots`,
 expectStatus(r,201);const benchmarkSnapshotId=r.body.data.id;
 
 r=await request('POST',`/api/runtime/projects/${projectId}/product-gates/G-PD-DISCOVERY/evaluate`,{
+  asOf:'2026-12-01T00:00:00Z'
+});
+expectStatus(r,200);
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('COMPETITIVE_SNAPSHOT_STALE'));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/product-gates/G-PD-DISCOVERY/evaluate`,{
   asOf:'2026-10-07T00:00:00Z'
 });
 expectStatus(r,200);
@@ -128,6 +150,15 @@ r=await request('POST',`/api/runtime/projects/${projectId}/decisions`,{
   decision:{selected:'DO_NOW'},impact:{scope:'M27.1'},evidence:{discovery:true}
 });
 expectStatus(r,201);const decisionId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/product-prioritizations`,{
+  opportunityId,hypothesisId,prioritizationKey:'PRI-INCOMPLETE',scoringModel:'CUSTOM',
+  scoreInputs:{goalFit:5,impact:5,evidenceStrength:4},
+  output:'DO_NOW',rationale:'Must fail because mandatory dimensions are absent.',
+  decisionId,evidence:{review:'product-owner'}
+});
+expectStatus(r,409);
+assert.equal(r.body.error,'PRODUCT_PRIORITY_DIMENSIONS_REQUIRED');
 
 r=await request('POST',`/api/runtime/projects/${projectId}/product-prioritizations`,{
   opportunityId,hypothesisId,prioritizationKey:'PRI-1',scoringModel:'CUSTOM',
@@ -197,8 +228,11 @@ r=await request('POST',`/api/runtime/projects/${projectId}/product-requirements`
   evidenceLinks:[{evidenceId},{insightId},{opportunityId},{decisionId}],
   evidence:{productDefinitionReview:'PASS'},
   traceFrom:[
-    {sourceType:'PRODUCT_BET',sourceId:betId,linkType:'JUSTIFIES'},
-    {sourceType:'OPPORTUNITY',sourceId:opportunityId,linkType:'JUSTIFIES'}
+    {sourceType:'EVIDENCE',sourceId:evidenceId,linkType:'SUPPORTED_BY'},
+    {sourceType:'INSIGHT',sourceId:insightId,linkType:'SUPPORTED_BY'},
+    {sourceType:'OPPORTUNITY',sourceId:opportunityId,linkType:'JUSTIFIES'},
+    {sourceType:'GOAL',sourceId:goalId,linkType:'GOVERNED_BY'},
+    {sourceType:'PRODUCT_BET',sourceId:betId,linkType:'JUSTIFIES'}
   ]
 });
 expectStatus(r,201);const requirementId=r.body.data.id;
@@ -300,7 +334,9 @@ expectStatus(r,200);assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body
 // Read model is bidirectionally inspectable.
 r=await request('GET',`/api/runtime/projects/${projectId}/product-domain`);
 expectStatus(r,200);
+assert.equal(r.body.data.researchStudies.length,1);
 assert.equal(r.body.data.evidence.length,1);
+assert.equal(r.body.data.evidence[0].researchStudyId,researchStudyId);
 assert.equal(r.body.data.insights.length,1);
 assert.equal(r.body.data.opportunities.length,1);
 assert.equal(r.body.data.prioritizations[0].decisionId,decisionId);
