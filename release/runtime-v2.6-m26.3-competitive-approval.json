@@ -1,0 +1,152 @@
+{
+  "milestone": "M26.3",
+  "release": "AI Native Runtime V2.6",
+  "title": "Competitive Intelligence + Approval / Notification",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.6-m26.3-competitive-approval",
+    "sha": "5ce60ab6c81adda19c7b05c9152e59a49ffd0c94",
+    "predecessorMilestone": "M26.2",
+    "predecessorSha": "06201d66f64183b4efbc7e834eac678fbc3c2f3a"
+  },
+  "competitiveIntelligence": {
+    "benchmarkTypes": [
+      "PRODUCT_MARKET",
+      "CREATIVE_CONTENT",
+      "AI_CAPABILITY"
+    ],
+    "formalObjects": [
+      "benchmark_subjects",
+      "benchmark_dimensions",
+      "benchmark_snapshots",
+      "benchmark_observations",
+      "creative_references",
+      "capability_benchmark_runs",
+      "market_signals",
+      "competitor_change_events",
+      "benchmark_decision_links"
+    ],
+    "observationContract": [
+      "Source",
+      "Observed At",
+      "As-of",
+      "Region/Plan/Version",
+      "Fact-vs-Inference",
+      "Evidence",
+      "Confidence",
+      "Freshness/Expiry"
+    ],
+    "currentHistoricalSnapshots": true,
+    "changeSignals": true,
+    "projectDecisionLinks": true,
+    "creativeReference": {
+      "usageRoleRequired": true,
+      "rightsStatusRequired": true,
+      "forbiddenCopyingRequired": true
+    },
+    "capabilityBenchmark": {
+      "capabilityRegistryBinding": true,
+      "quality": true,
+      "latency": true,
+      "cost": true,
+      "reliability": true,
+      "referenceSupport": true,
+      "rightsTerms": true,
+      "evidence": true
+    }
+  },
+  "approval": {
+    "facts": [
+      "approval_requests",
+      "approval_decisions"
+    ],
+    "decisions": [
+      "APPROVE",
+      "REJECT",
+      "REQUEST_CHANGE",
+      "EXPIRE"
+    ],
+    "assignedApproverEnforced": true,
+    "singleTerminalDecision": true,
+    "contextEvidenceRequired": true,
+    "dueAndEscalation": true,
+    "effectiveObjectAndVersion": true,
+    "humanGateMaterialization": true,
+    "humanGateRequestIdempotent": true,
+    "note": "Approval decision remains a separate auditable fact from Runtime stage transition; approval does not silently mutate stage state."
+  },
+  "notification": {
+    "table": "notifications",
+    "activityTable": "activity_events",
+    "pendingApprovalNotification": true,
+    "approvalDecisionNotification": true,
+    "escalationNotification": true,
+    "dedupeKey": true,
+    "notificationIsNotSourceOfTruth": true
+  },
+  "schema": {
+    "migration": "032_competitive_approval_notification.sql",
+    "migrationsTotal": 33,
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=33 skipped=0 total=33",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=33 total=33",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=32 total=33"
+  },
+  "qa": {
+    "ciRunId": 37467965883,
+    "headSha": "5ce60ab6c81adda19c7b05c9152e59a49ffd0c94",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "regression": [
+      "G25_6_DOMAIN_WORKFLOW_TEMPLATES_PASS",
+      "G26_1_STRATEGY_PROJECT_GOVERNANCE_PASS",
+      "G26_2_MILESTONE_INTELLIGENCE_PASS"
+    ],
+    "m263": "G26_3_COMPETITIVE_APPROVAL_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS",
+    "covered": [
+      "three benchmark classes",
+      "formal dimension registry",
+      "FACT vs INFERENCE",
+      "CURRENT/HISTORICAL snapshot lifecycle",
+      "freshness/staleness",
+      "competitor change event",
+      "benchmark -> project decision link",
+      "creative rights / forbidden copying",
+      "AI capability benchmark",
+      "market signal",
+      "assigned approver enforcement",
+      "notification not source of truth",
+      "single terminal approval decision",
+      "deadline expiry",
+      "deduped escalation notification",
+      "Human Gate -> durable Approval Request"
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "deploymentId": "64cae84a-0e48-4f9e-b625-cacfd16d6566",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "5ce60ab6c81adda19c7b05c9152e59a49ffd0c94",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": "PASS / 1 of 1",
+    "migration032Applied": true
+  },
+  "production": {
+    "unchanged": true,
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "status": "SUCCESS"
+  },
+  "nextAudit": "M26 closeout cold-read: project-scoped RBAC / user roles",
+  "conclusion": "M26.3 is STAGING PASS / FROZEN. Competitive Intelligence is now an updatable, evidence-based object model and Human Gate creates a durable Approval Request; notifications remain delivery-only and never replace Project/Runtime/Approval facts."
+}
