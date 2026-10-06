@@ -39,7 +39,8 @@
     "validate:core-meta-registry": "node test/core-meta-registry.test.mjs",
     "validate:capability-runtime": "node test/capability-runtime.test.mjs",
     "validate:stage-self-loop": "node test/stage-self-loop.test.mjs",
-    "validate:workflow-auto-orchestration": "node test/workflow-auto-orchestration.test.mjs"
+    "validate:workflow-auto-orchestration": "node test/workflow-auto-orchestration.test.mjs",
+    "validate:knowledge-context-backwrite": "node test/knowledge-context-backwrite.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
