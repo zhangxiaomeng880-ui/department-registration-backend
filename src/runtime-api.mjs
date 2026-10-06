@@ -152,6 +152,10 @@ import {
   createQaRetest,createQaRegression,evaluateQaGate,getProductQualityState,
   resolveQualityProjectScope,resolveQaDefectScope
 } from './product-acceptance-qa.mjs';
+import {
+  createReleaseCandidate,freezeReleaseCandidate,evaluateReleaseReadyGate,
+  getReleaseReadinessState,resolveReleaseCandidateScope
+} from './product-release-readiness.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1436,6 +1440,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const productReleaseReadinessMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-release-readiness$/);
+  if (req.method === 'GET' && productReleaseReadinessMatch) {
+    const projectId=productReleaseReadinessMatch[1];
+    const scope=await resolveProductProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getReleaseReadinessState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1463,7 +1478,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-acceptance-runs',createAcceptanceRun],
     ['product-qa-plans',createQaPlan],
     ['product-qa-executions',createQaExecution],
-    ['product-qa-regressions',createQaRegression]
+    ['product-qa-regressions',createQaRegression],
+    ['product-release-candidates',createReleaseCandidate]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1496,12 +1512,27 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       data=await evaluateAcceptanceGate(projectId,body,principal?.identityId||null);
     }else if(gateKey==='G-PD-QA'){
       data=await evaluateQaGate(projectId,body,principal?.identityId||null);
+    }else if(gateKey==='G-PD-RELEASE-READY'){
+      data=await evaluateReleaseReadyGate(projectId,body,principal?.identityId||null);
     }else if(['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey)){
       data=await evaluateProductDeliveryGate(projectId,gateKey,body,principal?.identityId||null);
     }else{
       data=await evaluateProductGate(projectId,gateKey,body,principal?.identityId||null);
     }
     json(res,200,{data});
+    return true;
+  }
+
+  const releaseCandidateFreezeMatch=match(url.pathname,/^\/api\/runtime\/product-release-candidates\/([^/]+)\/freeze$/);
+  if (req.method === 'POST' && releaseCandidateFreezeMatch) {
+    const candidateId=releaseCandidateFreezeMatch[1];
+    const scope=await resolveReleaseCandidateScope(candidateId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await freezeReleaseCandidate(
+      candidateId,await readBody(req),principal?.identityId||null
+    )});
     return true;
   }
 
