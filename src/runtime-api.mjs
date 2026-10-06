@@ -156,6 +156,10 @@ import {
   createReleaseCandidate,freezeReleaseCandidate,evaluateReleaseReadyGate,
   getReleaseReadinessState,resolveReleaseCandidateScope
 } from './product-release-readiness.mjs';
+import {
+  createReleaseRollout,verifyReleaseRollout,releaseReleaseRollout,advanceReleaseWave,
+  completeReleaseRollout,evaluateReleaseGate,getReleaseRolloutState,resolveReleaseRolloutScope
+} from './product-release-rollout.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1451,6 +1455,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const productReleaseRolloutMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-release-rollout$/);
+  if (req.method === 'GET' && productReleaseRolloutMatch) {
+    const projectId=productReleaseRolloutMatch[1];
+    const scope=await resolveProductProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getReleaseRolloutState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1479,7 +1494,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-qa-plans',createQaPlan],
     ['product-qa-executions',createQaExecution],
     ['product-qa-regressions',createQaRegression],
-    ['product-release-candidates',createReleaseCandidate]
+    ['product-release-candidates',createReleaseCandidate],
+    ['product-release-rollouts',createReleaseRollout]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1514,12 +1530,58 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       data=await evaluateQaGate(projectId,body,principal?.identityId||null);
     }else if(gateKey==='G-PD-RELEASE-READY'){
       data=await evaluateReleaseReadyGate(projectId,body,principal?.identityId||null);
+    }else if(gateKey==='G-PD-RELEASE'){
+      data=await evaluateReleaseGate(projectId,body,principal?.identityId||null);
     }else if(['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey)){
       data=await evaluateProductDeliveryGate(projectId,gateKey,body,principal?.identityId||null);
     }else{
       data=await evaluateProductGate(projectId,gateKey,body,principal?.identityId||null);
     }
     json(res,200,{data});
+    return true;
+  }
+
+  const releaseRolloutVerifyMatch=match(url.pathname,/^\/api\/runtime\/product-release-rollouts\/([^/]+)\/verify$/);
+  if (req.method === 'POST' && releaseRolloutVerifyMatch) {
+    const rolloutId=releaseRolloutVerifyMatch[1];
+    const scope=await resolveReleaseRolloutScope(rolloutId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await verifyReleaseRollout(rolloutId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const releaseRolloutReleaseMatch=match(url.pathname,/^\/api\/runtime\/product-release-rollouts\/([^/]+)\/release$/);
+  if (req.method === 'POST' && releaseRolloutReleaseMatch) {
+    const rolloutId=releaseRolloutReleaseMatch[1];
+    const scope=await resolveReleaseRolloutScope(rolloutId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await releaseReleaseRollout(rolloutId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const releaseRolloutWaveMatch=match(url.pathname,/^\/api\/runtime\/product-release-rollouts\/([^/]+)\/waves\/advance$/);
+  if (req.method === 'POST' && releaseRolloutWaveMatch) {
+    const rolloutId=releaseRolloutWaveMatch[1];
+    const scope=await resolveReleaseRolloutScope(rolloutId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await advanceReleaseWave(rolloutId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const releaseRolloutCompleteMatch=match(url.pathname,/^\/api\/runtime\/product-release-rollouts\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && releaseRolloutCompleteMatch) {
+    const rolloutId=releaseRolloutCompleteMatch[1];
+    const scope=await resolveReleaseRolloutScope(rolloutId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await completeReleaseRollout(rolloutId,await readBody(req),principal?.identityId||null)});
     return true;
   }
 
