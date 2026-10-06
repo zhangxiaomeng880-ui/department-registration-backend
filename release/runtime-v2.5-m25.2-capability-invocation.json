@@ -1,0 +1,138 @@
+{
+  "milestone": "M25.2",
+  "release": "AI Native Runtime V2.5",
+  "title": "Unified Capability Routing / Invocation",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.2-capability-invocation",
+    "sha": "b9e42799a32a41928074706dcfa9114ce1df0d41",
+    "predecessorMilestone": "M25.1",
+    "predecessorSha": "c31eaea5edc4e95fd191c4ecd420af234b06ad5d"
+  },
+  "scope": {
+    "requirementDrivenInvocation": true,
+    "routingModes": [
+      "FIXED",
+      "POLICY"
+    ],
+    "invocableCapabilityTypes": [
+      "MODEL",
+      "TOOL",
+      "SKILL",
+      "MCP"
+    ],
+    "agentCapabilityActsAsOrchestrator": true,
+    "projectTypeCapabilityMatrixEnforcedAtRuntime": true,
+    "agentGrantEnforcedAtRuntime": true,
+    "unknownAdapterFailsClosed": true,
+    "invocationEvidenceDurable": true,
+    "outputBodyPersistence": "hash/evidence only unless downstream artifact layer explicitly stores output"
+  },
+  "routingContract": {
+    "fixed": "Exact capability must remain ACTIVE, allowed for project type and granted to the stage Agent.",
+    "policy": "Selection occurs only inside the project-type allowlist and Agent grant set.",
+    "modelPolicy": "Existing model policy router is restricted to allowed provider/model pairs derived from unified capabilities.",
+    "nonModelPolicy": "Priority ordering uses project binding mode/priority, Agent grant priority and stable capability key tie-break.",
+    "policyEscapeProtection": true
+  },
+  "executionContract": {
+    "modelAdapter": "openai-responses via existing provider adapter",
+    "toolSkillMcpAdapter": "unified capability adapter dispatch contract",
+    "internalTestAdapter": "test-only; disabled unless explicit runtime flag is enabled",
+    "modelCommercialAuthorization": "existing entitlement/quota/rate-limit reservation chain",
+    "modelCostUsageLedger": "existing tool execution + usage ledger integration",
+    "unsupportedAdapterError": "CAPABILITY_ADAPTER_NOT_IMPLEMENTED",
+    "activeStageRequired": true,
+    "runTaskProjectScopeValidated": true
+  },
+  "evidenceModel": {
+    "table": "capability_invocations",
+    "records": [
+      "project/run/task/stage/requirement/agent scope",
+      "capability type and routing mode",
+      "requested and selected capability",
+      "adapter",
+      "routing decision and fallback chain",
+      "input/output SHA256",
+      "tool execution and usage ledger links",
+      "duration and terminal status",
+      "structured error code/category/message"
+    ]
+  },
+  "schema": {
+    "migration": "025_capability_invocation.sql",
+    "migrationsTotal": 26,
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=26 skipped=0 total=26",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=26 total=26",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=25 total=26"
+  },
+  "api": {
+    "invoke": "POST /api/runtime/capability-invocations",
+    "detail": "GET /api/runtime/capability-invocations/:invocationId",
+    "authorization": "existing project RBAC / platform administrator",
+    "unauthenticatedContract": "401"
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.2 Unified Capability Invocation Gate",
+    "runId": 37426020957,
+    "headSha": "b9e42799a32a41928074706dcfa9114ce1df0d41",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "G25_1_CORE_META_REGISTRY_PASS"
+    ],
+    "m252UnifiedCapabilityInvocation": "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "88432944-f5c2-4e43-9f15-7e1d7c0c0be1",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "b9e42799a32a41928074706dcfa9114ce1df0d41",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration025Applied": true,
+    "pendingFunctionalChanges": false
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M25.3 Stage Runtime / Self-loop",
+  "conclusion": "M25.2 Unified Capability Routing / Invocation is STAGING PASS / FROZEN. Stage capability requirements now drive real capability resolution and execution under project-type and Agent authorization boundaries, with FIXED/POLICY routing, fail-closed adapter dispatch, durable invocation evidence, and model usage/cost integration. Production remains unchanged on V2.3."
+}
