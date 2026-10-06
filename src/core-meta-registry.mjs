@@ -647,7 +647,8 @@ export const getProjectLifecycle=async projectId=>{
   return {
     project:{
       id:projects[0].id,projectKey:projects[0].project_key,name:projects[0].name,
-      projectType:projects[0].project_type,status:projects[0].status,
+      projectType:projects[0].project_type,projectSubtypeKey:projects[0].project_subtype_key||null,
+      status:projects[0].status,
       currentWorkflowVersion:projects[0].current_workflow_version||null,
       workflowTemplateId:projects[0].workflow_template_id||null,
       currentStageKey:projects[0].current_stage_key||null,
