@@ -133,6 +133,12 @@ import {
   evaluateProductGate,createProductRequirementBaseline,getProductDiscoveryState,
   getProductRequirement,resolveProductProjectScope,resolveProductRequirementScope
 } from './product-development-domain.mjs';
+import {
+  createProductFeasibilityReview,createArchitectureDecision,createProductDeliveryPlan,
+  createDesignContract,reviseDesignContract,createTechnicalContract,reviseTechnicalContract,
+  evaluateProductDeliveryGate,getProductDeliveryState,getDesignContract,getTechnicalContract,
+  resolveDesignContractScope,resolveTechnicalContractScope
+} from './product-development-delivery.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1368,6 +1374,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const productDeliveryDomainMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-delivery-domain$/);
+  if (req.method === 'GET' && productDeliveryDomainMatch) {
+    const projectId=productDeliveryDomainMatch[1];
+    const scope=await resolveProductProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getProductDeliveryState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1380,7 +1397,12 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-bets',createProductBet],
     ['product-requirements',createProductRequirement],
     ['product-trace-links',createProductTraceLink],
-    ['product-baselines',createProductRequirementBaseline]
+    ['product-baselines',createProductRequirementBaseline],
+    ['product-feasibility-reviews',createProductFeasibilityReview],
+    ['product-architecture-decisions',createArchitectureDecision],
+    ['product-delivery-plans',createProductDeliveryPlan],
+    ['product-design-contracts',createDesignContract],
+    ['product-technical-contracts',createTechnicalContract]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1403,8 +1425,10 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     if(!principal?.platformAdmin) await assertAccess({
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
-    json(res,200,{data:await evaluateProductGate(
-      projectId,gateKey,await readBody(req),principal?.identityId||null
+    const body=await readBody(req);
+    const m272Gate=['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey);
+    json(res,200,{data:await (m272Gate?evaluateProductDeliveryGate:evaluateProductGate)(
+      projectId,gateKey,body,principal?.identityId||null
     )});
     return true;
   }
@@ -1427,6 +1451,50 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     });
     json(res,201,{data:await reviseProductRequirement(
       productRequirementVersionMatch[1],await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const designContractMatch=match(url.pathname,/^\/api\/runtime\/product-design-contracts\/([^/]+)$/);
+  if (designContractMatch && ['GET'].includes(req.method)) {
+    const target=await resolveDesignContractScope(designContractMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...target,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getDesignContract(designContractMatch[1])});
+    return true;
+  }
+
+  const designContractVersionMatch=match(url.pathname,/^\/api\/runtime\/product-design-contracts\/([^/]+)\/versions$/);
+  if (req.method==='POST' && designContractVersionMatch) {
+    const target=await resolveDesignContractScope(designContractVersionMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...target,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await reviseDesignContract(
+      designContractVersionMatch[1],await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const technicalContractMatch=match(url.pathname,/^\/api\/runtime\/product-technical-contracts\/([^/]+)$/);
+  if (technicalContractMatch && ['GET'].includes(req.method)) {
+    const target=await resolveTechnicalContractScope(technicalContractMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...target,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getTechnicalContract(technicalContractMatch[1])});
+    return true;
+  }
+
+  const technicalContractVersionMatch=match(url.pathname,/^\/api\/runtime\/product-technical-contracts\/([^/]+)\/versions$/);
+  if (req.method==='POST' && technicalContractVersionMatch) {
+    const target=await resolveTechnicalContractScope(technicalContractVersionMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...target,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await reviseTechnicalContract(
+      technicalContractVersionMatch[1],await readBody(req),principal?.identityId||null
     )});
     return true;
   }
