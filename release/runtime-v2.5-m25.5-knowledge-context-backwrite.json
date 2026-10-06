@@ -1,0 +1,176 @@
+{
+  "milestone": "M25.5",
+  "release": "AI Native Runtime V2.5",
+  "title": "Knowledge / Context Injection & Backwrite",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.5-knowledge-context-backwrite",
+    "sha": "7c545e66232189b42f99636baf83c9455684e9e6",
+    "predecessorMilestone": "M25.4",
+    "predecessorSha": "fadd94aee2128427a5f7a4ca402b050cb3fc5288"
+  },
+  "workflowKnowledgePolicy": {
+    "firstClassInFrozenWorkflow": true,
+    "fields": [
+      "policyKey",
+      "sourceKey",
+      "queryTemplate",
+      "contextRole",
+      "required",
+      "maxItems",
+      "allowedStatuses",
+      "injectionMode",
+      "writebackMode",
+      "writebackTargetPath"
+    ],
+    "executableStatuses": [
+      "CURRENT",
+      "FACT",
+      "RULE",
+      "FINAL"
+    ],
+    "forbiddenForAutomaticExecution": [
+      "PENDING",
+      "HISTORICAL",
+      "DEPRECATED"
+    ],
+    "knowledgePolicyIncludedInDefinitionSha256": true
+  },
+  "contextInjection": {
+    "sourceBodyPersistence": false,
+    "transientPacket": true,
+    "packetConsumedImmediately": true,
+    "provenancePersisted": true,
+    "retrievalRecordPersisted": true,
+    "runKnowledgeContextFingerprintCompatible": true,
+    "requirementInputInjection": true,
+    "missingRequiredKnowledge": "HOLD -> ESCALATE before capability invocation",
+    "maxItemsEnforced": true,
+    "sourceStatusPolicyEnforced": true
+  },
+  "writeback": {
+    "mode": "PROPOSE",
+    "queue": "knowledge_writeback_queue",
+    "autoApply": false,
+    "externalConfirmationRequired": true,
+    "applyRequires": "externalWriteId from target connector",
+    "terminalStates": [
+      "APPLIED",
+      "REJECTED",
+      "FAILED"
+    ],
+    "optimisticVersionField": "expected_source_version",
+    "generatedPayloadMayPersist": true,
+    "retrievedSourceBodyNeverPersisted": true
+  },
+  "schema": {
+    "migration": "028_knowledge_context_backwrite.sql",
+    "migrationsTotal": 29,
+    "tables": [
+      "stage_knowledge_policies",
+      "knowledge_writeback_queue"
+    ],
+    "orchestrationAttemptExtensions": [
+      "knowledge_context_count",
+      "context_hash",
+      "writeback_count"
+    ],
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=29 skipped=0 total=29",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=29 total=29",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=28 total=29"
+  },
+  "api": {
+    "stageKnowledgePolicy": "POST /api/runtime/workflow-stages/:stageId/knowledge-policies",
+    "projectWritebacks": "GET /api/runtime/projects/:projectId/knowledge-writebacks",
+    "writebackDetail": "GET /api/runtime/knowledge-writebacks/:writebackId",
+    "writebackDecision": "POST /api/runtime/knowledge-writebacks/:writebackId/decision"
+  },
+  "e2e": {
+    "successPath": [
+      "registered external knowledge source metadata",
+      "CURRENT source packet supplied transiently",
+      "context packet validated and consumed",
+      "provenance written to knowledge_contexts",
+      "retrieval provenance written to knowledge_retrievals/items",
+      "context injected into stage capability execution",
+      "stage/project PASS",
+      "knowledgeWriteback output queued PENDING",
+      "APPLY without connector confirmation rejected",
+      "APPLY with externalWriteId accepted"
+    ],
+    "missingKnowledgePath": [
+      "required knowledge packet omitted",
+      "no capability invocation occurs",
+      "gate HOLD",
+      "stage ESCALATE",
+      "project BLOCKED"
+    ],
+    "sourceBodyLeakCheck": true
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.5 Knowledge Context Backwrite Gate",
+    "runId": 37433673029,
+    "headSha": "7c545e66232189b42f99636baf83c9455684e9e6",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "G25_1_CORE_META_REGISTRY_PASS",
+      "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS",
+      "G25_3_STAGE_SELF_LOOP_PASS",
+      "G25_4_WORKFLOW_AUTO_ORCHESTRATION_PASS"
+    ],
+    "m255KnowledgeContextBackwrite": "G25_5_KNOWLEDGE_CONTEXT_BACKWRITE_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "db28b1cf-2468-4764-8dee-20159caa6722",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "7c545e66232189b42f99636baf83c9455684e9e6",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration028Applied": true,
+    "pendingFunctionalChanges": false
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M25.6 Domain Workflow Templates / Product R&D + AIGC",
+  "conclusion": "M25.5 Knowledge / Context Injection & Backwrite is STAGING PASS / FROZEN. Frozen workflow stages now declare explicit knowledge policies; transient CURRENT/FACT/RULE/FINAL context is validated, provenance-recorded and injected into capability execution without persisting source bodies; successful stages may emit controlled writeback proposals that remain PENDING until an external connector confirms the write. Production remains unchanged on V2.3."
+}
