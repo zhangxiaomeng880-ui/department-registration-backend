@@ -52,7 +52,8 @@
     "validate:product-ai-contract": "node test/product-ai-contract.test.mjs",
     "validate:product-engineering-preview": "node test/product-engineering-preview.test.mjs",
     "validate:product-acceptance-qa": "node test/product-acceptance-qa.test.mjs",
-    "validate:product-release-readiness": "node test/product-release-readiness.test.mjs"
+    "validate:product-release-readiness": "node test/product-release-readiness.test.mjs",
+    "validate:product-release-rollout": "node test/product-release-rollout.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
