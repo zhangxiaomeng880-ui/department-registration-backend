@@ -72,8 +72,9 @@ import { createEvalReliabilitySnapshot,getEvalReliabilitySnapshot } from './eval
 import {
   upsertProjectType,listProjectTypes,upsertCapability,listCapabilities,upsertAgentProfile,
   grantAgentCapability,bindProjectTypeCapability,createWorkflowTemplate,addWorkflowMilestone,
-  addWorkflowStage,addStageCapabilityRequirement,addStageKnowledgePolicy,freezeWorkflowTemplate,getWorkflowTemplate,
-  bindProjectWorkflow,getProjectLifecycle
+  addWorkflowStage,addStageCapabilityRequirement,addStageKnowledgePolicy,
+  addStageAgentAssignment,addStageGateContract,listWorkflowTemplates,
+  freezeWorkflowTemplate,getWorkflowTemplate,bindProjectWorkflow,getProjectLifecycle
 } from './core-meta-registry.mjs';
 import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
 import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvents } from './stage-runtime.mjs';
@@ -812,6 +813,16 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/runtime/workflow-templates') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listWorkflowTemplates({
+      projectTypeKey:url.searchParams.get('projectTypeKey')||null,
+      status:url.searchParams.get('status')||null,
+      templateClass:url.searchParams.get('templateClass')||null
+    })});
+    return true;
+  }
+
   const workflowMilestoneMatch=match(url.pathname,/^\/api\/runtime\/workflow-templates\/([^/]+)\/milestones$/);
   if (req.method === 'POST' && workflowMilestoneMatch) {
     requirePlatformAdmin(principal);
@@ -830,6 +841,20 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && stageRequirementMatch) {
     requirePlatformAdmin(principal);
     json(res,201,{data:await addStageCapabilityRequirement(stageRequirementMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const stageAgentAssignmentMatch=match(url.pathname,/^\/api\/runtime\/workflow-stages\/([^/]+)\/agents$/);
+  if (req.method === 'POST' && stageAgentAssignmentMatch) {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await addStageAgentAssignment(stageAgentAssignmentMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const stageGateContractMatch=match(url.pathname,/^\/api\/runtime\/workflow-stages\/([^/]+)\/gate-contracts$/);
+  if (req.method === 'POST' && stageGateContractMatch) {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await addStageGateContract(stageGateContractMatch[1],await readBody(req))});
     return true;
   }
 
