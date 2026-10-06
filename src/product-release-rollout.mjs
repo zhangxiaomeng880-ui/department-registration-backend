@@ -63,18 +63,18 @@ const validateVerification=(verification,codePrefix='RELEASE')=>{
 };
 const insertTrace=async(db,{projectId,sourceType,sourceId,targetType,targetId,linkType,actorId,evidence})=>{
   await db.execute(
-    \`INSERT INTO product_trace_links
+    `INSERT INTO product_trace_links
       (id,project_id,source_type,source_id,target_type,target_id,link_type,evidence_json,created_by_identity_id)
      VALUES (?,?,?,?,?,?,?,?,?)
-     ON DUPLICATE KEY UPDATE evidence_json=VALUES(evidence_json)\`,
+     ON DUPLICATE KEY UPDATE evidence_json=VALUES(evidence_json)`,
     [randomUUID(),projectId,sourceType,sourceId,targetType,targetId,linkType,asJson(evidence||null),actorId||null]
   );
 };
 const insertEvent=async(db,{projectId,rolloutId,eventKey,fromState,toState,waveId,evidence,actorId,occurredAt})=>{
   await db.execute(
-    \`INSERT INTO product_release_state_events
+    `INSERT INTO product_release_state_events
       (id,project_id,rollout_id,event_key,from_state,to_state,wave_id,evidence_json,actor_identity_id,occurred_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?)\`,
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
     [randomUUID(),projectId,rolloutId,eventKey,fromState||null,toState,waveId||null,
      asJson(evidence),actorId||null,occurredAt?new Date(occurredAt):new Date()]
   );
@@ -133,8 +133,8 @@ const validateWaveDefinitions=(strategy,waves)=>{
 export const resolveReleaseRolloutScope=async rolloutId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute(
-    \`SELECT r.id,r.project_id,p.workspace_id FROM product_release_rollouts r
-      JOIN projects p ON p.id=r.project_id WHERE r.id=?\`,[rolloutId]
+    `SELECT r.id,r.project_id,p.workspace_id FROM product_release_rollouts r
+      JOIN projects p ON p.id=r.project_id WHERE r.id=?`,[rolloutId]
   );
   if(!rows.length)throw errorOf('Release Rollout not found','RELEASE_ROLLOUT_NOT_FOUND',404);
   return {releaseRolloutId:rolloutId,projectId:rows[0].project_id,workspaceId:rows[0].workspace_id};
@@ -188,11 +188,11 @@ export const createReleaseRollout=async(projectId,input={},actorId=null)=>{
     );
     if(active.length)throw errorOf('Only one active release rollout is allowed per project','ACTIVE_RELEASE_ROLLOUT_EXISTS',409);
     await conn.execute(
-      \`INSERT INTO product_release_rollouts
+      `INSERT INTO product_release_rollouts
         (id,project_id,release_candidate_id,release_version_id,rollout_key,strategy,release_state,lifecycle_status,
          target_environment,deployment_id,exact_commit_sha,artifact_sha256,target_scope_json,deployment_evidence_json,
          started_by_identity_id,deployed_at)
-       VALUES (?,?,?,?,?,?,'DEPLOYED','ACTIVE',?,?,?,?,?,?,?,?)\`,
+       VALUES (?,?,?,?,?,?,'DEPLOYED','ACTIVE',?,?,?,?,?,?,?,?)`,
       [id,projectId,candidate.id,candidate.release_version_id,input.rolloutKey,strategy,input.targetEnvironment,
        input.deploymentId,input.exactCommitSha.toLowerCase(),input.artifactSha256.toLowerCase(),
        asJson(input.targetScope),asJson(input.deploymentEvidence),actorId,
@@ -202,9 +202,9 @@ export const createReleaseRollout=async(projectId,input={},actorId=null)=>{
     for(const wave of waves){
       const waveId=randomUUID();waveIds[wave.waveKey]=waveId;
       await conn.execute(
-        \`INSERT INTO product_release_waves
+        `INSERT INTO product_release_waves
           (id,project_id,rollout_id,wave_key,sequence_no,scope_json,target_percentage,is_final_wave,status)
-         VALUES (?,?,?,?,?,?,?,?, 'PLANNED')\`,
+         VALUES (?,?,?,?,?,?,?,?, 'PLANNED')`,
         [waveId,projectId,id,wave.waveKey,wave.sequenceNo,asJson(wave.scope),
          wave.targetPercentage==null?null:wave.targetPercentage,wave.isFinalWave===true]
       );
@@ -241,9 +241,9 @@ export const verifyReleaseRollout=async(rolloutId,input={},actorId=null)=>{
       'Verification artifact does not match deployed artifact','RELEASE_VERIFY_ARTIFACT_MISMATCH',409
     );
     await conn.execute(
-      \`UPDATE product_release_rollouts
+      `UPDATE product_release_rollouts
           SET release_state='VERIFIED',verification_json=?,verified_at=?
-        WHERE id=?\`,
+        WHERE id=?`,
       [asJson(input),input.verifiedAt?new Date(input.verifiedAt):new Date(),rolloutId]
     );
     await insertEvent(conn,{projectId:row.project_id,rolloutId,eventKey:'VERIFIED',
@@ -275,9 +275,9 @@ const releaseWave=async(db,row,input,actorId,eventPrefix)=>{
     {expectedWaveKey:next.wave_key,actualWaveKey:input.waveKey}
   );
   await db.execute(
-    \`UPDATE product_release_waves
+    `UPDATE product_release_waves
         SET status='VERIFIED',verification_json=?,released_at=?,verified_at=?
-      WHERE id=?\`,
+      WHERE id=?`,
     [asJson(input.verification),input.releasedAt?new Date(input.releasedAt):new Date(),
      input.verifiedAt?new Date(input.verifiedAt):new Date(),next.id]
   );
@@ -314,16 +314,16 @@ export const releaseReleaseRollout=async(rolloutId,input={},actorId=null)=>{
     }
 
     await conn.execute(
-      \`UPDATE product_release_rollouts
+      `UPDATE product_release_rollouts
           SET release_state='RELEASED',release_evidence_json=?,released_by_identity_id=?,released_at=?
-        WHERE id=?\`,
+        WHERE id=?`,
       [asJson({approval:input.approval,releaseEvidence:input.releaseEvidence,
         initialWaveKey:wave?.wave_key||null}),
        input.approval.approverIdentityId,input.releasedAt?new Date(input.releasedAt):new Date(),rolloutId]
     );
     await conn.execute(
-      \`UPDATE project_versions SET status='RELEASED',effective_at=COALESCE(effective_at,CURRENT_TIMESTAMP(6))
-        WHERE id=? AND status='LOCKED'\`,[row.release_version_id]
+      `UPDATE project_versions SET status='RELEASED',effective_at=COALESCE(effective_at,CURRENT_TIMESTAMP(6))
+        WHERE id=? AND status='LOCKED'`,[row.release_version_id]
     );
     await insertEvent(conn,{projectId:row.project_id,rolloutId,eventKey:'RELEASED',
       fromState:'VERIFIED',toState:'RELEASED',waveId:wave?.id||null,
@@ -376,10 +376,10 @@ export const completeReleaseRollout=async(rolloutId,input={},actorId=null)=>{
       }
     }
     await conn.execute(
-      \`UPDATE product_release_rollouts
+      `UPDATE product_release_rollouts
           SET release_state='FULLY_ROLLED_OUT',lifecycle_status='COMPLETED',
               full_rollout_evidence_json=?,fully_rolled_out_at=?
-        WHERE id=?\`,
+        WHERE id=?`,
       [asJson({finalVerification:input.finalVerification,evidence:input.evidence}),
        input.completedAt?new Date(input.completedAt):new Date(),rolloutId]
     );
@@ -450,9 +450,9 @@ export const evaluateReleaseGate=async(projectId,input={},actorId=null)=>{
   const result={projectId,gateKey:GATE,status:reasons.length?'HOLD':'PASS',
     reasonCodes:reasons,evidenceSnapshot:evidence,asOf};
   if(input.persist!==false)await db.execute(
-    \`INSERT INTO product_m277_gate_evaluations
+    `INSERT INTO product_m277_gate_evaluations
       (id,project_id,gate_key,status,reason_codes_json,evidence_snapshot_json,as_of,evaluated_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?)\`,
+     VALUES (?,?,?,?,?,?,?,?)`,
     [randomUUID(),projectId,GATE,result.status,asJson(reasons),asJson(evidence),asOf,actorId]
   );
   return result;
