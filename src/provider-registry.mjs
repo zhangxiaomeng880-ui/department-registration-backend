@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
+import { syncModelCapability } from './core-meta-registry.mjs';
 
 const HEALTH = new Set(['HEALTHY','DEGRADED','DOWN','UNKNOWN']);
 const QUALITY = new Set(['BASIC','STANDARD','HIGH','PREMIUM']);
@@ -171,6 +172,7 @@ export const upsertModel = async input => {
     'SELECT * FROM model_registry WHERE provider_key = ? AND model_key = ?',
     [input.providerKey, input.modelKey]
   );
+  await syncModelCapability(input.providerKey,input.modelKey);
   return normalizeModel(rows[0]);
 };
 
