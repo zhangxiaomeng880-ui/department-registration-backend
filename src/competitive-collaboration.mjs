@@ -208,8 +208,23 @@ export const addBenchmarkObservation=async(snapshotId,input={})=>{
   if(!OBSERVATION_TYPES.has(type)) throw errorOf('Invalid observationType','INVALID_OBSERVATION_TYPE');
   if(!CONFIDENCE.has(confidence)) throw errorOf('Invalid confidence','INVALID_CONFIDENCE');
   const db=getRuntimePool();
-  const [snapshots]=await db.execute('SELECT id FROM benchmark_snapshots WHERE id=?',[snapshotId]);
+  const [snapshots]=await db.execute(
+    `SELECT s.id,b.workspace_id,b.benchmark_type
+       FROM benchmark_snapshots s
+       JOIN benchmark_subjects b ON b.id=s.subject_id
+      WHERE s.id=?`,[snapshotId]
+  );
   if(!snapshots.length) throw errorOf('Benchmark snapshot not found','BENCHMARK_SNAPSHOT_NOT_FOUND',404);
+  const [dimensions]=await db.execute(
+    `SELECT id FROM benchmark_dimensions
+      WHERE workspace_id=? AND benchmark_type=? AND dimension_key=? AND status='ACTIVE'`,
+    [snapshots[0].workspace_id,snapshots[0].benchmark_type,input.dimensionKey]
+  );
+  if(!dimensions.length) throw errorOf(
+    'Benchmark dimension is not registered for this benchmark type',
+    'BENCHMARK_DIMENSION_NOT_REGISTERED',409,
+    {dimensionKey:input.dimensionKey,benchmarkType:snapshots[0].benchmark_type}
+  );
   const id=input.id||randomUUID();
   await db.execute(
     `INSERT INTO benchmark_observations
@@ -338,6 +353,28 @@ export const linkBenchmarkDecision=async input=>{
     if(!decisions.length) throw errorOf('Project decision not found','PROJECT_DECISION_NOT_FOUND',404);
     if(decisions[0].project_id!==input.projectId) throw errorOf('Decision project mismatch','BENCHMARK_DECISION_SCOPE_MISMATCH',409);
   }
+  if(input.snapshotId){
+    const [rows]=await db.execute('SELECT subject_id FROM benchmark_snapshots WHERE id=?',[input.snapshotId]);
+    if(!rows.length||rows[0].subject_id!==input.subjectId) throw errorOf(
+      'Decision-link snapshot must belong to subject','BENCHMARK_DECISION_SCOPE_MISMATCH',409
+    );
+  }
+  if(input.observationId){
+    const [rows]=await db.execute(
+      `SELECT s.subject_id FROM benchmark_observations o
+        JOIN benchmark_snapshots s ON s.id=o.snapshot_id WHERE o.id=?`,
+      [input.observationId]
+    );
+    if(!rows.length||rows[0].subject_id!==input.subjectId) throw errorOf(
+      'Decision-link observation must belong to subject','BENCHMARK_DECISION_SCOPE_MISMATCH',409
+    );
+  }
+  if(input.changeEventId){
+    const [rows]=await db.execute('SELECT subject_id FROM competitor_change_events WHERE id=?',[input.changeEventId]);
+    if(!rows.length||rows[0].subject_id!==input.subjectId) throw errorOf(
+      'Decision-link change event must belong to subject','BENCHMARK_DECISION_SCOPE_MISMATCH',409
+    );
+  }
   const id=input.id||randomUUID();
   await db.execute(
     `INSERT INTO benchmark_decision_links
@@ -463,7 +500,7 @@ export const createApprovalRequest=async input=>{
       (id,tenant_id,workspace_id,project_id,request_key,target_type,target_id,required_role,
        approver_identity_id,requested_action,risk_level,context_json,evidence_json,due_at,escalation_at,
        status,effective_object_type,effective_object_id,effective_version,requested_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING',?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING',?,?,?,?)`,
     [
       id,workspace.tenant_id,input.workspaceId,input.projectId||null,input.requestKey,upper(input.targetType),
       String(input.targetId),input.requiredRole||null,input.approverIdentityId||null,input.requestedAction,
