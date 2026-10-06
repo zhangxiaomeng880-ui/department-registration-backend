@@ -168,7 +168,7 @@ export const createEngineeringChangeset=async(projectId,input={},actorId=null)=>
     'productBaselineId','deliveryPlanId','workItemId','designContractVersionId',
     'technicalContractVersionId','changesetKey','repositoryFullName','branchName','commitSha',
     'pullRequest','sourceVerification','requirementVersionIds','dependencyChange','migration',
-    'staticCheck','automatedTest','knownIssues','evidence'
+    'staticCheck','automatedTest','evidence'
   ],'INVALID_ENGINEERING_CHANGESET');
   verifySource(input);
   assertNaOrStatus({value:input.dependencyChange,label:'dependencyChange'});
