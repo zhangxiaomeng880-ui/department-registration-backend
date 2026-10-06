@@ -9,6 +9,11 @@ ALTER TABLE projects
   ADD COLUMN last_update_at TIMESTAMP(6) NULL AFTER update_cadence_days,
   ADD COLUMN stale_after_at TIMESTAMP(6) NULL AFTER last_update_at;
 
+ALTER TABLE strategic_items
+  ADD COLUMN update_cadence_days INT NULL AFTER health,
+  ADD COLUMN last_update_at TIMESTAMP(6) NULL AFTER update_cadence_days,
+  ADD COLUMN stale_after_at TIMESTAMP(6) NULL AFTER last_update_at;
+
 ALTER TABLE project_milestones
   ADD COLUMN calculated_progress_percent DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER progress_percent,
   ADD COLUMN progress_override_percent DECIMAL(5,2) NULL AFTER calculated_progress_percent,
