@@ -1,0 +1,172 @@
+{
+  "milestone": "M25.4",
+  "release": "AI Native Runtime V2.5",
+  "title": "Workflow Auto-Orchestration / Project Self-loop",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.4-workflow-auto-orchestration",
+    "sha": "fadd94aee2128427a5f7a4ca402b050cb3fc5288",
+    "predecessorMilestone": "M25.3",
+    "predecessorSha": "cc8951c04334b1a147e4a21e4b51472d7bc40bfc"
+  },
+  "projectSelfLoop": {
+    "frozenWorkflowRead": true,
+    "currentStageResolution": true,
+    "taskCreation": true,
+    "stageRequirementExecution": true,
+    "unifiedCapabilityInvocation": true,
+    "gateDecision": true,
+    "stageTransition": true,
+    "milestoneProgression": true,
+    "projectCompletion": true,
+    "stopOnEscalation": true,
+    "idempotentSession": true
+  },
+  "decisionPolicy": {
+    "allRequiredCapabilitiesPass": "PASS",
+    "missingRequiredInput": "HOLD -> ESCALATE",
+    "capabilityFailure": "RETRY while retry budget remains",
+    "retryBudgetExhausted": "ESCALATE by default; ROLLBACK when configured with rollbackStageKey",
+    "optionalFailure": "non-blocking unless optionalFailureBlocks=true",
+    "emptyStage": "HOLD -> ESCALATE unless allowAutoPassWithoutRequirements=true",
+    "maxStageTransitions": "hard stop / HOLD to prevent runaway loops"
+  },
+  "taskSemantics": {
+    "continuousRetryReusesSameTask": true,
+    "passToNextStageCreatesNewTask": true,
+    "rollbackTargetCreatesNewTask": true,
+    "rawStageInputPersisted": false,
+    "persistedInputManifest": "presence + SHA256 only"
+  },
+  "evidenceModel": {
+    "tables": [
+      "workflow_orchestration_sessions",
+      "workflow_orchestration_stage_attempts",
+      "capability_invocations",
+      "stage_transition_events",
+      "gate_results",
+      "stage_snapshots",
+      "checkpoints"
+    ],
+    "sessionTracks": [
+      "project/run/workflow",
+      "current stage",
+      "stage attempts",
+      "capability invocation count",
+      "terminal/stop reason",
+      "input manifest hashes",
+      "result status"
+    ],
+    "attemptTracks": [
+      "task/stage/attempt number",
+      "required/optional requirement counts",
+      "invocation pass/fail counts",
+      "gate status",
+      "transition type/event",
+      "decision evidence without source bodies"
+    ]
+  },
+  "schema": {
+    "migration": "027_workflow_auto_orchestration.sql",
+    "migrationsTotal": 28,
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=28 skipped=0 total=28",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=28 total=28",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=27 total=28"
+  },
+  "api": {
+    "start": "POST /api/runtime/projects/:projectId/orchestrations",
+    "list": "GET /api/runtime/projects/:projectId/orchestrations",
+    "detail": "GET /api/runtime/orchestrations/:sessionId",
+    "executePermission": "agent:execute",
+    "readPermission": "run:read",
+    "unauthenticatedContract": "401"
+  },
+  "e2e": {
+    "successPath": [
+      "frozen two-stage workflow",
+      "stage 1 requirement invocation",
+      "automatic PASS -> stage 2",
+      "stage 2 requirement invocation",
+      "automatic PASS -> project COMPLETED",
+      "run PASS",
+      "session PASS"
+    ],
+    "failurePath": [
+      "runtime-selectable capability with unavailable adapter",
+      "first failure -> automatic RETRY",
+      "retry reuses same task",
+      "second failure exhausts retry budget",
+      "automatic ESCALATE",
+      "stage/project BLOCKED",
+      "run HOLD",
+      "session BLOCKED"
+    ],
+    "idempotencyVerified": true,
+    "rawSourceBodyLeakCheck": true
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.4 Workflow Auto-Orchestration Gate",
+    "runId": 37432514162,
+    "headSha": "fadd94aee2128427a5f7a4ca402b050cb3fc5288",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "G25_1_CORE_META_REGISTRY_PASS",
+      "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS",
+      "G25_3_STAGE_SELF_LOOP_PASS"
+    ],
+    "m254WorkflowAutoOrchestration": "G25_4_WORKFLOW_AUTO_ORCHESTRATION_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "1b543476-cc44-4aa2-a5a7-453c2ab45a1e",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "fadd94aee2128427a5f7a4ca402b050cb3fc5288",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration027Applied": true,
+    "pendingFunctionalChanges": false
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M25.5 Knowledge / Context Injection and Backwrite",
+  "conclusion": "M25.4 Workflow Auto-Orchestration / Project Self-loop is STAGING PASS / FROZEN. A frozen workflow can now autonomously drive current-stage task creation, capability execution, gate evaluation, retry/escalation/rollback policy, stage and milestone progression, and final project completion while persisting auditable orchestration evidence and source-input hashes rather than raw source bodies. Production remains unchanged on V2.3."
+}
