@@ -399,12 +399,68 @@ export const freezeWorkflowTemplate=async templateId=>{
   await assertWorkflowDraft(templateId,db);
   const definition=await getWorkflowTemplate(templateId);
   if(!definition.stages.length) throw errorOf('Workflow template requires at least one stage','WORKFLOW_TEMPLATE_EMPTY',409);
+
+  const [bindingRows]=await db.execute(
+    `SELECT b.capability_key,c.capability_type,c.status,c.routable
+       FROM project_type_capability_bindings b
+       JOIN capability_registry c ON c.capability_key=b.capability_key
+      WHERE b.project_type_key=? AND b.binding_mode IN ('ALLOWED','DEFAULT')`,
+    [definition.projectTypeKey]
+  );
+  const projectBindings=new Map(bindingRows.map(row=>[row.capability_key,row]));
+
   for(const stage of definition.stages){
-    if(stage.defaultAgentCapabilityKey) await assertCapabilityType(stage.defaultAgentCapabilityKey,'AGENT',db);
+    if(stage.defaultAgentCapabilityKey){
+      await assertCapabilityType(stage.defaultAgentCapabilityKey,'AGENT',db);
+      if(!projectBindings.has(stage.defaultAgentCapabilityKey)) throw errorOf(
+        'Stage default Agent is not allowed for project type','WORKFLOW_AGENT_NOT_ALLOWED',409,
+        {stageKey:stage.stageKey,agentCapabilityKey:stage.defaultAgentCapabilityKey,projectTypeKey:definition.projectTypeKey}
+      );
+    }
     for(const requirement of stage.requirements){
-      if(requirement.capabilityKey) await assertCapabilityType(requirement.capabilityKey,requirement.capabilityType,db);
+      if(requirement.capabilityKey){
+        await assertCapabilityType(requirement.capabilityKey,requirement.capabilityType,db);
+        if(!projectBindings.has(requirement.capabilityKey)) throw errorOf(
+          'Fixed stage capability is not allowed for project type','WORKFLOW_CAPABILITY_NOT_ALLOWED',409,
+          {stageKey:stage.stageKey,requirementKey:requirement.requirementKey,capabilityKey:requirement.capabilityKey}
+        );
+        if(stage.defaultAgentCapabilityKey){
+          const [grants]=await db.execute(
+            `SELECT 1 FROM agent_capability_grants
+              WHERE agent_capability_key=? AND child_capability_key=? LIMIT 1`,
+            [stage.defaultAgentCapabilityKey,requirement.capabilityKey]
+          );
+          if(!grants.length) throw errorOf(
+            'Stage Agent is not granted the fixed capability','WORKFLOW_AGENT_CAPABILITY_NOT_GRANTED',409,
+            {stageKey:stage.stageKey,requirementKey:requirement.requirementKey,capabilityKey:requirement.capabilityKey}
+          );
+        }
+      }else if(requirement.routingMode==='POLICY'){
+        const params=[definition.projectTypeKey,requirement.capabilityType];
+        let sql=`SELECT c.capability_key
+                    FROM project_type_capability_bindings b
+                    JOIN capability_registry c ON c.capability_key=b.capability_key`;
+        if(stage.defaultAgentCapabilityKey){
+          sql+=` JOIN agent_capability_grants g
+                    ON g.child_capability_key=c.capability_key AND g.agent_capability_key=?`;
+          params.push(stage.defaultAgentCapabilityKey);
+        }
+        sql+=` WHERE b.project_type_key=? AND c.capability_type=?
+                  AND b.binding_mode IN ('ALLOWED','DEFAULT')
+                  AND c.status='ACTIVE' AND c.routable=TRUE
+                ORDER BY b.priority,c.capability_key LIMIT 1`;
+        if(stage.defaultAgentCapabilityKey){
+          params.splice(0,2,stage.defaultAgentCapabilityKey,definition.projectTypeKey,requirement.capabilityType);
+        }
+        const [candidates]=await db.execute(sql,params);
+        if(!candidates.length) throw errorOf(
+          'Policy-routed stage capability has no allowed candidate','WORKFLOW_CAPABILITY_UNRESOLVED',409,
+          {stageKey:stage.stageKey,requirementKey:requirement.requirementKey,capabilityType:requirement.capabilityType}
+        );
+      }
     }
   }
+  const milestoneKeyById=new Map(definition.milestones.map(x=>[x.id,x.milestoneKey]));
   const hashMaterial={
     projectTypeKey:definition.projectTypeKey,templateKey:definition.templateKey,version:definition.version,
     milestones:definition.milestones.map(x=>({
@@ -412,7 +468,8 @@ export const freezeWorkflowTemplate=async templateId=>{
     })),
     stages:definition.stages.map(x=>({
       stageKey:x.stageKey,displayName:x.displayName,stageType:x.stageType,sequenceNo:x.sequenceNo,
-      milestoneTemplateId:x.milestoneTemplateId,defaultAgentCapabilityKey:x.defaultAgentCapabilityKey,
+      milestoneKey:x.milestoneTemplateId?milestoneKeyById.get(x.milestoneTemplateId)||null:null,
+      defaultAgentCapabilityKey:x.defaultAgentCapabilityKey,
       gatePolicyKey:x.gatePolicyKey,config:x.config,
       requirements:x.requirements.map(r=>({
         requirementKey:r.requirementKey,capabilityType:r.capabilityType,capabilityKey:r.capabilityKey,
