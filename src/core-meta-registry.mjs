@@ -593,7 +593,12 @@ export const getProjectLifecycle=async projectId=>{
     stages:stages.map(row=>({
       id:row.id,workflowTemplateStageId:row.workflow_template_stage_id,milestoneId:row.milestone_id||null,
       stageKey:row.stage_key,displayName:row.display_name,sequenceNo:Number(row.sequence_no),status:row.status,
+      attemptCount:Number(row.attempt_count||0),
       agentCapabilityKey:row.agent_capability_key||null,gatePolicyKey:row.gate_policy_key||null,
+      lastGateResultId:row.last_gate_result_id||null,
+      lastTransitionType:row.last_transition_type||null,
+      blockedReason:row.blocked_reason||null,
+      lastTransitionAt:row.last_transition_at||null,
       state:parseJson(row.state_json),startedAt:row.started_at||null,completedAt:row.completed_at||null
     }))
   };
