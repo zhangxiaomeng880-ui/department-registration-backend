@@ -88,6 +88,52 @@ const createNotification=async(db,{
   }
 };
 
+export const resolveBenchmarkSubjectScope=async subjectId=>{
+  const db=getRuntimePool();
+  const subject=await loadSubject(subjectId,db);
+  const workspace=await loadWorkspace(subject.workspace_id,db);
+  return {
+    subjectId,workspaceId:subject.workspace_id,tenantId:workspace.tenant_id,
+    projectId:subject.project_id||null
+  };
+};
+
+export const resolveBenchmarkSnapshotScope=async snapshotId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT s.id,b.id AS subject_id,b.workspace_id,b.project_id,w.tenant_id
+       FROM benchmark_snapshots s
+       JOIN benchmark_subjects b ON b.id=s.subject_id
+       JOIN workspaces w ON w.id=b.workspace_id
+      WHERE s.id=?`,[snapshotId]
+  );
+  if(!rows.length) throw errorOf('Benchmark snapshot not found','BENCHMARK_SNAPSHOT_NOT_FOUND',404);
+  return {
+    snapshotId,subjectId:rows[0].subject_id,workspaceId:rows[0].workspace_id,
+    tenantId:rows[0].tenant_id,projectId:rows[0].project_id||null
+  };
+};
+
+export const resolveApprovalScope=async approvalId=>{
+  const db=getRuntimePool();
+  const row=await loadApproval(approvalId,db);
+  return {
+    approvalId,tenantId:row.tenant_id,workspaceId:row.workspace_id,projectId:row.project_id||null
+  };
+};
+
+export const resolveNotificationScope=async notificationId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    'SELECT id,tenant_id,workspace_id,project_id FROM notifications WHERE id=?',[notificationId]
+  );
+  if(!rows.length) throw errorOf('Notification not found','NOTIFICATION_NOT_FOUND',404);
+  return {
+    notificationId,tenantId:rows[0].tenant_id,workspaceId:rows[0].workspace_id,
+    projectId:rows[0].project_id||null
+  };
+};
+
 export const createBenchmarkDimension=async input=>{
   if(!input?.workspaceId||!input?.benchmarkType||!input?.dimensionKey||!input?.displayName) throw errorOf(
     'workspaceId, benchmarkType, dimensionKey and displayName are required','INVALID_BENCHMARK_DIMENSION'
