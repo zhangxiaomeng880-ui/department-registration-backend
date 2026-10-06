@@ -436,10 +436,10 @@ export const freezeWorkflowTemplate=async templateId=>{
           );
         }
       }else if(requirement.routingMode==='POLICY'){
-        const params=[definition.projectTypeKey,requirement.capabilityType];
         let sql=`SELECT c.capability_key
                     FROM project_type_capability_bindings b
                     JOIN capability_registry c ON c.capability_key=b.capability_key`;
+        const params=[];
         if(stage.defaultAgentCapabilityKey){
           sql+=` JOIN agent_capability_grants g
                     ON g.child_capability_key=c.capability_key AND g.agent_capability_key=?`;
@@ -449,9 +449,7 @@ export const freezeWorkflowTemplate=async templateId=>{
                   AND b.binding_mode IN ('ALLOWED','DEFAULT')
                   AND c.status='ACTIVE' AND c.routable=TRUE
                 ORDER BY b.priority,c.capability_key LIMIT 1`;
-        if(stage.defaultAgentCapabilityKey){
-          params.splice(0,2,stage.defaultAgentCapabilityKey,definition.projectTypeKey,requirement.capabilityType);
-        }
+        params.push(definition.projectTypeKey,requirement.capabilityType);
         const [candidates]=await db.execute(sql,params);
         if(!candidates.length) throw errorOf(
           'Policy-routed stage capability has no allowed candidate','WORKFLOW_CAPABILITY_UNRESOLVED',409,
