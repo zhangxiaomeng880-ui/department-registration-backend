@@ -456,9 +456,25 @@ export const createQaRetest=async(defectId,input={},actorId=null)=>{
   if(defect.status==='RESOLVED')throw errorOf('QA Defect already resolved','QA_DEFECT_ALREADY_RESOLVED',409);
   const changeset=await assertProjectRow(db,'product_engineering_changesets',input.fixChangesetId,defect.project_id,'ENGINEERING_CHANGESET_NOT_FOUND');
   if(changeset.commit_sha.toLowerCase()!==sha)throw errorOf('Fix commit must equal Fix Changeset commit','QA_FIX_COMMIT_MISMATCH',409);
+  const [failedContexts]=await db.execute(
+    `SELECT e.preview_deployment_id,p.commit_sha failed_commit,b.changeset_id failed_changeset_id
+       FROM product_qa_executions e
+       JOIN product_preview_deployments p ON p.id=e.preview_deployment_id
+       JOIN product_build_records b ON b.id=p.build_record_id
+      WHERE e.id=?`,[defect.qa_execution_id]
+  );
+  if(!failedContexts.length)throw errorOf('Failed QA execution preview lineage is missing','QA_FAILED_PREVIEW_LINEAGE_REQUIRED',409);
+  const failed=failedContexts[0];
+  if(failed.failed_changeset_id===input.fixChangesetId||failed.failed_commit.toLowerCase()===sha)throw errorOf(
+    'Defect Retest requires a new Fix Changeset and Fix Commit','QA_FIX_MUST_CHANGE_SOURCE',409
+  );
   const preview=await assertProjectRow(db,'product_preview_deployments',input.previewDeploymentId,defect.project_id,'PREVIEW_DEPLOYMENT_NOT_FOUND');
   if(preview.commit_sha.toLowerCase()!==sha)throw errorOf('Retest Preview must run exact Fix Commit','QA_RETEST_PREVIEW_COMMIT_MISMATCH',409);
   if(preview.deployment_status!=='SUCCESS')throw errorOf('Retest requires successful Preview','QA_RETEST_PREVIEW_NOT_SUCCESS',409);
+  const [previewBuilds]=await db.execute('SELECT * FROM product_build_records WHERE id=?',[preview.build_record_id]);
+  if(!previewBuilds.length||previewBuilds[0].changeset_id!==input.fixChangesetId)throw errorOf(
+    'Retest Preview must be built from the declared Fix Changeset','QA_RETEST_FIX_CHANGESET_MISMATCH',409
+  );
 
   const id=randomUUID();
   await db.execute(
