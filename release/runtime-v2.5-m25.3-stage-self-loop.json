@@ -1,0 +1,184 @@
+{
+  "milestone": "M25.3",
+  "release": "AI Native Runtime V2.5",
+  "title": "Stage Runtime / Self-loop",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.5-m25.3-stage-self-loop",
+    "sha": "cc8951c04334b1a147e4a21e4b51472d7bc40bfc",
+    "predecessorMilestone": "M25.2",
+    "predecessorSha": "b9e42799a32a41928074706dcfa9114ce1df0d41"
+  },
+  "stateModel": {
+    "transitionDecisions": [
+      "PASS",
+      "RETRY",
+      "ROLLBACK",
+      "ESCALATE"
+    ],
+    "stageLifecycleStatuses": [
+      "PENDING",
+      "ACTIVE",
+      "BLOCKED",
+      "COMPLETED"
+    ],
+    "gateAndLifecycleSeparated": true,
+    "currentStageOnly": true,
+    "workflowGatePolicyEnforced": true,
+    "idempotentTransitions": true,
+    "retryLimitFromStageConfig": true
+  },
+  "selfLoopContract": {
+    "pass": [
+      "requires gate PASS",
+      "marks current Stage COMPLETED",
+      "completes Milestone when all member Stages complete",
+      "activates next Stage / next Milestone",
+      "completes Project and Run when final Stage passes"
+    ],
+    "retry": [
+      "requires gate FAIL or HOLD",
+      "keeps/reopens Stage ACTIVE",
+      "increments Stage attempt_count",
+      "increments current Task retry_count when task supplied",
+      "restores Project ACTIVE and Run RUNNING",
+      "fails closed when configured maxRetries is exceeded"
+    ],
+    "escalate": [
+      "requires gate FAIL or HOLD",
+      "marks Stage and Milestone BLOCKED",
+      "marks Project BLOCKED and Run HOLD",
+      "records blocking reason",
+      "may be resumed through an explicit RETRY or resolved with a later PASS"
+    ],
+    "rollback": [
+      "requires gate FAIL or HOLD and an earlier target Stage",
+      "reactivates target Stage",
+      "resets target-and-later lifecycle Stages to PENDING except target ACTIVE",
+      "reopens target Milestone and resets later Milestones",
+      "cancels the current Task with STAGE_ROLLBACK",
+      "restores Project ACTIVE and Run RUNNING"
+    ]
+  },
+  "atomicEvidence": {
+    "gateResult": true,
+    "stageSnapshot": true,
+    "checkpoint": true,
+    "transitionEvent": true,
+    "projectStageState": true,
+    "milestoneState": true,
+    "projectState": true,
+    "runState": true,
+    "taskStateWhenSupplied": true,
+    "singleDatabaseTransaction": true
+  },
+  "schema": {
+    "migration": "026_stage_self_loop.sql",
+    "migrationsTotal": 27,
+    "additions": [
+      "project_stage_instances.attempt_count",
+      "project_stage_instances.last_gate_result_id",
+      "project_stage_instances.last_transition_type",
+      "project_stage_instances.blocked_reason",
+      "project_stage_instances.last_transition_at",
+      "project_milestones.last_transition_at",
+      "stage_transition_events"
+    ],
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=27 skipped=0 total=27",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=27 total=27",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=26 total=27"
+  },
+  "api": {
+    "transition": "POST /api/runtime/projects/:projectId/stage-transitions",
+    "list": "GET /api/runtime/projects/:projectId/stage-transitions",
+    "detail": "GET /api/runtime/stage-transitions/:transitionEventId",
+    "authorization": "existing project/run RBAC",
+    "unauthenticatedContract": "401"
+  },
+  "e2e": {
+    "coveredSequence": [
+      "wrong gate policy rejected",
+      "RETRY #1",
+      "idempotent duplicate RETRY",
+      "RETRY #2",
+      "retry limit exceeded rejected",
+      "PASS Discovery -> Design",
+      "ESCALATE Design",
+      "RETRY blocked Design -> ACTIVE",
+      "PASS Design -> Build",
+      "ROLLBACK Build -> Design",
+      "PASS Design -> Build again",
+      "PASS Build -> Project COMPLETED"
+    ],
+    "validatesGateCount": true,
+    "validatesCheckpointCount": true,
+    "validatesCurrentStageSnapshots": true,
+    "validatesRollbackTaskCancellation": true,
+    "validatesFinalRunPass": true,
+    "validatesFinalProjectCompletion": true
+  },
+  "ci": {
+    "workflow": "Runtime v2.5 M25.3 Stage Self-loop Gate",
+    "runId": 37429344316,
+    "headSha": "cc8951c04334b1a147e4a21e4b51472d7bc40bfc",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "G25_1_CORE_META_REGISTRY_PASS",
+      "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS"
+    ],
+    "m253StageSelfLoop": "G25_3_STAGE_SELF_LOOP_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "5fe27e76-6ff9-409b-b36d-8d01e381be9c",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "cc8951c04334b1a147e4a21e4b51472d7bc40bfc",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration026Applied": true,
+    "pendingFunctionalChanges": false
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": "M25.4 Workflow Auto-Orchestration / Project Self-loop",
+  "conclusion": "M25.3 Stage Runtime / Self-loop is STAGING PASS / FROZEN. Gate outcomes now atomically drive durable Stage, Milestone, Project, Run and Task lifecycle transitions with checkpoint/snapshot/evidence creation for PASS, RETRY, ROLLBACK and ESCALATE. The stage-level self-loop is no longer a document convention; it is enforced by Runtime state. Production remains unchanged on V2.3."
+}
