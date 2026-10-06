@@ -1,0 +1,95 @@
+{
+  "milestone": "M24.6",
+  "release": "AI Native Runtime V2.4",
+  "title": "Reliability RC Freeze",
+  "status": "RC_FROZEN",
+  "stagingStatus": "PASS",
+  "productionTouched": false,
+  "runtimeRc": {
+    "branch": "rc/ai-native-runtime-v2.4-m24.6-reliability-rc",
+    "sha": "85d66fd5a42901da895173a76446f0439b4db63c",
+    "identicalToM245Candidate": true,
+    "newRuntimeCodeAfterM245": false
+  },
+  "evidenceChain": {
+    "m243": {
+      "branch": "release/ai-native-runtime-v2.4-m24.3-evidence",
+      "sha": "09c99e2244edf66d95c49d61021e705a5786dea1"
+    },
+    "m244": {
+      "branch": "release/ai-native-runtime-v2.4-m24.4-evidence",
+      "sha": "e1858a6cc3dda834679cd26174c504e301e92868"
+    },
+    "m245": {
+      "branch": "release/ai-native-runtime-v2.4-m24.5-evidence",
+      "sha": "1032e63d83287d7c31b1366f6ce20a4e1094f966"
+    }
+  },
+  "rcValidation": {
+    "workflow": "Runtime v2.4 M24.5 Reliability Analytics Gate",
+    "runId": 37423297195,
+    "runAttempt": 2,
+    "headSha": "85d66fd5a42901da895173a76446f0439b4db63c",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationFirstApply": "RUNTIME_MIGRATIONS_PASS applied=24 skipped=0 total=24",
+    "migrationSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=24 total=24",
+    "gates": [
+      "G22_5_BILLING_LEDGER_PASS",
+      "G23_1_BILLING_OPERATIONS_PASS",
+      "G23_2_COLLECTIONS_PASS",
+      "G23_3_REVENUE_ANALYTICS_PASS",
+      "G23_4_FINANCIAL_ADJUSTMENTS_PASS",
+      "G23_5_FINANCE_CLOSE_PASS",
+      "G23_6_COMMERCIAL_FINANCE_RC_E2E_PASS",
+      "G24_1_EVAL_REPLAY_CONTRACT_PASS",
+      "G24_2_EVAL_RUNNER_ASSERTION_ENGINE_PASS",
+      "G24_2_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_3_RUNTIME_REPLAY_REGRESSION_GATE_PASS",
+      "G24_4_STAGING_SCHEMA_COMPATIBILITY_PASS",
+      "G24_4_PRODUCTION_SAFE_SHADOW_EVAL_PASS",
+      "G24_5_RELIABILITY_ANALYTICS_PASS",
+      "RAILWAY_RUNTIME_COMPATIBILITY_PASS"
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "7d556109-e4ef-49d1-b4f8-4f2a943b4f72",
+    "runtimeSha": "85d66fd5a42901da895173a76446f0439b4db63c",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": "/ready PASS",
+    "migrationsTotal": 24,
+    "latestMigration": "023_eval_reliability_analytics.sql",
+    "note": "Environment reports an empty staged patch with zero effective changes; no pending functional change is included in this RC."
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS",
+    "runtimeOnline": true,
+    "mysqlOnline": true
+  },
+  "freezeRules": {
+    "noNewCapabilityInM246": true,
+    "rcShaPinned": true,
+    "stagingEvidencePinned": true,
+    "productionPromotionRequiresExplicitApproval": true,
+    "postFreezeChangesRequireNewCandidateAndFullGateRerun": true
+  },
+  "conclusion": "AI Native Runtime V2.4 Reliability RC is frozen on SHA 85d66fd5a42901da895173a76446f0439b4db63c. The same SHA passed an independent RC rerun of the full V2.3-through-M24.5 validation chain, is healthy in Staging, and Production remains unchanged on V2.3. No production promotion is performed by this milestone."
+}
