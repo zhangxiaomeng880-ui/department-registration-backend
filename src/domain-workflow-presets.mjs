@@ -52,59 +52,59 @@ const s=(stageKey,displayName,sequenceNo,milestoneKey,gateKey,agentRole,supporti
 const PRODUCT_PRESET={
   presetKey:'PRODUCT_DEVELOPMENT_STANDARD',
   projectTypeKey:'PRODUCT_DEVELOPMENT',
-  version:'1.2',
-  displayName:'Product Development Standard Workflow',
+  version:'1.3',
+  displayName:'产品研发标准工作流',
   sourceRefs:[
     {name:'AI_Native_2.0_产品研发工作流_V1.2_CURRENT.md',status:'CURRENT',date:'2026-10-05'},
     {name:'AI_NATIVE_2.0_MASTER_BLUEPRINT_V1.4_FROZEN.md',status:'FROZEN'}
   ],
   milestones:[
-    m('PD-M0','Readiness Complete',1),
-    m('PD-M1','Problem / Opportunity Validated',2),
-    m('PD-M2','Product Baseline Approved',3),
-    m('PD-M3','Design + Technical Contract Locked',4),
-    m('PD-M4','Feature Complete / Preview Ready',5),
-    m('PD-M5','Acceptance + QA PASS',6),
-    m('PD-M6','Release Candidate Ready',7),
-    m('PD-M7','Production Verified',8),
-    m('PD-M8','Outcome Reviewed / Version Closed',9)
+    m('PD-M0','项目就绪完成',1),
+    m('PD-M1','问题 / 机会已验证',2),
+    m('PD-M2','产品基线已批准',3),
+    m('PD-M3','设计与技术契约已锁定',4),
+    m('PD-M4','功能开发完成 / 预览就绪',5),
+    m('PD-M5','产品验收与质量验证通过',6),
+    m('PD-M6','发布候选版本就绪',7),
+    m('PD-M7','生产环境已验证',8),
+    m('PD-M8','结果复盘完成 / 版本关闭',9)
   ],
   stages:[
-    s('PD_00_INIT','Project Initialization / System Readiness',1,'PD-M0','G-PD-INIT','PROJECT_INITIALIZATION',['ENVIRONMENT','SECURITY'],{
+    s('PD_00_INIT','项目初始化 / 系统就绪',1,'PD-M0','G-PD-INIT','PROJECT_INITIALIZATION',['ENVIRONMENT','SECURITY'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('PROJECT_INITIALIZATION')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load current project baseline, scope, roles, environments and execution constraints.','PROJECT_CONTEXT')]
     }),
-    s('PD_01_DISCOVERY','Discovery / Evidence / Insight / Competitor Intelligence',2,'PD-M1','G-PD-DISCOVERY','PRODUCT_RESEARCH',['DATA','OPERATIONS'],{
+    s('PD_01_DISCOVERY','用户发现 / 证据 / 洞察 / 竞品情报',2,'PD-M1','G-PD-DISCOVERY','PRODUCT_RESEARCH',['DATA','OPERATIONS'],{
       capabilityRequirements:[modelReq('PRODUCT_DISCOVERY')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load current product facts, rules, existing decisions and user context.','PROJECT_CONTEXT'),
         k('MARKET_RESEARCH','MARKET_RESEARCH','Load dated market, competitor and user evidence relevant to the current problem.','RESEARCH_CONTEXT')
       ]
     }),
-    s('PD_02_OPPORTUNITY','Opportunity / Hypothesis / Prioritization',3,'PD-M1','G-PD-PRIORITY','PRODUCT',['RESEARCH','DATA','PROJECT'],{
+    s('PD_02_OPPORTUNITY','机会 / 假设 / 优先级',3,'PD-M1','G-PD-PRIORITY','PRODUCT',['RESEARCH','DATA','PROJECT'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('PRODUCT_PRIORITIZATION')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load validated discovery evidence, opportunities, constraints and current backlog.','PROJECT_CONTEXT')]
     }),
-    s('PD_03_GOAL','Goal / Success Criteria / Product Bet',4,'PD-M1','G-PD-GOAL','PRODUCT',['RESEARCH','DATA'],{
+    s('PD_03_GOAL','目标 / 成功标准 / 产品下注',4,'PD-M1','G-PD-GOAL','PRODUCT',['RESEARCH','DATA'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('PRODUCT_GOAL_DEFINITION')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load approved opportunity, business constraints and measurable outcome context.','PROJECT_CONTEXT')]
     }),
-    s('PD_04_PRODUCT','Product Definition / Requirement Baseline',5,'PD-M2','G-PD-PRODUCT','PRODUCT',['RESEARCH','DESIGN'],{
+    s('PD_04_PRODUCT','产品定义 / 需求基线',5,'PD-M2','G-PD-PRODUCT','PRODUCT',['RESEARCH','DESIGN'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('PRODUCT_DEFINITION')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load approved goal, scope, existing requirements and change history.','PROJECT_CONTEXT')]
     }),
-    s('PD_05_FEASIBILITY','Feasibility / Risk / Architecture',6,'PD-M3','G-PD-FEASIBILITY','FEASIBILITY',['ENGINEERING','SECURITY','COMPLIANCE'],{
+    s('PD_05_FEASIBILITY','可行性 / 风险 / 架构',6,'PD-M3','G-PD-FEASIBILITY','FEASIBILITY',['ENGINEERING','SECURITY','COMPLIANCE'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('TECHNICAL_FEASIBILITY')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load frozen product baseline and constraints.','PROJECT_CONTEXT'),
         k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load current architecture, API, data, environment and dependency facts.','ENGINEERING_CONTEXT')
       ]
     }),
-    s('PD_06_PLAN','Delivery Planning / Milestone / Release Plan',7,'PD-M3','G-PD-PLAN','PRODUCT_PROJECT',['ENGINEERING','DESIGN','QA'],{
+    s('PD_06_PLAN','交付规划 / 里程碑 / 发布计划',7,'PD-M3','G-PD-PLAN','PRODUCT_PROJECT',['ENGINEERING','DESIGN','QA'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('DELIVERY_PLANNING')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load product baseline, feasibility decision, dependencies, risks and milestone context.','PROJECT_CONTEXT')]
     }),
-    s('PD_07_DESIGN','Design / Prototype / Design Contract',8,'PD-M3','G-PD-DESIGN','DESIGN',['PRODUCT'],{
+    s('PD_07_DESIGN','产品设计 / 原型 / 设计契约',8,'PD-M3','G-PD-DESIGN','DESIGN',['PRODUCT'],{
       executionMode:'HUMAN_GATE',
       capabilityRequirements:[modelReq('PRODUCT_DESIGN'),taggedReq('DESIGN_TOOL','TOOL','DESIGN')],
       knowledgePolicies:[
@@ -112,12 +112,15 @@ const PRODUCT_PRESET={
         k('DESIGN_SOURCE','DESIGN_SOURCE','Load current design system, design source and existing prototype constraints.','DESIGN_CONTEXT',false)
       ]
     }),
-    s('PD_08_CONTRACT','Technical / API / Data / Integration / Instrumentation Contract',9,'PD-M3','G-PD-CONTRACT','ENGINEERING_DATA',['PRODUCT','SECURITY'],{
+    s('PD_08_CONTRACT','技术 / API / 数据 / 集成 / 埋点契约',9,'PD-M3','G-PD-CONTRACT','ENGINEERING_DATA',['PRODUCT','SECURITY'],{
       executionMode:'HUMAN_GATE',
       capabilityRequirements:[modelReq('TECHNICAL_CONTRACT')],
-      knowledgePolicies:[k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load current API, schema, integration, instrumentation and security constraints.','ENGINEERING_CONTEXT')]
+      knowledgePolicies:[k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load current API, schema, integration, instrumentation and security constraints.','ENGINEERING_CONTEXT')],
+      metadata:{
+        specializedGates:[{gateKey:'G-PD-AI-CONTRACT',displayName:'AI 应用专项契约门禁',requiredForSubtypes:['AI_APPLICATION']}]
+      }
     }),
-    s('PD_09_ENGINEERING','Engineering / Implementation',10,'PD-M4',null,'ENGINEERING',['PRODUCT','DESIGN'],{
+    s('PD_09_ENGINEERING','工程实现',10,'PD-M4',null,'ENGINEERING',['PRODUCT','DESIGN'],{
       executionMode:'HYBRID',capabilityRequirements:[
         taggedReq('CODE_EXECUTION','TOOL','CODE_EXECUTION'),
         taggedReq('SOURCE_CONTROL','MCP','SOURCE_CONTROL')
@@ -127,48 +130,48 @@ const PRODUCT_PRESET={
         k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load repository, branch, current code and dependency context.','ENGINEERING_CONTEXT')
       ]
     }),
-    s('PD_10_BUILD','Build / Integration / Preview',11,'PD-M4','G-PD-ENGINEERING','PREVIEW_RELEASE_ENGINEERING',['ENGINEERING'],{
+    s('PD_10_BUILD','构建 / 集成 / 预览',11,'PD-M4','G-PD-ENGINEERING','PREVIEW_RELEASE_ENGINEERING',['ENGINEERING'],{
       capabilityRequirements:[taggedReq('BUILD_PREVIEW','TOOL','BUILD_DEPLOY')],
       knowledgePolicies:[k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load exact implementation version, environment, migration and build context.','ENGINEERING_CONTEXT')]
     }),
-    s('PD_11_ACCEPTANCE','Product Acceptance',12,'PD-M5','G-PD-ACCEPTANCE','ACCEPTANCE',['PRODUCT','DESIGN'],{
+    s('PD_11_ACCEPTANCE','产品验收',12,'PD-M5','G-PD-ACCEPTANCE','ACCEPTANCE',['PRODUCT','DESIGN'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('PRODUCT_ACCEPTANCE')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load frozen requirements, design contract, acceptance matrix and preview evidence.','PROJECT_CONTEXT')]
     }),
-    s('PD_12_QA','QA / Non-functional / Security Validation',13,'PD-M5','G-PD-QA','QA',['ENGINEERING','SECURITY','EVAL'],{
+    s('PD_12_QA','质量验证 / 非功能 / 安全验证',13,'PD-M5','G-PD-QA','QA',['ENGINEERING','SECURITY','EVAL'],{
       capabilityRequirements:[taggedReq('TEST_EXECUTION','TOOL','TESTING')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load acceptance baseline, quality matrix and known issues.','PROJECT_CONTEXT'),
         k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load exact build, environment and change set under test.','ENGINEERING_CONTEXT')
       ]
     }),
-    s('PD_13_RELEASE_READY','Release Readiness / Version Freeze',14,'PD-M6','G-PD-RELEASE-READY','RELEASE',['QA','PRODUCT','COMPLIANCE'],{
+    s('PD_13_RELEASE_READY','发布准备 / 版本冻结',14,'PD-M6','G-PD-RELEASE-READY','RELEASE',['QA','PRODUCT','COMPLIANCE'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('RELEASE_READINESS')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load release candidate scope, acceptance, QA, risks and rollout/rollback constraints.','PROJECT_CONTEXT'),
         k('RIGHTS_COMPLIANCE','RIGHTS_COMPLIANCE','Load applicable security, privacy, compliance and release obligations.','COMPLIANCE_CONTEXT',false)
       ]
     }),
-    s('PD_14_RELEASE','Release / Rollout',15,'PD-M7','G-PD-RELEASE','RELEASE',['ENGINEERING','OPERATIONS'],{
+    s('PD_14_RELEASE','发布 / 灰度',15,'PD-M7','G-PD-RELEASE','RELEASE',['ENGINEERING','OPERATIONS'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[taggedReq('DEPLOYMENT','TOOL','DEPLOYMENT')],
       knowledgePolicies:[k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load exact frozen release candidate, environment and rollback target.','ENGINEERING_CONTEXT')]
     }),
-    s('PD_15_POST_RELEASE','Post-release Verification / Incident Operations',16,'PD-M7',null,'OPERATIONS_RELEASE',['ENGINEERING','DATA'],{
+    s('PD_15_POST_RELEASE','发布后验证 / 事故运营',16,'PD-M7',null,'OPERATIONS_RELEASE',['ENGINEERING','DATA'],{
       capabilityRequirements:[taggedReq('OBSERVABILITY','TOOL','OBSERVABILITY')],
       knowledgePolicies:[k('ENGINEERING_SOURCE','ENGINEERING_SOURCE','Load production health, readiness, incident and deployment evidence.','OPERATIONS_CONTEXT')]
     }),
-    s('PD_16_OUTCOME','Data / Experiment / Feedback',17,'PD-M8','G-PD-OUTCOME','DATA_EXPERIMENT',['PRODUCT'],{
+    s('PD_16_OUTCOME','数据 / 实验 / 反馈',17,'PD-M8','G-PD-OUTCOME','DATA_EXPERIMENT',['PRODUCT'],{
       capabilityRequirements:[taggedReq('DATA_ANALYTICS','TOOL','DATA_ANALYTICS')],
       knowledgePolicies:[k('PERFORMANCE_DATA','PERFORMANCE_DATA','Load current instrumentation, KPI, experiment, feedback and incident evidence.','DATA_CONTEXT')]
     }),
-    s('PD_17_REVIEW','Decision / Review',18,'PD-M8','G-PD-REVIEW','REVIEW',['PRODUCT','ENGINEERING','QA','DATA'],{
+    s('PD_17_REVIEW','决策 / 复盘',18,'PD-M8','G-PD-REVIEW','REVIEW',['PRODUCT','ENGINEERING','QA','DATA'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('PROJECT_REVIEW')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load planned versus actual delivery, change, defect, release and outcome evidence.','PROJECT_CONTEXT'),
         k('PERFORMANCE_DATA','PERFORMANCE_DATA','Load outcome, experiment and operational evidence.','DATA_CONTEXT',false)
       ]
     }),
-    s('PD_18_KNOWLEDGE','Knowledge / Backlog / Next Version',19,'PD-M8','G-PD-REVIEW','KNOWLEDGE_UPDATE',['REVIEW','PRODUCT'],{
+    s('PD_18_KNOWLEDGE','知识沉淀 / 待办 / 下一版本',19,'PD-M8','G-PD-REVIEW','KNOWLEDGE_UPDATE',['REVIEW','PRODUCT'],{
       capabilityRequirements:[modelReq('KNOWLEDGE_SYNTHESIS')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load project review evidence, decisions, patterns, failures and backlog context.','PROJECT_CONTEXT',true,'PROPOSE')]
     })
@@ -413,6 +416,27 @@ const listCapabilityCandidates=async requirement=>{
 
 const agentKeyFor=(projectTypeKey,role)=>`AGENT:STANDARD:${projectTypeKey}:${role}`;
 
+const PRODUCT_ROLE_DISPLAY_NAMES={
+  PROJECT_INITIALIZATION:'项目初始化智能体',
+  PRODUCT_RESEARCH:'产品研究智能体',
+  PRODUCT:'产品经理智能体',
+  FEASIBILITY:'可行性评审智能体',
+  PRODUCT_PROJECT:'产品项目管理智能体',
+  DESIGN:'产品设计智能体',
+  ENGINEERING_DATA:'工程与数据契约智能体',
+  ENGINEERING:'工程实现智能体',
+  PREVIEW_RELEASE_ENGINEERING:'构建与预览智能体',
+  ACCEPTANCE:'产品验收智能体',
+  QA:'质量验证智能体',
+  RELEASE:'发布管理智能体',
+  OPERATIONS_RELEASE:'发布运营智能体',
+  DATA_EXPERIMENT:'数据实验智能体',
+  REVIEW:'项目复盘智能体',
+  KNOWLEDGE_UPDATE:'知识沉淀智能体'
+};
+const agentDisplayNameFor=(projectTypeKey,role)=>
+  projectTypeKey==='PRODUCT_DEVELOPMENT'?(PRODUCT_ROLE_DISPLAY_NAMES[role]||`${role} 智能体`):`${role} Agent`;
+
 const ensureStageAgent=async(spec,stage,candidateMap)=>{
   const agentKey=agentKeyFor(spec.projectTypeKey,stage.agentRole);
   const roleStages=spec.stages.filter(item=>item.agentRole===stage.agentRole);
@@ -420,7 +444,7 @@ const ensureStageAgent=async(spec,stage,candidateMap)=>{
   const supportingRoles=[...new Set(roleStages.flatMap(item=>item.supportingRoles||[]))];
   await upsertCapability({
     capabilityKey:agentKey,capabilityType:'AGENT',
-    displayName:`${stage.agentRole} Agent`,version:spec.version,status:'ACTIVE',routable:true,
+    displayName:agentDisplayNameFor(spec.projectTypeKey,stage.agentRole),version:spec.version,status:'ACTIVE',routable:true,
     adapterKey:'agent-runtime',
     metadata:{
       standardDomainAgent:true,presetKey:spec.presetKey,projectTypeKey:spec.projectTypeKey,
