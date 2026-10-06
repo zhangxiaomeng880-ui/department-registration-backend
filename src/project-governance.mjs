@@ -177,6 +177,28 @@ export const createStrategicItem=async input=>{
   return {id,workspaceId:input.workspaceId,itemKey:input.itemKey,itemType:type,title:input.title,status:upper(input.status||'ACTIVE')};
 };
 
+export const listStrategicItems=async({workspaceId,itemType=null,status=null}={})=>{
+  if(!workspaceId) throw errorOf('workspaceId is required','INVALID_STRATEGIC_ITEM_QUERY');
+  const db=getRuntimePool();
+  await assertWorkspace(workspaceId,db);
+  const where=['workspace_id=?'],params=[workspaceId];
+  if(itemType){where.push('item_type=?');params.push(upper(itemType));}
+  if(status){where.push('status=?');params.push(upper(status));}
+  const [rows]=await db.execute(
+    `SELECT * FROM strategic_items WHERE ${where.join(' AND ')}
+      ORDER BY CASE item_type WHEN 'OBJECTIVE' THEN 0 ELSE 1 END,priority,target_end,item_key`,
+    params
+  );
+  return rows.map(row=>({
+    id:row.id,workspaceId:row.workspace_id,parentId:row.parent_id||null,itemKey:row.item_key,
+    itemType:row.item_type,title:row.title,goal:row.goal,theme:row.theme||null,
+    scope:parseJson(row.scope_json),ownerIdentityId:row.owner_identity_id||null,
+    targetStart:row.target_start||null,targetEnd:row.target_end||null,
+    successMetric:parseJson(row.success_metric_json),priority:row.priority,
+    health:row.health,status:row.status,evidence:parseJson(row.evidence_json)
+  }));
+};
+
 export const createPortfolio=async input=>{
   if(!input?.workspaceId||!input?.portfolioKey||!input?.name) throw errorOf(
     'workspaceId, portfolioKey and name are required','INVALID_PORTFOLIO'
@@ -197,6 +219,56 @@ export const createPortfolio=async input=>{
     ]
   );
   return {id,workspaceId:input.workspaceId,portfolioKey:input.portfolioKey,name:input.name};
+};
+
+export const listPortfolios=async({workspaceId,status=null}={})=>{
+  if(!workspaceId) throw errorOf('workspaceId is required','INVALID_PORTFOLIO_QUERY');
+  const db=getRuntimePool();
+  await assertWorkspace(workspaceId,db);
+  const where=['workspace_id=?'],params=[workspaceId];
+  if(status){where.push('status=?');params.push(upper(status));}
+  const [rows]=await db.execute(
+    `SELECT * FROM portfolios WHERE ${where.join(' AND ')}
+      ORDER BY priority,target_end,portfolio_key`,
+    params
+  );
+  return rows.map(row=>({
+    id:row.id,workspaceId:row.workspace_id,portfolioKey:row.portfolio_key,name:row.name,
+    strategicTheme:row.strategic_theme||null,ownerIdentityId:row.owner_identity_id||null,
+    targetStart:row.target_start||null,targetEnd:row.target_end||null,
+    priority:row.priority,health:row.health,status:row.status,
+    capacitySignal:parseJson(row.capacity_signal_json),budgetSignal:parseJson(row.budget_signal_json)
+  }));
+};
+
+export const getPortfolioRoadmap=async portfolioId=>{
+  const db=getRuntimePool();
+  const [portfolios]=await db.execute('SELECT * FROM portfolios WHERE id=?',[portfolioId]);
+  if(!portfolios.length) throw errorOf('Portfolio not found','PORTFOLIO_NOT_FOUND',404);
+  const [projects]=await db.execute(
+    `SELECT l.roadmap_order,l.target_window,p.id,p.project_key,p.name,p.project_type,p.project_subtype_key,
+            p.status,p.health,p.priority,p.target_date,p.current_milestone_id
+       FROM portfolio_project_links l
+       JOIN projects p ON p.id=l.project_id
+      WHERE l.portfolio_id=?
+      ORDER BY COALESCE(l.roadmap_order,2147483647),p.priority,p.project_key`,
+    [portfolioId]
+  );
+  return {
+    portfolio:{
+      id:portfolios[0].id,workspaceId:portfolios[0].workspace_id,
+      portfolioKey:portfolios[0].portfolio_key,name:portfolios[0].name,
+      health:portfolios[0].health,status:portfolios[0].status
+    },
+    projects:projects.map(row=>({
+      id:row.id,projectKey:row.project_key,name:row.name,projectType:row.project_type,
+      projectSubtypeKey:row.project_subtype_key||null,status:row.status,
+      health:row.health,priority:row.priority,targetDate:row.target_date||null,
+      currentMilestoneId:row.current_milestone_id||null,
+      roadmapOrder:row.roadmap_order==null?null:Number(row.roadmap_order),
+      targetWindow:row.target_window||null
+    }))
+  };
 };
 
 export const linkStrategicItemProject=async input=>{
