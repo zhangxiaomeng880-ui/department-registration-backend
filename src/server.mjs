@@ -5,6 +5,7 @@ import { handleKnowledgeRoute } from './knowledge-api.mjs';
 import { checkRuntimeDbReady } from './runtime-db.mjs';
 import { modelProviderConfigured } from './openai-responses-provider.mjs';
 import { authorizeRuntimeRequest, assertRuntimeSecurityConfig, runtimeAuthRequired } from './runtime-security.mjs';
+import { bootstrapBuiltinDomainWorkflowSpecs } from './domain-workflow-specs.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
@@ -80,4 +81,7 @@ export const server = http.createServer((req, res) => route(req, res).catch(erro
     ...(error.details ? { details: error.details } : {}),
   }
 )));
-if (process.argv[1] && process.argv[1].endsWith('server.mjs')) server.listen(port, '0.0.0.0', () => console.log(`department-registration-backend listening on ${port}`));
+if (process.argv[1] && process.argv[1].endsWith('server.mjs')) {
+  await bootstrapBuiltinDomainWorkflowSpecs();
+  server.listen(port, '0.0.0.0', () => console.log(`department-registration-backend listening on ${port}`));
+}
