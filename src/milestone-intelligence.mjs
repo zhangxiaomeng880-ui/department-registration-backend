@@ -597,6 +597,10 @@ export const createProjectVersion=async(projectId,input={})=>{
   const type=upper(input.versionType),status=upper(input.status||'DRAFT');
   if(!VERSION_TYPES.has(type)) throw errorOf('Invalid project version type','INVALID_PROJECT_VERSION_TYPE');
   if(!VERSION_STATUSES.has(status)) throw errorOf('Invalid project version status','INVALID_PROJECT_VERSION_STATUS');
+  if(status!=='DRAFT') throw errorOf(
+    'New project versions must start as DRAFT and move through the version lifecycle',
+    'PROJECT_VERSION_MUST_START_DRAFT',409,{requestedStatus:status}
+  );
   await loadProject(projectId);
   const db=getRuntimePool(),id=input.id||randomUUID();
   await db.execute(
