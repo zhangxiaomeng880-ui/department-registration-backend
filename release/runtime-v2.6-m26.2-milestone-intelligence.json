@@ -1,0 +1,150 @@
+{
+  "milestone": "M26.2",
+  "release": "AI Native Runtime V2.6",
+  "title": "Milestone Governance / Forecast / Health / Staleness / Capacity",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.6-m26.2-milestone-intelligence",
+    "sha": "06201d66f64183b4efbc7e834eac678fbc3c2f3a",
+    "predecessorMilestone": "M26.1",
+    "predecessorSha": "c667d0d0780bd7c1c3d95ee41d5fe61531386a65"
+  },
+  "semantics": {
+    "milestoneStageReleaseSeparated": true,
+    "projectHealth": [
+      "GREEN",
+      "AMBER",
+      "RED"
+    ],
+    "milestoneHealth": [
+      "ON_TRACK",
+      "AT_RISK",
+      "OFF_TRACK"
+    ],
+    "progress": {
+      "calculatedFromWorkItems": true,
+      "estimateWeightedWhenAvailable": true,
+      "manualOverrideRequiresReason": true
+    },
+    "forecast": {
+      "capacityHoursPerCalendarDay": true,
+      "throughputItemsPerCalendarDay": true,
+      "confidenceTracked": true,
+      "lateSignal": true
+    },
+    "staleness": {
+      "project": true,
+      "milestone": true,
+      "strategicItem": true,
+      "cadenceDriven": true
+    },
+    "criticalPath": {
+      "dependencySignals": true,
+      "blockerSignals": true,
+      "violationDrivesOffTrack": true
+    },
+    "completion": {
+      "explicitEvidenceRequired": true,
+      "progress100Required": true,
+      "requiredGatesPassRequired": true,
+      "requiredDeliverablesRequired": true,
+      "activeBlockersForbidden": true
+    },
+    "projectVersionLifecycle": [
+      "DRAFT",
+      "CANDIDATE",
+      "LOCKED",
+      "RELEASED",
+      "RETIRED"
+    ],
+    "newVersionMustStartDraft": true,
+    "milestoneVersionLinkIndependentOfStage": true
+  },
+  "schema": {
+    "migration": "031_milestone_intelligence.sql",
+    "migrationsTotal": 32,
+    "tables": [
+      "governance_updates",
+      "governance_capacity_snapshots",
+      "project_versions",
+      "milestone_version_links"
+    ],
+    "projectFields": [
+      "update_cadence_days",
+      "last_update_at",
+      "stale_after_at"
+    ],
+    "milestoneFields": [
+      "calculated_progress_percent",
+      "progress_override_percent",
+      "progress_override_reason",
+      "health",
+      "forecast_end",
+      "forecast_method",
+      "forecast_confidence",
+      "update_cadence_days",
+      "last_update_at",
+      "stale_after_at",
+      "capacity_signal_json",
+      "dependency_signal_json",
+      "completion_evidence_json"
+    ],
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=32 skipped=0 total=32",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=32 total=32",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=31 total=32"
+  },
+  "qa": {
+    "ciRunId": 37465185603,
+    "headSha": "06201d66f64183b4efbc7e834eac678fbc3c2f3a",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "regression": [
+      "G25_6_DOMAIN_WORKFLOW_TEMPLATES_PASS",
+      "G26_1_STRATEGY_PROJECT_GOVERNANCE_PASS"
+    ],
+    "milestoneGate": "G26_2_MILESTONE_INTELLIGENCE_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS",
+    "covered": [
+      "initiative update history",
+      "50% calculated progress",
+      "capacity forecast",
+      "staleness -> AT_RISK",
+      "manual override reason guard",
+      "critical path violation -> OFF_TRACK",
+      "risk -> AT_RISK",
+      "blocker -> OFF_TRACK and explicit resolution",
+      "completion gate blocks before 100%",
+      "completion succeeds with evidence",
+      "version lifecycle bypass rejected",
+      "milestone-version link independent of stage",
+      "project intelligence health/staleness roll-up"
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "deploymentId": "96387ef3-eb76-4374-81e1-209af0343348",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "06201d66f64183b4efbc7e834eac678fbc3c2f3a",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": "PASS / 1 of 1",
+    "migration031Applied": true
+  },
+  "production": {
+    "unchanged": true,
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "status": "SUCCESS"
+  },
+  "nextMilestone": "M26.3 Competitive Intelligence / Approval / Notification",
+  "conclusion": "M26.2 is STAGING PASS / FROZEN. Milestone governance is now evidence-driven and calculable rather than a static progress field; Project/Milestone/Stage/Release Version remain distinct Runtime objects."
+}
