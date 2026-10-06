@@ -8,6 +8,7 @@ const EVIDENCE_SOURCES=new Set([
   'BUSINESS_DATA','INCIDENT','RELIABILITY','RESEARCH','MARKET','COMPETITOR',
   'BUSINESS_REQUIREMENT','TECHNICAL_REQUIREMENT','SECURITY_REQUIREMENT','COMPLIANCE_REQUIREMENT'
 ]);
+const RESEARCH_METHODS=new Set(['INTERVIEW','USABILITY','SURVEY','SUPPORT','SALES','OPERATIONS','ANALYTICS','FIELD_OBSERVATION']);
 const OPPORTUNITY_TYPES=new Set(['PROBLEM','OPPORTUNITY']);
 const PRIORITY_OUTPUTS=new Set(['DO_NOW','PLAN','EXPERIMENT','RESEARCH_MORE','PARK','REJECT']);
 const REQUIREMENT_TYPES=new Set([
@@ -16,7 +17,7 @@ const REQUIREMENT_TYPES=new Set([
 const REQUIREMENT_STATUSES=new Set(['DRAFT','APPROVED','CURRENT','DEPRECATED','REJECTED']);
 const PRODUCT_GATES=new Set(['G-PD-DISCOVERY','G-PD-PRIORITY','G-PD-GOAL','G-PD-PRODUCT']);
 const TRACE_TYPES=new Set([
-  'EVIDENCE','INSIGHT','OPPORTUNITY','SOLUTION_CANDIDATE','HYPOTHESIS','PRIORITIZATION',
+  'RESEARCH_STUDY','EVIDENCE','INSIGHT','OPPORTUNITY','SOLUTION_CANDIDATE','HYPOTHESIS','PRIORITIZATION',
   'GOAL','PRODUCT_BET','REQUIREMENT','REQUIREMENT_VERSION','PRODUCT_BASELINE',
   'PROJECT_BASELINE','PROJECT_DECISION','BENCHMARK_SNAPSHOT'
 ]);
@@ -44,7 +45,7 @@ const assertEnum=(value,set,code,label)=>{
   return x;
 };
 const normalizeEvidence=row=>({
-  id:row.id,projectId:row.project_id,evidenceKey:row.evidence_key,sourceType:row.source_type,
+  id:row.id,projectId:row.project_id,researchStudyId:row.research_study_id||null,evidenceKey:row.evidence_key,sourceType:row.source_type,
   sourceRef:row.source_ref||null,sourceDate:row.source_date||null,timeRange:parseJson(row.time_range_json),
   segment:parseJson(row.segment_json),context:parseJson(row.context_json),observation:row.observation,
   rawEvidence:parseJson(row.raw_evidence_json),confidence:row.confidence,
@@ -83,6 +84,30 @@ const assertProjectObject=async(db,table,id,projectId,code='PRODUCT_OBJECT_NOT_F
   if(!rows.length)throw errorOf('Product object not found',code,404,{id});
   if(rows[0].project_id!==projectId)throw errorOf('Product object scope mismatch','PRODUCT_OBJECT_SCOPE_MISMATCH',409,{id});
 };
+const TRACE_TABLES={
+  RESEARCH_STUDY:'product_research_studies',EVIDENCE:'product_evidence',INSIGHT:'product_insights',
+  OPPORTUNITY:'product_opportunities',SOLUTION_CANDIDATE:'product_solution_candidates',
+  HYPOTHESIS:'product_hypotheses',PRIORITIZATION:'product_prioritization_records',
+  GOAL:'product_goal_definitions',PRODUCT_BET:'product_bets',REQUIREMENT:'product_requirements',
+  REQUIREMENT_VERSION:'product_requirement_versions',PRODUCT_BASELINE:'product_requirement_baselines',
+  PROJECT_BASELINE:'project_baselines',PROJECT_DECISION:'project_decisions'
+};
+const assertTraceObject=async(db,type,id,projectId)=>{
+  const t=assertEnum(type,TRACE_TYPES,'INVALID_PRODUCT_TRACE_TYPE','trace object type');
+  if(t==='BENCHMARK_SNAPSHOT'){
+    const [rows]=await db.execute(
+      `SELECT s.project_id FROM benchmark_snapshots b JOIN benchmark_subjects s ON s.id=b.subject_id WHERE b.id=?`,
+      [id]
+    );
+    if(!rows.length)throw errorOf('Trace object not found','PRODUCT_TRACE_OBJECT_NOT_FOUND',404,{type:t,id});
+    if(rows[0].project_id!==projectId)throw errorOf('Trace object scope mismatch','PRODUCT_OBJECT_SCOPE_MISMATCH',409,{type:t,id});
+    return;
+  }
+  const table=TRACE_TABLES[t];
+  if(!table)throw errorOf('Trace object type is not resolvable','PRODUCT_TRACE_OBJECT_NOT_RESOLVABLE',409,{type:t});
+  await assertProjectObject(db,table,id,projectId,'PRODUCT_TRACE_OBJECT_NOT_FOUND');
+};
+
 const createTraceInternal=async(db,{projectId,sourceType,sourceId,targetType,targetId,linkType,evidence,createdByIdentityId})=>{
   const s=assertEnum(sourceType,TRACE_TYPES,'INVALID_PRODUCT_TRACE_TYPE','trace sourceType');
   const t=assertEnum(targetType,TRACE_TYPES,'INVALID_PRODUCT_TRACE_TYPE','trace targetType');
@@ -117,6 +142,31 @@ export const resolveProductRequirementScope=async requirementId=>{
   return {requirementId,projectId:rows[0].project_id,workspaceId:rows[0].workspace_id};
 };
 
+export const createProductResearchStudy=async(projectId,input={},actorId=null)=>{
+  await loadProductProject(projectId);
+  if(!input.researchKey||!input.objective||!input.researchQuestion||!input.method||
+     !nonEmpty(input.sample)||!nonEmpty(input.rawEvidenceLocator))throw errorOf(
+    'researchKey, objective, researchQuestion, method, sample and rawEvidenceLocator are required',
+    'INVALID_PRODUCT_RESEARCH_STUDY'
+  );
+  const method=assertEnum(input.method,RESEARCH_METHODS,'INVALID_PRODUCT_RESEARCH_METHOD','research method');
+  const confidence=assertEnum(input.confidence||'MEDIUM',CONFIDENCE,'INVALID_PRODUCT_CONFIDENCE','confidence');
+  const db=getRuntimePool(),id=randomUUID();
+  await db.execute(
+    `INSERT INTO product_research_studies
+      (id,project_id,research_key,objective,research_question,method,participant_segment_json,sample_json,
+       recruitment_json,time_range_json,consent_privacy_json,recording_boundary_json,raw_evidence_locator_json,
+       confidence,limitation_json,status,evidence_json,created_by_identity_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id,projectId,input.researchKey,input.objective,input.researchQuestion,method,
+     asJson(input.participantSegment||null),asJson(input.sample),asJson(input.recruitment||null),
+     asJson(input.timeRange||null),asJson(input.consentPrivacy||null),asJson(input.recordingBoundary||null),
+     asJson(input.rawEvidenceLocator),confidence,asJson(input.limitation||null),upper(input.status||'ACTIVE'),
+     asJson(input.evidence||null),actorId]
+  );
+  return {id,projectId,researchKey:input.researchKey,objective:input.objective,researchQuestion:input.researchQuestion,method,confidence,status:upper(input.status||'ACTIVE')};
+};
+
 export const createProductEvidence=async(projectId,input={},actorId=null)=>{
   await loadProductProject(projectId);
   if(!input.evidenceKey||!input.sourceType||!input.observation||!nonEmpty(input.rawEvidence))throw errorOf(
@@ -125,16 +175,21 @@ export const createProductEvidence=async(projectId,input={},actorId=null)=>{
   const sourceType=assertEnum(input.sourceType,EVIDENCE_SOURCES,'INVALID_PRODUCT_EVIDENCE_SOURCE','evidence sourceType');
   const confidence=assertEnum(input.confidence||'MEDIUM',CONFIDENCE,'INVALID_PRODUCT_CONFIDENCE','confidence');
   const db=getRuntimePool(),id=randomUUID();
+  if(input.researchStudyId)await assertProjectObject(db,'product_research_studies',input.researchStudyId,projectId,'PRODUCT_RESEARCH_STUDY_NOT_FOUND');
   await db.execute(
     `INSERT INTO product_evidence
-      (id,project_id,evidence_key,source_type,source_ref,source_date,time_range_json,segment_json,context_json,
+      (id,project_id,research_study_id,evidence_key,source_type,source_ref,source_date,time_range_json,segment_json,context_json,
        observation,raw_evidence_json,confidence,limitation_json,freshness_expires_at,privacy_json,status,created_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id,projectId,input.evidenceKey,sourceType,input.sourceRef||null,input.sourceDate||null,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id,projectId,input.researchStudyId||null,input.evidenceKey,sourceType,input.sourceRef||null,input.sourceDate||null,
      asJson(input.timeRange||null),asJson(input.segment||null),asJson(input.context||null),
      input.observation,asJson(input.rawEvidence),confidence,asJson(input.limitation||null),
      dateOrNull(input.freshnessExpiresAt),asJson(input.privacy||null),upper(input.status||'ACTIVE'),actorId]
   );
+  if(input.researchStudyId)await createTraceInternal(db,{
+    projectId,sourceType:'RESEARCH_STUDY',sourceId:input.researchStudyId,targetType:'EVIDENCE',targetId:id,
+    linkType:'PRODUCES',createdByIdentityId:actorId
+  });
   const [rows]=await db.execute('SELECT * FROM product_evidence WHERE id=?',[id]);
   return normalizeEvidence(rows[0]);
 };
@@ -237,6 +292,15 @@ export const createProductPrioritization=async(projectId,input={},actorId=null)=
   await assertProjectObject(db,'product_opportunities',input.opportunityId,projectId,'PRODUCT_OPPORTUNITY_NOT_FOUND');
   if(input.hypothesisId)await assertProjectObject(db,'product_hypotheses',input.hypothesisId,projectId,'PRODUCT_HYPOTHESIS_NOT_FOUND');
   await assertProjectObject(db,'project_decisions',input.decisionId,projectId,'PROJECT_DECISION_NOT_FOUND');
+  const requiredScoreDimensions=[
+    'goalFit','impact','evidenceStrength','reachFrequency','confidence',
+    'effort','riskDependency','timeCriticality','opportunityCost'
+  ];
+  const missingScoreDimensions=requiredScoreDimensions.filter(key=>input.scoreInputs?.[key]==null);
+  if(missingScoreDimensions.length)throw errorOf(
+    'Prioritization scoreInputs must include all required decision dimensions',
+    'PRODUCT_PRIORITY_DIMENSIONS_REQUIRED',409,{missing:missingScoreDimensions}
+  );
   const output=assertEnum(input.output,PRIORITY_OUTPUTS,'INVALID_PRODUCT_PRIORITY_OUTPUT','priority output');
   const id=randomUUID();
   await db.execute(
@@ -337,10 +401,13 @@ export const createProductRequirement=async(projectId,input={},actorId=null)=>{
       [id,projectId,input.requirementKey,requirementType,input.title,status,input.ownerIdentityId||actorId||null]
     );
     const versionId=await insertRequirementVersion(conn,{requirementId:id,projectId,versionNo:1,input,changeId:null,actorId});
-    for(const link of input.traceFrom||[])await createTraceInternal(conn,{
-      projectId,sourceType:link.sourceType,sourceId:link.sourceId,targetType:'REQUIREMENT',
-      targetId:id,linkType:link.linkType||'JUSTIFIES',evidence:link.evidence,createdByIdentityId:actorId
-    });
+    for(const link of input.traceFrom||[]){
+      await assertTraceObject(conn,link.sourceType,link.sourceId,projectId);
+      await createTraceInternal(conn,{
+        projectId,sourceType:link.sourceType,sourceId:link.sourceId,targetType:'REQUIREMENT',
+        targetId:id,linkType:link.linkType||'JUSTIFIES',evidence:link.evidence,createdByIdentityId:actorId
+      });
+    }
     await conn.commit();
     return {id,projectId,requirementKey:input.requirementKey,requirementType,title:input.title,status,currentVersionNo:1,currentVersionId:versionId};
   }catch(e){try{await conn.rollback();}catch{}throw e;}finally{conn.release();}
@@ -370,6 +437,8 @@ export const createProductTraceLink=async(projectId,input={},actorId=null)=>{
     'sourceType, sourceId, targetType and targetId are required','INVALID_PRODUCT_TRACE_LINK'
   );
   const db=getRuntimePool();
+  await assertTraceObject(db,input.sourceType,input.sourceId,projectId);
+  await assertTraceObject(db,input.targetType,input.targetId,projectId);
   return createTraceInternal(db,{projectId,...input,createdByIdentityId:actorId});
 };
 
@@ -415,10 +484,29 @@ const productGateReadiness=async(projectId,gateKey,{asOf=new Date(),ignoreBaseli
   await loadProductProject(projectId,db);
   const c=await counts(db,projectId),reasons=[],evidence={counts:c};
   if(gate==='G-PD-DISCOVERY'){
+    const atDate=new Date(asOf);
+    const [[freshEvidence]]=await db.execute(
+      `SELECT COUNT(*) AS count FROM product_evidence
+        WHERE project_id=? AND status='ACTIVE'
+          AND (freshness_expires_at IS NULL OR freshness_expires_at>=?)`,
+      [projectId,atDate]
+    );
+    const [[freshBenchmark]]=await db.execute(
+      `SELECT COUNT(*) AS count
+         FROM benchmark_subjects s JOIN benchmark_snapshots b ON b.subject_id=s.id
+        WHERE s.project_id=? AND s.benchmark_type='PRODUCT_MARKET' AND b.status='CURRENT'
+          AND b.observed_at<=?
+          AND (b.freshness_days IS NULL OR DATE_ADD(b.observed_at, INTERVAL b.freshness_days DAY)>=?)`,
+      [projectId,atDate,atDate]
+    );
+    evidence.freshEvidenceCount=Number(freshEvidence.count||0);
+    evidence.freshCompetitiveSnapshotCount=Number(freshBenchmark.count||0);
     if(!c.evidence_count)reasons.push('EVIDENCE_REQUIRED');
+    else if(!evidence.freshEvidenceCount)reasons.push('EVIDENCE_STALE');
     if(!c.insight_count)reasons.push('INSIGHT_REQUIRED');
     if(!c.opportunity_count)reasons.push('PROBLEM_OR_OPPORTUNITY_REQUIRED');
     if(!c.benchmark_count)reasons.push('COMPETITIVE_SNAPSHOT_REQUIRED');
+    else if(!evidence.freshCompetitiveSnapshotCount)reasons.push('COMPETITIVE_SNAPSHOT_STALE');
     if(await traceCount(db,projectId,'EVIDENCE','INSIGHT')<1)reasons.push('EVIDENCE_INSIGHT_TRACE_REQUIRED');
     if(await traceCount(db,projectId,'INSIGHT','OPPORTUNITY')<1)reasons.push('INSIGHT_OPPORTUNITY_TRACE_REQUIRED');
   }
@@ -447,8 +535,16 @@ const productGateReadiness=async(projectId,gateKey,{asOf=new Date(),ignoreBaseli
       if(!nonEmpty(parseJson(req.evidence_links_json)))reasons.push(`EVIDENCE_LINK_REQUIRED:${req.requirement_key}`);
       if(!nonEmpty(parseJson(req.business_rules_json)))reasons.push(`BUSINESS_RULE_REQUIRED:${req.requirement_key}`);
     }
-    if(reqs.length&&await traceCount(db,projectId,'PRODUCT_BET','REQUIREMENT')<1&&
-       await traceCount(db,projectId,'OPPORTUNITY','REQUIREMENT')<1)reasons.push('BET_OR_OPPORTUNITY_REQUIREMENT_TRACE_REQUIRED');
+    if(reqs.length){
+      const evidenceTrace=(await traceCount(db,projectId,'EVIDENCE','REQUIREMENT'))+
+        (await traceCount(db,projectId,'INSIGHT','REQUIREMENT'));
+      const opportunityTrace=(await traceCount(db,projectId,'OPPORTUNITY','REQUIREMENT'))+
+        (await traceCount(db,projectId,'PRODUCT_BET','REQUIREMENT'));
+      const goalTrace=await traceCount(db,projectId,'GOAL','REQUIREMENT');
+      if(!evidenceTrace)reasons.push('EVIDENCE_OR_INSIGHT_REQUIREMENT_TRACE_REQUIRED');
+      if(!opportunityTrace)reasons.push('BET_OR_OPPORTUNITY_REQUIREMENT_TRACE_REQUIRED');
+      if(!goalTrace)reasons.push('GOAL_REQUIREMENT_TRACE_REQUIRED');
+    }
     if(!ignoreBaselineFreshness){
       const [baselines]=await db.execute(
         "SELECT locked_at FROM product_requirement_baselines WHERE project_id=? AND status='CURRENT' ORDER BY locked_at DESC LIMIT 1",
@@ -542,7 +638,8 @@ export const createProductRequirementBaseline=async(projectId,input={},actorId=n
 export const getProductDiscoveryState=async projectId=>{
   await loadProductProject(projectId);
   const db=getRuntimePool();
-  const [evidence,insights,opportunities,candidates,hypotheses,priorities,goals,bets,requirements,baselines,traces,gates]=await Promise.all([
+  const [researchStudies,evidence,insights,opportunities,candidates,hypotheses,priorities,goals,bets,requirements,baselines,traces,gates]=await Promise.all([
+    db.execute('SELECT * FROM product_research_studies WHERE project_id=? ORDER BY created_at,id',[projectId]).then(x=>x[0]),
     db.execute('SELECT * FROM product_evidence WHERE project_id=? ORDER BY created_at,id',[projectId]).then(x=>x[0]),
     db.execute('SELECT * FROM product_insights WHERE project_id=? ORDER BY created_at,id',[projectId]).then(x=>x[0]),
     db.execute('SELECT * FROM product_opportunities WHERE project_id=? ORDER BY created_at,id',[projectId]).then(x=>x[0]),
@@ -560,7 +657,12 @@ export const getProductDiscoveryState=async projectId=>{
     db.execute('SELECT * FROM product_gate_evaluations WHERE project_id=? ORDER BY as_of,id',[projectId]).then(x=>x[0])
   ]);
   return {
-    projectId,evidence:evidence.map(normalizeEvidence),
+    projectId,
+    researchStudies:researchStudies.map(r=>({
+      id:r.id,researchKey:r.research_key,objective:r.objective,researchQuestion:r.research_question,
+      method:r.method,confidence:r.confidence,status:r.status
+    })),
+    evidence:evidence.map(normalizeEvidence),
     insights:insights.map(r=>({id:r.id,insightKey:r.insight_key,title:r.title,observation:r.observation,confidence:r.confidence,status:r.status})),
     opportunities:opportunities.map(r=>({id:r.id,opportunityKey:r.opportunity_key,type:r.opportunity_type,title:r.title,status:r.status,confidence:r.confidence})),
     solutionCandidates:candidates.map(r=>({id:r.id,opportunityId:r.opportunity_id,candidateKey:r.candidate_key,title:r.title,status:r.status})),
