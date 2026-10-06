@@ -1,0 +1,246 @@
+{
+  "milestone": "M26.1",
+  "release": "AI Native Runtime V2.6",
+  "title": "Strategy / Project Governance Core",
+  "status": "STAGING_PASS",
+  "frozen": true,
+  "productionTouched": false,
+  "runtimeCandidate": {
+    "branch": "feat/ai-native-runtime-v2.6-m26.1-project-governance-v2",
+    "sha": "c667d0d0780bd7c1c3d95ee41d5fe61531386a65",
+    "predecessorMilestone": "M25.6",
+    "predecessorSha": "212feb79e4e2845dd955a8bc085a36fd6eb12346"
+  },
+  "rejectedPriorBranch": {
+    "branch": "feat/ai-native-runtime-v2.6-m26.1-project-governance",
+    "reason": "It was based on the earlier M25.6 SPEC_ONLY SHA and introduced a duplicate projects.project_subtype column. It is retained only as process history and is not a release baseline.",
+    "canonicalSubtypeField": "projects.project_subtype_key"
+  },
+  "scope": {
+    "strategy": [
+      "OBJECTIVE",
+      "INITIATIVE"
+    ],
+    "portfolioRoadmap": true,
+    "projectGovernance": true,
+    "projectBaselineVersion": true,
+    "projectStructure": [
+      "BUSINESS_DOMAIN",
+      "MODULE",
+      "EPIC"
+    ],
+    "iteration": true,
+    "workItem": true,
+    "dependency": true,
+    "riskIssueBlocker": true,
+    "decisionChange": true,
+    "managementMilestone": true
+  },
+  "invariants": {
+    "projectLifecycleStatuses": [
+      "DRAFT",
+      "READY",
+      "ACTIVE",
+      "BLOCKED",
+      "PAUSED",
+      "COMPLETED",
+      "ARCHIVED",
+      "CANCELLED"
+    ],
+    "projectHealth": [
+      "GREEN",
+      "AMBER",
+      "RED"
+    ],
+    "statusHealthSeparated": true,
+    "milestoneLifecycleStatuses": [
+      "PLANNED",
+      "ACTIVE",
+      "BLOCKED",
+      "PAUSED",
+      "COMPLETED",
+      "CANCELLED"
+    ],
+    "milestoneNotStage": true,
+    "iterationNotRun": true,
+    "baselineVersionedNotOverwritten": true,
+    "oneCurrentBaselinePerProject": true,
+    "crossWorkspaceGovernanceLinksFailClosed": true,
+    "archiveRequiresFinalBaseline": true,
+    "archiveRequiresClosureEvidence": true,
+    "archivedProjectTerminal": true
+  },
+  "schema": {
+    "migration": "030_strategy_project_governance.sql",
+    "migrationsTotal": 31,
+    "projectExtensions": [
+      "owner_identity_id",
+      "project_manager_identity_id",
+      "goal",
+      "success_criteria_json",
+      "scope_json",
+      "out_of_scope_json",
+      "priority",
+      "health",
+      "start_date",
+      "target_date",
+      "actual_end_date",
+      "risk_level",
+      "budget_guardrail_amount",
+      "budget_guardrail_currency",
+      "release_distribution_status",
+      "tags_json",
+      "closure_json",
+      "archived_at",
+      "current_baseline_id",
+      "current_iteration_id",
+      "current_milestone_id"
+    ],
+    "tables": [
+      "strategic_items",
+      "portfolios",
+      "strategic_item_project_links",
+      "portfolio_project_links",
+      "project_baselines",
+      "project_structure_nodes",
+      "project_iterations",
+      "project_work_items",
+      "project_dependencies",
+      "project_risks",
+      "project_issues",
+      "project_blockers",
+      "project_decisions",
+      "project_changes"
+    ],
+    "milestoneExtensions": [
+      "management_status",
+      "objective",
+      "owner_identity_id",
+      "planned_start",
+      "planned_end",
+      "actual_start",
+      "actual_end",
+      "progress_percent",
+      "exit_criteria_json",
+      "required_deliverables_json",
+      "required_gates_json",
+      "evidence_json",
+      "milestone_version"
+    ],
+    "freshDbFirstApply": "RUNTIME_MIGRATIONS_PASS applied=31 skipped=0 total=31",
+    "freshDbSecondApply": "RUNTIME_MIGRATIONS_PASS applied=0 skipped=31 total=31",
+    "stagingMigrationResult": "RUNTIME_MIGRATIONS_PASS applied=1 skipped=30 total=31"
+  },
+  "api": {
+    "strategy": [
+      "POST /api/runtime/strategic-items",
+      "GET /api/runtime/strategic-items"
+    ],
+    "portfolio": [
+      "POST /api/runtime/portfolios",
+      "GET /api/runtime/portfolios",
+      "GET /api/runtime/portfolios/:portfolioId/roadmap"
+    ],
+    "links": [
+      "POST /api/runtime/strategy-project-links",
+      "POST /api/runtime/portfolio-project-links"
+    ],
+    "projectGovernance": [
+      "GET /api/runtime/projects/:projectId/governance",
+      "PATCH /api/runtime/projects/:projectId/governance"
+    ],
+    "projectObjects": [
+      "POST /api/runtime/projects/:projectId/baselines",
+      "POST /api/runtime/projects/:projectId/structure-nodes",
+      "POST /api/runtime/projects/:projectId/iterations",
+      "POST /api/runtime/projects/:projectId/milestones",
+      "POST /api/runtime/projects/:projectId/work-items",
+      "POST /api/runtime/projects/:projectId/dependencies",
+      "POST /api/runtime/projects/:projectId/risks",
+      "POST /api/runtime/projects/:projectId/issues",
+      "POST /api/runtime/projects/:projectId/blockers",
+      "POST /api/runtime/projects/:projectId/decisions",
+      "POST /api/runtime/projects/:projectId/changes"
+    ],
+    "authorization": "existing workspace:read/write and project:read/write RBAC"
+  },
+  "e2e": {
+    "verifiesCanonicalProjectSubtypeKeyOnly": true,
+    "verifiesStatusHealthSeparation": true,
+    "verifiesObjectiveInitiativeHierarchy": true,
+    "verifiesPortfolioRoadmap": true,
+    "verifiesSameWorkspaceLinks": true,
+    "verifiesCrossWorkspaceLinkRejection": true,
+    "verifiesBusinessDomainModuleEpic": true,
+    "verifiesIterationAndManagementMilestone": true,
+    "verifiesWorkItemAndDependency": true,
+    "verifiesRiskIssueBlockerDecisionChange": true,
+    "verifiesBaselineHistory": true,
+    "verifiesArchiveGuards": true
+  },
+  "ci": {
+    "workflow": "Runtime v2.6 M26.1 Strategy Project Governance Gate",
+    "acceptedRunId": 37449995068,
+    "headSha": "c667d0d0780bd7c1c3d95ee41d5fe61531386a65",
+    "status": "SUCCESS",
+    "dependencyAudit": "PASS / 0 vulnerabilities",
+    "migrationDoubleApply": "PASS",
+    "regressionChain": [
+      "G25_1_CORE_META_REGISTRY_PASS",
+      "G25_2_UNIFIED_CAPABILITY_INVOCATION_PASS",
+      "G25_3_STAGE_SELF_LOOP_PASS",
+      "G25_4_WORKFLOW_AUTO_ORCHESTRATION_PASS",
+      "G25_5_KNOWLEDGE_CONTEXT_BACKWRITE_PASS",
+      "G25_6_DOMAIN_WORKFLOW_TEMPLATES_PASS"
+    ],
+    "m261": "G26_1_STRATEGY_PROJECT_GOVERNANCE_PASS",
+    "railwayCompatibility": "RAILWAY_RUNTIME_COMPATIBILITY_PASS",
+    "resolvedValidationHistory": [
+      {
+        "runId": 37449501263,
+        "reason": "Initial governance route insertion truncated the existing project-create route; fixed without changing governance semantics."
+      },
+      {
+        "runId": 37449756703,
+        "reason": "A stale duplicated route tail remained after the handler terminator; removed without changing valid routes."
+      }
+    ]
+  },
+  "staging": {
+    "project": "ai-native-runtime-v2-staging",
+    "environment": "staging",
+    "service": "runtime-staging-rc1",
+    "deploymentId": "5aff1c91-ed86-40fe-b69d-e32cfa56ff7f",
+    "deploymentStatus": "SUCCESS",
+    "runtimeSha": "c667d0d0780bd7c1c3d95ee41d5fe61531386a65",
+    "runtimeOnline": true,
+    "mysqlOnline": true,
+    "replicas": {
+      "running": 1,
+      "crashed": 0,
+      "total": 1
+    },
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0,
+    "healthcheck": {
+      "path": "/ready",
+      "result": "PASS / Railway healthcheck succeeded 1/1"
+    },
+    "migration030Applied": true
+  },
+  "production": {
+    "unchanged": true,
+    "project": "ai-native-runtime-v2",
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "sha": "34578464f5d19e87978ccb81719fb23a4b79d6f1",
+    "deploymentId": "0713e169-338e-4845-a64f-700e70c12591",
+    "deploymentStatus": "SUCCESS"
+  },
+  "nextMilestone": {
+    "key": "M26.2",
+    "title": "Milestone Intelligence / Forecast / Update / Staleness / Capacity",
+    "purpose": "Turn milestone/project management facts into roll-up, forecast, health, dependency/capacity warning and update-staleness intelligence while keeping Milestone independent from Runtime Stage and Release Version."
+  },
+  "conclusion": "M26.1 Strategy / Project Governance Core is STAGING PASS / FROZEN. The final M25.6 execution-ready domain workflows remain intact while Strategy, Portfolio, Project Baseline/Version, structure, Iteration, Work Item, Dependency, Risk/Issue/Blocker, Decision/Change and independent management Milestones become durable project-governance facts. Production remains unchanged on V2.3."
+}
