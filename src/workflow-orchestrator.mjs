@@ -292,7 +292,7 @@ const executeCurrentStage=async({
   let preparedKnowledge;
   try{
     preparedKnowledge=await prepareStageKnowledgeContext({
-      runId,taskId:task.id,stage,knowledgePackets
+      projectId,runId,taskId:task.id,stage,knowledgePackets
     });
   }catch(error){
     if(['REQUIRED_KNOWLEDGE_CONTEXT_MISSING','REQUIRED_KNOWLEDGE_CONTEXT_EMPTY'].includes(error.code)){
@@ -408,11 +408,20 @@ const executeCurrentStage=async({
   const blockingFailure=requiredInputMissing||requiredFailed||(policy.optionalFailureBlocks&&optionalFailed);
 
   let transitionInput;
-  if(!blockingFailure){
+  const humanGateRequired=stage.config?.humanGateRequired===true||stage.config?.executionMode==='HUMAN_GATE';
+  if(!blockingFailure&&humanGateRequired){
+    transitionInput={
+      transitionType:'ESCALATE',
+      gateStatus:'HOLD',
+      blockingReason:'Human approval is required before this stage can PASS',
+      humanGateRequired:true
+    };
+  }else if(!blockingFailure){
     transitionInput={
       transitionType:'PASS',
       gateStatus:'PASS',
-      blockingReason:null
+      blockingReason:null,
+      humanGateRequired:false
     };
   }else{
     transitionInput=decideFailureTransition(
@@ -433,7 +442,8 @@ const executeCurrentStage=async({
       requiredRequirementCount:required.length,
       optionalRequirementCount:optional.length,
       optionalFailureBlocks:policy.optionalFailureBlocks,
-      allRequiredPassed:!requiredInputMissing&&!requiredFailed
+      allRequiredPassed:!requiredInputMissing&&!requiredFailed,
+      humanGateRequired
     },
     evidence:{
       orchestrationSessionId:sessionId,
@@ -442,7 +452,7 @@ const executeCurrentStage=async({
     actorKey
   });
   let writebacks=[];
-  if(transitionInput.transitionType==='PASS'){
+  if(!blockingFailure&&(transitionInput.transitionType==='PASS'||humanGateRequired)){
     writebacks=await queueKnowledgeWritebacks({
       project:{
         id:projectId,
@@ -468,7 +478,7 @@ const executeCurrentStage=async({
     transitionType:transitionInput.transitionType,
     transitionEventId:transition.id,
     decision:{
-      requiredInputMissing,requiredFailed,optionalFailed,
+      requiredInputMissing,requiredFailed,optionalFailed,humanGateRequired,
       knowledgeContext:{
         count:preparedKnowledge.contextCount,
         contextHash:preparedKnowledge.contextHash,
