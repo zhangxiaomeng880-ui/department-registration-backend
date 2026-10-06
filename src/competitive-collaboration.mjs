@@ -692,15 +692,27 @@ export const createHumanGateApproval=async({
   projectId,stageKey,runId,taskId,gateKey,requestedByIdentityId=null,evidence={}
 })=>{
   const db=getRuntimePool(),project=await loadProject(projectId,db);
-  return createApprovalRequest({
-    workspaceId:project.workspace_id,projectId,
-    requestKey:`HUMAN_GATE:${runId}:${stageKey}:${taskId||'NO_TASK'}`,
-    targetType:'STAGE',targetId:stageKey,requiredRole:'REVIEWER',
-    requestedAction:`Approve Human Gate ${gateKey||stageKey}`,
-    riskLevel:'HIGH',
-    context:{runId,taskId,stageKey,gateKey},
-    evidence,requestedByIdentityId,
-    effectiveObjectType:'PROJECT_STAGE',
-    effectiveObjectId:stageKey
-  });
+  const requestKey=`HUMAN_GATE:${runId}:${stageKey}:${taskId||'NO_TASK'}`;
+  const [existing]=await db.execute(
+    'SELECT id,project_id,request_key,status FROM approval_requests WHERE workspace_id=? AND request_key=? LIMIT 1',
+    [project.workspace_id,requestKey]
+  );
+  if(existing.length) return {
+    id:existing[0].id,projectId:existing[0].project_id||null,
+    requestKey:existing[0].request_key,status:existing[0].status,idempotent:true
+  };
+  return {
+    ...await createApprovalRequest({
+      workspaceId:project.workspace_id,projectId,
+      requestKey,
+      targetType:'STAGE',targetId:stageKey,requiredRole:'REVIEWER',
+      requestedAction:`Approve Human Gate ${gateKey||stageKey}`,
+      riskLevel:'HIGH',
+      context:{runId,taskId,stageKey,gateKey},
+      evidence,requestedByIdentityId,
+      effectiveObjectType:'PROJECT_STAGE',
+      effectiveObjectId:stageKey
+    }),
+    idempotent:false
+  };
 };
