@@ -246,7 +246,7 @@ const finishAttempt=async(attemptId,input)=>{
 };
 
 const executeCurrentStage=async({
-  sessionId,runId,projectId,template,lifecycle,stageInputs,actorKey,sessionAttemptNo
+  sessionId,runId,projectId,template,lifecycle,stageInputs,actorKey,sessionAttemptNo,retryTaskId=null
 })=>{
   const stageKey=lifecycle.project.currentStageKey;
   const stageInstance=lifecycle.stages.find(item=>item.stageKey===stageKey);
@@ -261,19 +261,21 @@ const executeCurrentStage=async({
   const optional=requirements.filter(item=>item.requirementMode!=='REQUIRED');
   const policy=stagePolicyOf(stage);
 
-  const task=await createTask({
-    runId,
-    stageKey,
-    taskKey:`orchestrate:${sessionId}:${stageKey}:${sessionAttemptNo}`,
-    taskType:'WORKFLOW_STAGE_AUTO',
-    sequenceNo:sessionAttemptNo,
-    input:{
-      orchestrationSessionId:sessionId,
-      stageKey,
-      inputManifest:inputManifestOf({[stageKey]:stageInputs?.[stageKey]||{}})[stageKey]||{}
-    },
-    maxRetries:policy.maxRetries
-  });
+  const task=retryTaskId
+    ? {id:retryTaskId}
+    : await createTask({
+        runId,
+        stageKey,
+        taskKey:`orchestrate:${sessionId}:${stageKey}:${sessionAttemptNo}`,
+        taskType:'WORKFLOW_STAGE_AUTO',
+        sequenceNo:sessionAttemptNo,
+        input:{
+          orchestrationSessionId:sessionId,
+          stageKey,
+          inputManifest:inputManifestOf({[stageKey]:stageInputs?.[stageKey]||{}})[stageKey]||{}
+        },
+        maxRetries:policy.maxRetries
+      });
   const attemptId=await insertAttempt({
     sessionId,runId,taskId:task.id,stageInstance,attemptNo:sessionAttemptNo,
     requiredCount:required.length,optionalCount:optional.length
@@ -407,7 +409,8 @@ const executeCurrentStage=async({
   return {
     transition,
     invocationCount,
-    blocked:transitionInput.transitionType==='ESCALATE'
+    blocked:transitionInput.transitionType==='ESCALATE',
+    retryTaskId:transitionInput.transitionType==='RETRY'?task.id:null
   };
 };
 
@@ -469,6 +472,8 @@ export const orchestrateProjectWorkflow=async input=>{
   let attempts=0;
   let stopReasonCode=null;
   let stopReasonMessage=null;
+  let retryTaskId=null;
+  let retryStageKey=null;
 
   while(attempts<maxStageTransitions){
     const current=await getProjectLifecycle(input.projectId);
@@ -503,9 +508,12 @@ export const orchestrateProjectWorkflow=async input=>{
       sessionId,runId:run.id,projectId:input.projectId,
       template,lifecycle:current,stageInputs,
       actorKey:input.actorKey||'WORKFLOW_ORCHESTRATOR',
-      sessionAttemptNo:attempts
+      sessionAttemptNo:attempts,
+      retryTaskId:retryStageKey===stageKey?retryTaskId:null
     });
     totalInvocations+=result.invocationCount;
+    retryTaskId=result.retryTaskId||null;
+    retryStageKey=result.retryTaskId?stageKey:null;
     await updateSession(sessionId,{
       stageAttempts:attempts,capabilityInvocationCount:totalInvocations
     });
