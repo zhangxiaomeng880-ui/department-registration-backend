@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/ai-native-runtime-v2.7-m27.11-product-e2e-exit
+      - work/ai-native-runtime-v2.7-m27.11-product-e2e-exit
   workflow_dispatch:
 
 jobs:
