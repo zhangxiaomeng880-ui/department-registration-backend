@@ -70,7 +70,8 @@
     "validate:aigc-asset-system": "node test/aigc-asset-system.test.mjs",
     "validate:aigc-generation-image": "node test/aigc-generation-image.test.mjs",
     "validate:aigc-video-audio-production": "node test/aigc-video-audio-production.test.mjs",
-    "validate:aigc-edit-timeline": "node test/aigc-edit-timeline.test.mjs"
+    "validate:aigc-edit-timeline": "node test/aigc-edit-timeline.test.mjs",
+    "validate:aigc-master-acceptance": "node test/aigc-master-acceptance.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
