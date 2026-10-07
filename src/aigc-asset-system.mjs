@@ -302,7 +302,7 @@ export const bindAigcAssetRequirement=async(projectId,input={},actorId=null)=>{
     [id,projectId,breakdown.id,req.id,resolutionType,assetVersionId,callSheetId,bindingStatus,
      asJson(input.rightsApproval),asJson(input.usageScope),asJson(input.versionBinding),asJson(input.evidence),actorId]
   );
-  await insertTrace(db,{projectId,sourceType:'ASSET_REQUIREMENT',sourceId:req.id,targetType,targetId?targetType:'UNKNOWN',
+  await insertTrace(db,{projectId,sourceType:'ASSET_REQUIREMENT',sourceId:req.id,targetType:targetId?targetType:'UNKNOWN',
     targetId:targetId||id,linkType:'RESOLVED_BY',actorId,evidence:{resolutionType,bindingStatus}});
   return {id,projectId,assetRequirementId:req.id,resolutionType,assetVersionId,callSheetId,bindingStatus,isCurrent:true};
 };
