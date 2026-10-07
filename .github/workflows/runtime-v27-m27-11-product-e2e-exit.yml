@@ -120,6 +120,7 @@ jobs:
           npm run validate:product-review
           node --check src/product-domain-e2e-exit.mjs
           npm run validate:product-development-final
+          npm run validate:m27-product-development-freeze
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
           trap - EXIT
