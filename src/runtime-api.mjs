@@ -263,6 +263,10 @@ import {
   createM29DetectionRule,evaluateM29DetectionRule,evaluateM29DataDetectionGate,
   getM29DataDetectionState,resolveM29DataProjectScope,resolveM29DetectionRuleScope
 } from './m29-data-detection.mjs';
+import {
+  createM29DecisionCandidate,decideM29DecisionCandidate,evaluateM29DecisionGate,
+  getM29DecisionState,resolveM29DecisionProjectScope,resolveM29DecisionCandidateScope
+} from './m29-decision-policy.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2000,6 +2004,50 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29DataDetectionGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29DecisionStateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-decision-policy$/);
+  if (req.method === 'GET' && m29DecisionStateMatch) {
+    const projectId=m29DecisionStateMatch[1],scope=await resolveM29DecisionProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getM29DecisionState(projectId)});
+    return true;
+  }
+
+  const m29DecisionCreateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-decision-candidates$/);
+  if (req.method === 'POST' && m29DecisionCreateMatch) {
+    const projectId=m29DecisionCreateMatch[1],scope=await resolveM29DecisionProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createM29DecisionCandidate(
+      projectId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const m29DecisionHumanMatch=match(url.pathname,/^\/api\/runtime\/m29-decision-candidates\/([^/]+)\/decide$/);
+  if (req.method === 'POST' && m29DecisionHumanMatch) {
+    const decisionId=m29DecisionHumanMatch[1],scope=await resolveM29DecisionCandidateScope(decisionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await decideM29DecisionCandidate(
+      decisionId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const m29DecisionGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-gates\/G-M29-DECISION\/evaluate$/);
+  if (req.method === 'POST' && m29DecisionGateMatch) {
+    const projectId=m29DecisionGateMatch[1],scope=await resolveM29DecisionProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateM29DecisionGate(projectId,await readBody(req))});
     return true;
   }
 
