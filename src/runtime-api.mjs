@@ -254,6 +254,11 @@ import {
   evaluateAigcReviewGate,freezeAigcReviewCycle,getAigcReviewState,
   resolveAigcReviewProjectScope,resolveAigcReviewScope,resolveAigcProposalScope
 } from './aigc-review-archive.mjs';
+import {
+  createM29DataSource,createM29MetricDefinition,captureM29MetricObservation,
+  createM29DetectionRule,evaluateM29DetectionRule,evaluateM29DataDetectionGate,
+  getM29DataDetectionState,resolveM29DataProjectScope,resolveM29DetectionRuleScope
+} from './m29-data-detection.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -263,6 +268,18 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
 
   if (!runtimeDbConfigured()) {
     json(res, 503, { error: 'RUNTIME_DB_NOT_CONFIGURED' });
+    return true;
+  }
+
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/m29-data-sources') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createM29DataSource(await readBody(req))});
+    return true;
+  }
+  if (req.method === 'POST' && url.pathname === '/api/runtime/m29-metric-definitions') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await createM29MetricDefinition(await readBody(req))});
     return true;
   }
 
@@ -1918,6 +1935,57 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:read',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await getAigcReviewState(projectId)});
+    return true;
+  }
+
+  const m29DataDetectionMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-data-detection$/);
+  if (req.method === 'GET' && m29DataDetectionMatch) {
+    const projectId=m29DataDetectionMatch[1];
+    const scope=await resolveM29DataProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getM29DataDetectionState(projectId)});
+    return true;
+  }
+
+  const m29ObservationMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-metric-observations$/);
+  if (req.method === 'POST' && m29ObservationMatch) {
+    const projectId=m29ObservationMatch[1],scope=await resolveM29DataProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await captureM29MetricObservation(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29DetectionRuleCreateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-detection-rules$/);
+  if (req.method === 'POST' && m29DetectionRuleCreateMatch) {
+    const projectId=m29DetectionRuleCreateMatch[1],scope=await resolveM29DataProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createM29DetectionRule(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29DetectionEvalMatch=match(url.pathname,/^\/api\/runtime\/m29-detection-rules\/([^/]+)\/evaluate$/);
+  if (req.method === 'POST' && m29DetectionEvalMatch) {
+    const ruleId=m29DetectionEvalMatch[1],scope=await resolveM29DetectionRuleScope(ruleId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateM29DetectionRule(ruleId,await readBody(req))});
+    return true;
+  }
+
+  const m29DataGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-gates\/G-M29-DATA-DETECTION\/evaluate$/);
+  if (req.method === 'POST' && m29DataGateMatch) {
+    const projectId=m29DataGateMatch[1],scope=await resolveM29DataProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateM29DataDetectionGate(projectId,await readBody(req))});
     return true;
   }
 
