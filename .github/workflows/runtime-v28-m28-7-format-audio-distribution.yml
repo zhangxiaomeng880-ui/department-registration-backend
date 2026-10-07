@@ -99,6 +99,7 @@ jobs:
           npm run validate:github-oidc-executor-receipt
           npm run validate:aigc-story-script
           npm run validate:aigc-breakdown
+          npm run validate:aigc-format-strategy
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
           trap - EXIT
