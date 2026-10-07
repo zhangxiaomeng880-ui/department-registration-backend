@@ -211,6 +211,7 @@ export const createAigcBreakdownPlan=async(projectId,input={},actorId=null)=>{
   const coverageSnapshot={
     scriptVersionId:script.id,
     sceneRange:{start:Number(script.scene_start),end:Number(script.scene_end),count:Number(script.scene_count)},
+    sceneCount:Number(script.scene_count),
     coveredSceneCount:input.scenes.length,
     unitCount:input.units.length,
     shotCount:normalizedShots.length,
