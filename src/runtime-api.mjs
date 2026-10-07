@@ -160,6 +160,11 @@ import {
   createReleaseRollout,verifyReleaseRollout,releaseReleaseRollout,advanceReleaseWave,
   completeReleaseRollout,evaluateReleaseGate,getReleaseRolloutState,resolveReleaseRolloutScope
 } from './product-release-rollout.mjs';
+import {
+  createPostReleaseVerification,createIncident,triageIncident,createIncidentAction,
+  verifyIncidentAction,createIncidentReview,getPostReleaseOperationsState,
+  resolvePostReleaseProjectScope,resolveIncidentScope,resolveIncidentActionScope
+} from './product-post-release-incident.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1466,6 +1471,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const postReleaseOpsMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-post-release-operations$/);
+  if (req.method === 'GET' && postReleaseOpsMatch) {
+    const projectId=postReleaseOpsMatch[1];
+    const scope=await resolvePostReleaseProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getPostReleaseOperationsState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1495,7 +1511,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-qa-executions',createQaExecution],
     ['product-qa-regressions',createQaRegression],
     ['product-release-candidates',createReleaseCandidate],
-    ['product-release-rollouts',createReleaseRollout]
+    ['product-release-rollouts',createReleaseRollout],
+    ['product-post-release-verifications',createPostReleaseVerification],
+    ['product-incidents',createIncident]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1582,6 +1600,50 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await completeReleaseRollout(rolloutId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const incidentTriageMatch=match(url.pathname,/^\/api\/runtime\/product-incidents\/([^/]+)\/triage$/);
+  if (req.method === 'POST' && incidentTriageMatch) {
+    const incidentId=incidentTriageMatch[1];
+    const scope=await resolveIncidentScope(incidentId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await triageIncident(incidentId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const incidentActionsMatch=match(url.pathname,/^\/api\/runtime\/product-incidents\/([^/]+)\/actions$/);
+  if (req.method === 'POST' && incidentActionsMatch) {
+    const incidentId=incidentActionsMatch[1];
+    const scope=await resolveIncidentScope(incidentId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createIncidentAction(incidentId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const incidentActionVerifyMatch=match(url.pathname,/^\/api\/runtime\/product-incident-actions\/([^/]+)\/verify$/);
+  if (req.method === 'POST' && incidentActionVerifyMatch) {
+    const actionId=incidentActionVerifyMatch[1];
+    const scope=await resolveIncidentActionScope(actionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await verifyIncidentAction(actionId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const incidentReviewMatch=match(url.pathname,/^\/api\/runtime\/product-incidents\/([^/]+)\/review$/);
+  if (req.method === 'POST' && incidentReviewMatch) {
+    const incidentId=incidentReviewMatch[1];
+    const scope=await resolveIncidentScope(incidentId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createIncidentReview(incidentId,await readBody(req),principal?.identityId||null)});
     return true;
   }
 
