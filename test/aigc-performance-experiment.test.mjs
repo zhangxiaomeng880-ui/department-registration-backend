@@ -131,6 +131,11 @@ assert.ok(pm.candidateToSelectedRate>=0&&pm.candidateToSelectedRate<=1,JSON.stri
 assert.ok(pm.firstPassQaRate>=0&&pm.firstPassQaRate<=1,JSON.stringify(pm));
 assert.ok(pm.failureBlockedRate>=0&&pm.failureBlockedRate<=1,JSON.stringify(pm));
 assert.ok(pm.assetReuseRate>=0&&pm.assetReuseRate<=1,JSON.stringify(pm));
+assert.ok(pm.costPerShot==null||pm.costPerShot>=0,JSON.stringify(pm));
+assert.ok(pm.costPerMinute==null||pm.costPerMinute>=0,JSON.stringify(pm));
+assert.ok(pm.timePerShotMs==null||pm.timePerShotMs>=0,JSON.stringify(pm));
+assert.ok(pm.timePerStageMs>=0,JSON.stringify(pm));
+assert.ok(pm.durationMs>=0,JSON.stringify(pm));
 assert.equal(typeof pm.modelToolSuccessRate,'object');
 
 // Stage 13 may not auto-promote a Story Rule.
