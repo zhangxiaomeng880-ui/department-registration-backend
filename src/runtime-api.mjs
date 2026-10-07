@@ -221,6 +221,12 @@ import {
   evaluateAigcProductionGate,getAigcProductionState,resolveAigcProductionProjectScope,
   resolveAigcProductionRequirementScope,resolveAigcProductionFailureScope
 } from './aigc-video-audio-production.mjs';
+import {
+  createAigcTimelineVersion,createAigcTimelineReviewThread,resolveAigcTimelineReviewThread,
+  reopenAigcTimelineReviewThread,lockAigcTimelineVersion,createAigcRenderExport,
+  evaluateAigcEditGate,getAigcEditState,resolveAigcEditProjectScope,
+  resolveAigcTimelineScope,resolveAigcReviewThreadScope
+} from './aigc-edit-timeline.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1822,6 +1828,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcEditMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-edit-timeline$/);
+  if (req.method === 'GET' && aigcEditMatch) {
+    const projectId=aigcEditMatch[1];
+    const scope=await resolveAigcEditProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcEditState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1842,7 +1859,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-asset-call-sheets',createAigcAssetCallSheet],
     ['aigc-asset-requirement-bindings',bindAigcAssetRequirement],
     ['aigc-generation-jobs',createAigcGenerationJob],
-    ['aigc-production-requirements',createAigcProductionRequirements]
+    ['aigc-production-requirements',createAigcProductionRequirements],
+    ['aigc-timeline-versions',createAigcTimelineVersion]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1878,7 +1896,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
               ?await evaluateAigcImageGate(projectId,body,principal?.identityId||null)
               :gateKey==='G-AIGC-PRODUCTION'
                 ?await evaluateAigcProductionGate(projectId,body,principal?.identityId||null)
-                :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+                :gateKey==='G-AIGC-EDIT'
+                  ?await evaluateAigcEditGate(projectId,body,principal?.identityId||null)
+                  :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
     return true;
   }
@@ -1965,6 +1985,71 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     });
     json(res,200,{data:await resolveAigcProductionFailureAnalysis(
       failureId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const timelineReviewCreateMatch=match(url.pathname,/^\/api\/runtime\/aigc-timeline-versions\/([^/]+)\/review-threads$/);
+  if (req.method === 'POST' && timelineReviewCreateMatch) {
+    const timelineVersionId=timelineReviewCreateMatch[1];
+    const scope=await resolveAigcTimelineScope(timelineVersionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createAigcTimelineReviewThread(
+      timelineVersionId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const timelineReviewResolveMatch=match(url.pathname,/^\/api\/runtime\/aigc-timeline-review-threads\/([^/]+)\/resolve$/);
+  if (req.method === 'POST' && timelineReviewResolveMatch) {
+    const threadId=timelineReviewResolveMatch[1];
+    const scope=await resolveAigcReviewThreadScope(threadId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await resolveAigcTimelineReviewThread(
+      threadId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const timelineReviewReopenMatch=match(url.pathname,/^\/api\/runtime\/aigc-timeline-review-threads\/([^/]+)\/reopen$/);
+  if (req.method === 'POST' && timelineReviewReopenMatch) {
+    const threadId=timelineReviewReopenMatch[1];
+    const scope=await resolveAigcReviewThreadScope(threadId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await reopenAigcTimelineReviewThread(
+      threadId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const timelineLockMatch=match(url.pathname,/^\/api\/runtime\/aigc-timeline-versions\/([^/]+)\/lock$/);
+  if (req.method === 'POST' && timelineLockMatch) {
+    const timelineVersionId=timelineLockMatch[1];
+    const scope=await resolveAigcTimelineScope(timelineVersionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await lockAigcTimelineVersion(
+      timelineVersionId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const renderExportMatch=match(url.pathname,/^\/api\/runtime\/aigc-timeline-versions\/([^/]+)\/render-exports$/);
+  if (req.method === 'POST' && renderExportMatch) {
+    const timelineVersionId=renderExportMatch[1];
+    const scope=await resolveAigcTimelineScope(timelineVersionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createAigcRenderExport(
+      timelineVersionId,await readBody(req),principal?.identityId||null
     )});
     return true;
   }
