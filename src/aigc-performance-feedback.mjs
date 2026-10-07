@@ -423,7 +423,11 @@ export const getAigcPerformanceFeedbackState=async projectId=>{
     feedbackSignals:feedback.map(x=>({
       id:x.id,performanceSnapshotId:x.performance_snapshot_id||null,signalKey:x.signal_key,
       feedbackType:x.feedback_type,subject:x.subject,signal:parseJson(x.signal_json),
-      source:parseJson(x.source_json),confidence:x.confidence,limitation:parseJson(x.limitation_json)
+      source:parseJson(x.source_json),confidence:x.confidence,severity:x.severity,
+      recommendedScope:x.recommended_scope||null,
+      storyRuleChangeRequested:Boolean(x.story_rule_change_requested),
+      status:x.status,collectedAt:x.collected_at,
+      limitation:parseJson(x.limitation_json)
     })),
     experimentCandidates:experiments.map(x=>({
       id:x.id,experimentKey:x.experiment_key,experimentType:x.experiment_type,hypothesis:x.hypothesis,
