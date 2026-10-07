@@ -4,6 +4,28 @@
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
+INSERT INTO aigc_module_registry(module_key,display_name,stage_key,sort_order,description)
+VALUES
+  ('M29_DATA_SOURCE','数据源','M29_DATA_DETECTION',600,'统一接入 Product Outcome、AIGC Performance 等已验证结果数据，不复制 Domain 事实表'),
+  ('M29_METRIC_DEFINITION','指标定义','M29_DATA_DETECTION',610,'统一指标语义、方向、单位、抽取合同与质量策略'),
+  ('M29_DATA_QUALITY','数据质量','M29_DATA_DETECTION',620,'新鲜度、完整性、样本量与上游质量的 Fail-closed 评估'),
+  ('M29_DETECTION_RULE','检测规则','M29_DATA_DETECTION',630,'基于合格指标观测检测变化并生成可去重 Signal')
+ON DUPLICATE KEY UPDATE
+  display_name=VALUES(display_name),stage_key=VALUES(stage_key),sort_order=VALUES(sort_order),
+  status='ACTIVE',description=VALUES(description);
+
+INSERT INTO aigc_ui_labels(label_type,stable_key,display_name,status)
+VALUES
+  ('GATE','G-M29-DATA-DETECTION','数据 / 指标 / 质量 / 检测门禁','ACTIVE'),
+  ('M29_DOMAIN','PRODUCT','产品研发','ACTIVE'),
+  ('M29_DOMAIN','AIGC','AIGC 内容生产','ACTIVE'),
+  ('M29_DOMAIN','PLATFORM','平台','ACTIVE'),
+  ('M29_DOMAIN','PORTFOLIO','项目组合','ACTIVE'),
+  ('M29_QUALITY','PASS','数据质量通过','ACTIVE'),
+  ('M29_QUALITY','WARN','数据质量警告','ACTIVE'),
+  ('M29_QUALITY','FAIL','数据质量失败','ACTIVE')
+ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),status='ACTIVE';
+
 CREATE TABLE IF NOT EXISTS m29_data_sources (
   id CHAR(36) PRIMARY KEY,
   source_key VARCHAR(200) NOT NULL,
