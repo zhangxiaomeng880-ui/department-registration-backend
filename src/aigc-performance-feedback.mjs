@@ -4,6 +4,9 @@ import { getRuntimePool } from './runtime-db.mjs';
 const GATE='G-AIGC-PERFORMANCE';
 const CONFIDENCE=new Set(['LOW','MEDIUM','HIGH']);
 const FEEDBACK_TYPES=new Set(['QUANTITATIVE','QUALITATIVE']);
+const DATA_QUALITY=new Set(['PASS','WARN','FAIL']);
+const FEEDBACK_SEVERITIES=new Set(['LOW','MEDIUM','HIGH','CRITICAL']);
+const RECOMMENDED_SCOPES=new Set(['DISTRIBUTION','PRODUCTION','CREATIVE','REVIEW']);
 const EXPERIMENT_TYPES=new Set(['DISTRIBUTION','PRODUCTION','CREATIVE']);
 const RECOGNIZED_METRICS=new Set([
   'entry','retention3s','retention5s','completionRate','watchTimeSeconds',
@@ -58,11 +61,19 @@ export const createAigcPerformanceSnapshot=async(projectId,input={},actorId=null
   await loadProject(projectId);
   requireFields(input,[
     'publicationRecordId','snapshotKey','platformKey','region','language',
-    'windowStart','windowEnd','metrics','source','confidence','limitations','evidence','observedAt'
+    'windowStart','windowEnd','metrics','sampleSize','dataQualityStatus','dataQuality',
+    'source','confidence','limitations','evidence','observedAt'
   ],'INVALID_AIGC_PERFORMANCE_SNAPSHOT');
-  const confidence=upper(input.confidence);
+  const confidence=upper(input.confidence),dataQualityStatus=upper(input.dataQualityStatus);
   if(!CONFIDENCE.has(confidence))throw errorOf(
     'Performance confidence must be LOW/MEDIUM/HIGH','AIGC_PERFORMANCE_CONFIDENCE_INVALID',409
+  );
+  if(!DATA_QUALITY.has(dataQualityStatus))throw errorOf(
+    'Performance data quality must be PASS/WARN/FAIL','AIGC_PERFORMANCE_DATA_QUALITY_INVALID',409
+  );
+  const sampleSize=Number(input.sampleSize);
+  if(!Number.isInteger(sampleSize)||sampleSize<0)throw errorOf(
+    'Performance sampleSize must be a non-negative integer','AIGC_PERFORMANCE_SAMPLE_SIZE_INVALID',409
   );
   if(containsSecret(input.source))throw errorOf(
     'Performance source metadata must not contain credentials',
@@ -73,7 +84,7 @@ export const createAigcPerformanceSnapshot=async(projectId,input={},actorId=null
     throw errorOf('Performance snapshot has no recognized metrics',
       'AIGC_PERFORMANCE_METRICS_REQUIRED',409);
   const windowStart=new Date(input.windowStart),windowEnd=new Date(input.windowEnd),observedAt=new Date(input.observedAt);
-  if([windowStart,windowEnd,observedAt].some(x=>Number.isNaN(x.getTime()))||windowEnd<=windowStart)
+  if([windowStart,windowEnd,observedAt].some(x=>Number.isNaN(x.getTime()))||windowEnd<=windowStart||observedAt<windowEnd)
     throw errorOf('Performance time window is invalid','AIGC_PERFORMANCE_WINDOW_INVALID',409);
 
   const db=getRuntimePool();
@@ -104,15 +115,16 @@ export const createAigcPerformanceSnapshot=async(projectId,input={},actorId=null
   await db.execute(
     `INSERT INTO aigc_performance_snapshots
       (id,project_id,publication_record_id,snapshot_key,platform_key,region,language,
-       window_start,window_end,metrics_json,source_json,confidence,limitations_json,evidence_json,
-       observed_at,created_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       window_start,window_end,metrics_json,sample_size,data_quality_status,data_quality_json,
+       source_json,confidence,limitations_json,evidence_json,observed_at,created_by_identity_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id,projectId,pub.id,input.snapshotKey,pub.platform_key,input.region,input.language,
-     windowStart,windowEnd,asJson(input.metrics),asJson(input.source),confidence,
-     asJson(input.limitations),asJson(input.evidence),observedAt,actorId]
+     windowStart,windowEnd,asJson(input.metrics),sampleSize,dataQualityStatus,asJson(input.dataQuality),
+     asJson(input.source),confidence,asJson(input.limitations),asJson(input.evidence),observedAt,actorId]
   );
   return {id,projectId,publicationRecordId:pub.id,snapshotKey:input.snapshotKey,
-    platformKey:pub.platform_key,region:input.region,language:input.language,confidence};
+    platformKey:pub.platform_key,region:input.region,language:input.language,
+    sampleSize,dataQualityStatus,confidence};
 };
 
 export const createAigcProductionMetricSnapshot=async(projectId,input={},actorId=null)=>{
@@ -187,15 +199,29 @@ export const createAigcProductionMetricSnapshot=async(projectId,input={},actorId
 export const createAigcFeedbackSignal=async(projectId,input={},actorId=null)=>{
   await loadProject(projectId);
   requireFields(input,[
-    'signalKey','feedbackType','subject','signal','source','confidence','limitation','evidence'
+    'signalKey','feedbackType','subject','signal','source','confidence','severity',
+    'recommendedScope','limitation','collectedAt','evidence'
   ],'INVALID_AIGC_FEEDBACK_SIGNAL');
-  const feedbackType=upper(input.feedbackType),confidence=upper(input.confidence);
+  const feedbackType=upper(input.feedbackType),confidence=upper(input.confidence),
+    severity=upper(input.severity),recommendedScope=upper(input.recommendedScope);
   if(!FEEDBACK_TYPES.has(feedbackType))throw errorOf(
     'Feedback type must be QUANTITATIVE or QUALITATIVE','AIGC_FEEDBACK_TYPE_INVALID',409
   );
   if(!CONFIDENCE.has(confidence))throw errorOf(
     'Feedback confidence must be LOW/MEDIUM/HIGH','AIGC_FEEDBACK_CONFIDENCE_INVALID',409
   );
+  if(!FEEDBACK_SEVERITIES.has(severity))throw errorOf(
+    'Feedback severity invalid','AIGC_FEEDBACK_SEVERITY_INVALID',409
+  );
+  if(!RECOMMENDED_SCOPES.has(recommendedScope))throw errorOf(
+    'Feedback recommended scope invalid','AIGC_FEEDBACK_SCOPE_INVALID',409
+  );
+  const storyRuleChangeRequested=input.storyRuleChangeRequested===true;
+  if(storyRuleChangeRequested&&recommendedScope!=='REVIEW')throw errorOf(
+    'Story Rule signals must route to Review','AIGC_STORY_RULE_REVIEW_REQUIRED',409
+  );
+  const collectedAt=new Date(input.collectedAt);
+  if(Number.isNaN(collectedAt.getTime()))throw errorOf('Invalid collectedAt','AIGC_FEEDBACK_COLLECTED_AT_INVALID',409);
   if(containsSecret(input.source))throw errorOf(
     'Feedback source metadata must not contain credentials','AIGC_FEEDBACK_SOURCE_CREDENTIAL_FORBIDDEN',409
   );
@@ -212,13 +238,17 @@ export const createAigcFeedbackSignal=async(projectId,input={},actorId=null)=>{
   await db.execute(
     `INSERT INTO aigc_feedback_signals
       (id,project_id,performance_snapshot_id,signal_key,feedback_type,subject,signal_json,
-       source_json,confidence,limitation_json,evidence_json,created_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+       source_json,confidence,severity,recommended_scope,story_rule_change_requested,status,
+       limitation_json,evidence_json,collected_at,created_by_identity_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id,projectId,input.performanceSnapshotId||null,input.signalKey,feedbackType,input.subject,
-     asJson(input.signal),asJson(input.source),confidence,asJson(input.limitation),asJson(input.evidence),actorId]
+     asJson(input.signal),asJson(input.source),confidence,severity,recommendedScope,storyRuleChangeRequested?1:0,
+     storyRuleChangeRequested?'REVIEW_REQUIRED':'COLLECTED',asJson(input.limitation),asJson(input.evidence),
+     collectedAt,actorId]
   );
   return {id,projectId,performanceSnapshotId:input.performanceSnapshotId||null,
-    signalKey:input.signalKey,feedbackType,subject:input.subject,confidence};
+    signalKey:input.signalKey,feedbackType,subject:input.subject,confidence,severity,recommendedScope,
+    storyRuleChangeRequested,status:storyRuleChangeRequested?'REVIEW_REQUIRED':'COLLECTED'};
 };
 
 const validateSourceIds=async(db,projectId,table,ids,code)=>{
@@ -251,8 +281,10 @@ export const createAigcExperimentCandidate=async(projectId,input={},actorId=null
   if(escalation.applied===true||escalation.autoApply===true)
     throw errorOf('Stage 13 cannot apply Story Rule changes',
       'AIGC_STORY_RULE_AUTO_APPLY_FORBIDDEN',409);
-  if(escalation.requested===true&&(!nonEmpty(escalation.reason)||!nonEmpty(escalation.reviewGate)))
-    throw errorOf('Story Rule escalation requires explicit Review gate metadata',
+  if(escalation.requested===true&&(
+      !nonEmpty(escalation.reason)||!nonEmpty(escalation.reviewGate)||escalation.humanGateRequired!==true
+    ))
+    throw errorOf('Story Rule escalation requires explicit Review + Human Gate metadata',
       'AIGC_STORY_RULE_REVIEW_REQUIRED',409);
   const status=escalation.requested===true?'REVIEW_REQUIRED':'CANDIDATE';
 
@@ -279,6 +311,11 @@ export const createAigcExperimentCandidate=async(projectId,input={},actorId=null
 export const evaluateAigcPerformanceGate=async(projectId,input={},actorId=null)=>{
   await loadProject(projectId);
   const db=getRuntimePool(),reasons=[];
+  const asOf=input.asOf?new Date(input.asOf):new Date();
+  if(Number.isNaN(asOf.getTime()))throw errorOf('Invalid asOf','INVALID_DATE');
+  const maxAgeHours=Math.max(1,Math.min(720,Number(input.maxAgeHours)||168));
+  const cutoff=new Date(asOf.getTime()-maxAgeHours*3600000);
+
   const [verifiedPubs,performance,production,experiments,feedback]=await Promise.all([
     listRows(db,
       `SELECT DISTINCT r.id FROM aigc_publication_records r
@@ -297,21 +334,41 @@ export const evaluateAigcPerformanceGate=async(projectId,input={},actorId=null)=
   const verifiedIds=new Set(verifiedPubs.map(x=>x.id));
   const invalidPerformance=performance.filter(x=>!verifiedIds.has(x.publication_record_id));
   if(invalidPerformance.length)reasons.push('AIGC_PERFORMANCE_PUBLICATION_LINEAGE_INVALID');
+  const coveredIds=new Set(performance.filter(x=>verifiedIds.has(x.publication_record_id)).map(x=>x.publication_record_id));
+  const missingPublicationIds=verifiedPubs.filter(x=>!coveredIds.has(x.id)).map(x=>x.id);
+  if(missingPublicationIds.length)reasons.push('AIGC_PERFORMANCE_PUBLICATION_COVERAGE_INCOMPLETE');
+  const qualityFail=performance.filter(x=>x.data_quality_status==='FAIL');
+  if(qualityFail.length)reasons.push('AIGC_PERFORMANCE_DATA_QUALITY_FAIL');
+  const stalePerformance=performance.filter(x=>new Date(x.observed_at)<cutoff);
+  if(performance.length&&stalePerformance.length===performance.length)
+    reasons.push('AIGC_PERFORMANCE_SNAPSHOT_STALE');
+  const latestProduction=production.slice().sort((a,b)=>new Date(a.as_of)-new Date(b.as_of)).at(-1)||null;
+  if(latestProduction&&new Date(latestProduction.as_of)<cutoff)
+    reasons.push('AIGC_PRODUCTION_METRIC_SNAPSHOT_STALE');
+
   const invalidExperimentType=experiments.filter(x=>!EXPERIMENT_TYPES.has(x.experiment_type));
   if(invalidExperimentType.length)reasons.push('AIGC_EXPERIMENT_TYPE_INVALID');
   const storyApplied=experiments.filter(x=>(parseJson(x.story_rule_escalation_json)||{}).applied===true);
   if(storyApplied.length)reasons.push('AIGC_STORY_RULE_AUTO_APPLY_FORBIDDEN');
+  const unsafeStory=experiments.filter(x=>{
+    const e=parseJson(x.story_rule_escalation_json)||{};
+    return e.requested===true&&(x.status!=='REVIEW_REQUIRED'||e.humanGateRequired!==true||!nonEmpty(e.reviewGate));
+  });
+  if(unsafeStory.length)reasons.push('AIGC_STORY_RULE_REVIEW_REQUIRED');
   const reviewRequiredStory=experiments.filter(x=>{
     const e=parseJson(x.story_rule_escalation_json)||{};
-    return e.requested===true&&x.status==='REVIEW_REQUIRED'&&e.applied!==true;
+    return e.requested===true&&x.status==='REVIEW_REQUIRED'&&e.applied!==true&&e.humanGateRequired===true;
   });
 
-  const asOf=input.asOf?new Date(input.asOf):new Date();
-  if(Number.isNaN(asOf.getTime()))throw errorOf('Invalid asOf','INVALID_DATE');
   const evidence={
     verifiedPublicationCount:verifiedPubs.length,
     performanceSnapshotCount:performance.length,
+    coveredPublicationCount:coveredIds.size,
+    missingPublicationIds,
+    dataQualityFailSnapshotIds:qualityFail.map(x=>x.id),
+    stalePerformanceSnapshotIds:stalePerformance.map(x=>x.id),
     productionMetricSnapshotCount:production.length,
+    latestProductionMetricSnapshotId:latestProduction?.id||null,
     feedbackSignalCount:feedback.length,
     experimentCandidateCount:experiments.length,
     distributionExperimentCount:experiments.filter(x=>x.experiment_type==='DISTRIBUTION').length,
@@ -319,7 +376,7 @@ export const evaluateAigcPerformanceGate=async(projectId,input={},actorId=null)=
     creativeExperimentCount:experiments.filter(x=>x.experiment_type==='CREATIVE').length,
     reviewRequiredStoryEscalationCount:reviewRequiredStory.length,
     storyRuleAppliedCount:storyApplied.length,
-    invalidPerformanceSnapshotIds:invalidPerformance.map(x=>x.id),
+    storyRuleAutoMutationExecuted:false,
     readyForReviewAndKnowledge:reasons.length===0
   };
   const result={projectId,gateKey:GATE,status:reasons.length?'HOLD':'PASS',
@@ -332,7 +389,6 @@ export const evaluateAigcPerformanceGate=async(projectId,input={},actorId=null)=
   );
   return result;
 };
-
 export const getAigcPerformanceFeedbackState=async projectId=>{
   const project=await loadProject(projectId);
   const db=getRuntimePool();
@@ -355,8 +411,10 @@ export const getAigcPerformanceFeedbackState=async projectId=>{
     performanceSnapshots:performance.map(x=>({
       id:x.id,publicationRecordId:x.publication_record_id,snapshotKey:x.snapshot_key,
       platformKey:x.platform_key,region:x.region,language:x.language,windowStart:x.window_start,
-      windowEnd:x.window_end,metrics:parseJson(x.metrics_json),source:parseJson(x.source_json),
-      confidence:x.confidence,limitations:parseJson(x.limitations_json),observedAt:x.observed_at
+      windowEnd:x.window_end,metrics:parseJson(x.metrics_json),sampleSize:Number(x.sample_size),
+      dataQualityStatus:x.data_quality_status,dataQuality:parseJson(x.data_quality_json),
+      source:parseJson(x.source_json),confidence:x.confidence,
+      limitations:parseJson(x.limitations_json),observedAt:x.observed_at
     })),
     productionMetricSnapshots:production.map(x=>({
       id:x.id,snapshotKey:x.snapshot_key,asOf:x.as_of,metrics:parseJson(x.metrics_json),
