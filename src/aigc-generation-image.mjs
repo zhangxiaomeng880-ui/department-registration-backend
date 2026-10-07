@@ -5,7 +5,7 @@ import { evaluateAigcAssetGate } from './aigc-asset-system.mjs';
 const GATE='G-AIGC-IMAGE';
 const GENERATION_KINDS=new Set(['IMAGE','KEYFRAME','STORYBOARD']);
 const JOB_STATUSES=new Set(['QUEUED','RUNNING','PASS','FAIL','BLOCKED']);
-const CANDIDATE_STATUSES=new Set(['CANDIDATE','SELECTED','REJECTED','HISTORICAL']);
+const CANDIDATE_STATUSES=new Set(['CANDIDATE','SELECTED','LOCKED','REJECTED','HISTORICAL']);
 const SHA64=/^[0-9a-f]{64}$/i;
 const QA_DIMENSIONS=[
   'identity','look','sceneProp','actionPose','expressionPerformance','gazeBlocking',
@@ -137,11 +137,46 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
     'Generation Call Sheet must be READY','AIGC_GENERATION_CALL_SHEET_NOT_READY',409
   );
 
-  const referenceVersionIds=input.referenceBindings.map(x=>x.referenceId);
+  const preflight=parseJson(callSheet.preflight_json)||{};
+  if(upper(preflight.status)!=='PASS')throw errorOf(
+    'Generation Call Sheet preflight must PASS','AIGC_GENERATION_CALL_SHEET_PREFLIGHT_NOT_PASS',409,
+    {parentCallSheetId:callSheet.id,preflightStatus:preflight.status||null}
+  );
+
+  const requiredCallSheetRefs=await listRows(db,
+    `SELECT b.reference_asset_version_id,b.reference_role,b.required,v.version_key,v.state
+       FROM aigc_call_sheet_reference_bindings b
+       JOIN aigc_asset_versions v ON v.id=b.reference_asset_version_id
+      WHERE b.call_sheet_id=? AND b.required=TRUE AND b.status='READY'
+      ORDER BY b.reference_role,b.reference_asset_version_id`,
+    [callSheet.id]
+  );
+  const inputRefByTuple=new Map(input.referenceBindings.map(x=>[
+    `${x.referenceId}:${upper(x.role)}`,x
+  ]));
+  const missingInheritedRefs=requiredCallSheetRefs.filter(x=>{
+    const supplied=inputRefByTuple.get(`${x.reference_asset_version_id}:${upper(x.reference_role)}`);
+    return !supplied||supplied.versionKey!==x.version_key;
+  });
+  if(missingInheritedRefs.length)throw errorOf(
+    'Generation must inherit every required Parent Call Sheet reference',
+    'AIGC_GENERATION_REQUIRED_REFERENCE_NOT_INHERITED',409,{
+      missingReferences:missingInheritedRefs.map(x=>({
+        referenceId:x.reference_asset_version_id,role:x.reference_role,versionKey:x.version_key
+      }))
+    }
+  );
+
+  const referenceVersionIds=[...new Set(input.referenceBindings.map(x=>x.referenceId))];
   const [referenceRows]=referenceVersionIds.length
     ?await db.query(
-      `SELECT id,version_key,state FROM aigc_asset_versions
-        WHERE owner_project_id=? AND id IN (${referenceVersionIds.map(()=>'?').join(',')})`,
+      `SELECT v.id,v.version_key,v.state,a.owner_project_id,l.library_scope,l.permission_policy_json,
+              l.rights_policy_json,l.usage_scope_json
+         FROM aigc_asset_versions v
+         JOIN aigc_assets a ON a.id=v.asset_id
+         JOIN aigc_asset_libraries l ON l.id=a.library_id
+        WHERE v.workspace_id=(SELECT workspace_id FROM projects WHERE id=?)
+          AND v.id IN (${referenceVersionIds.map(()=>'?').join(',')})`,
       [projectId,...referenceVersionIds]
     )
     :[[]];
@@ -151,7 +186,26 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
     if(!row||row.version_key!==ref.versionKey||!['PASS','CURRENT','LOCKED','FROZEN'].includes(row.state))
       throw errorOf('Generation reference is not an exact approved asset version',
         'AIGC_GENERATION_REFERENCE_VERSION_INVALID',409,{referenceId:ref.referenceId,versionKey:ref.versionKey});
+    if(row.owner_project_id!==projectId){
+      const permission=parseJson(row.permission_policy_json)||{};
+      const rights=parseJson(row.rights_policy_json)||{};
+      const usageScope=parseJson(row.usage_scope_json)||{};
+      if(row.library_scope!=='WORKSPACE'||permission.crossProjectReuse!==true||rights.reuseAllowed===false||
+         (Array.isArray(usageScope.allowedProjectIds)&&usageScope.allowedProjectIds.length&&!usageScope.allowedProjectIds.includes(projectId)))
+        throw errorOf('Generation reference is outside governed project/workspace reuse scope',
+          'AIGC_GENERATION_REFERENCE_SCOPE_DENIED',409,{referenceId:ref.referenceId});
+    }
   }
+  const generationPreflight={
+    status:'PASS',
+    parentCallSheetId:callSheet.id,
+    callSheetPreflightStatus:'PASS',
+    requiredInheritedReferenceCount:requiredCallSheetRefs.length,
+    suppliedReferenceCount:input.referenceBindings.length,
+    inheritedRequiredReferences:requiredCallSheetRefs.map(x=>({
+      referenceId:x.reference_asset_version_id,role:x.reference_role,versionKey:x.version_key
+    }))
+  };
 
   const id=randomUUID(),status=upper(input.status||'QUEUED');
   if(!JOB_STATUSES.has(status)||['PASS','FAIL'].includes(status))
@@ -161,14 +215,14 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
     `INSERT INTO aigc_generation_jobs
       (id,project_id,breakdown_plan_id,shot_id,parent_call_sheet_id,job_key,generation_kind,
        provider,model_tool,model_tool_version,tool_key,skill_key,mcp_key,prompt_text,negative_prompt_text,
-       prompt_version,reference_bindings_json,parameters_json,input_fingerprint_sha256,requested_output_count,
+       prompt_version,reference_bindings_json,preflight_json,parameters_json,input_fingerprint_sha256,requested_output_count,
        started_at,usage_json,cost_json,status,retry_json,safety_json,provenance_json,evidence_json,
        created_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     [
       id,projectId,breakdown.id,input.shotId,input.parentCallSheetId,input.jobKey,generationKind,
       input.provider,input.modelTool,input.modelToolVersion,input.toolKey||null,input.skillKey||null,input.mcpKey||null,
-      input.prompt,input.negativePrompt||null,input.promptVersion,asJson(input.referenceBindings),asJson(input.parameters),
+      input.prompt,input.negativePrompt||null,input.promptVersion,asJson(input.referenceBindings),asJson(generationPreflight),asJson(input.parameters),
       String(input.inputFingerprintSha256).toLowerCase(),requestedOutputCount,
       input.startedAt?new Date(input.startedAt):(status==='RUNNING'?new Date():null),
       asJson(input.usage||{}),asJson(input.cost||{}),status,asJson(input.retry),asJson(input.safety),
@@ -272,8 +326,8 @@ export const completeAigcGenerationJob=async(generationJobId,input={})=>{
 export const selectAigcGenerationCandidate=async(candidateId,input={},actorId=null)=>{
   requireFields(input,['eventType','reason','evidence'],'INVALID_AIGC_CANDIDATE_SELECTION');
   const eventType=upper(input.eventType);
-  if(!['SELECT','RESTORE'].includes(eventType))throw errorOf(
-    'Selection eventType must be SELECT or RESTORE','AIGC_CANDIDATE_SELECTION_EVENT_INVALID',409
+  if(!['SELECT','RESTORE','LOCK'].includes(eventType))throw errorOf(
+    'Selection eventType must be SELECT, RESTORE or LOCK','AIGC_CANDIDATE_SELECTION_EVENT_INVALID',409
   );
   const db=getRuntimePool();
   const [rows]=await db.execute(
@@ -305,9 +359,42 @@ export const selectAigcGenerationCandidate=async(candidateId,input={},actorId=nu
       [candidate.shot_id]
     );
     const current=currentRows[0]||null;
+
+    if(eventType==='LOCK'){
+      if(!candidate.is_current||current?.id!==candidateId||!['SELECTED','LOCKED'].includes(candidate.selection_status))
+        throw errorOf('Candidate must be current SELECTED before lock','AIGC_CANDIDATE_CURRENT_REQUIRED_FOR_LOCK',409);
+      if(candidate.selection_status==='LOCKED'){
+        await conn.commit();
+        return {id:candidateId,shotId:candidate.shot_id,selectionStatus:'LOCKED',isCurrent:true,
+          lockedAt:candidate.locked_at,eventType,idempotent:true};
+      }
+      const lockedAt=new Date();
+      await conn.execute(
+        "UPDATE aigc_generation_candidates SET selection_status='LOCKED',locked_at=?,human_comment=? WHERE id=?",
+        [lockedAt,input.humanComment||candidate.human_comment||null,candidateId]
+      );
+      await conn.execute(
+        `INSERT INTO aigc_candidate_selection_events
+          (id,project_id,shot_id,from_candidate_id,to_candidate_id,event_type,reason,evidence_json,selected_by_identity_id)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        [randomUUID(),candidate.project_id,candidate.shot_id,candidateId,candidateId,'LOCK',
+         input.reason,asJson(input.evidence),actorId]
+      );
+      await insertTrace(conn,{projectId:candidate.project_id,sourceType:'GENERATION_CANDIDATE',sourceId:candidateId,
+        targetType:'SHOT',targetId:candidate.shot_id,linkType:'LOCKED_FOR',actorId,
+        evidence:{eventType:'LOCK',reason:input.reason,generationKind:candidate.generation_kind}});
+      await conn.commit();
+      return {id:candidateId,shotId:candidate.shot_id,selectionStatus:'LOCKED',isCurrent:true,
+        lockedAt,eventType,idempotent:false};
+    }
+
+    if(current?.selection_status==='LOCKED'&&current.id!==candidateId)
+      throw errorOf('Locked current candidate cannot be replaced without a new governed production version',
+        'AIGC_LOCKED_CANDIDATE_REPLACEMENT_FORBIDDEN',409,{currentCandidateId:current.id});
     if(current?.id===candidateId){
       await conn.commit();
-      return {id:candidateId,shotId:candidate.shot_id,selectionStatus:'SELECTED',isCurrent:true,idempotent:true};
+      return {id:candidateId,shotId:candidate.shot_id,selectionStatus:current.selection_status,isCurrent:true,
+        eventType,idempotent:true};
     }
     if(current){
       await conn.execute(
@@ -316,7 +403,7 @@ export const selectAigcGenerationCandidate=async(candidateId,input={},actorId=nu
       );
     }
     await conn.execute(
-      "UPDATE aigc_generation_candidates SET is_current=TRUE,selection_status='SELECTED',rejected_reason=NULL,human_comment=? WHERE id=?",
+      "UPDATE aigc_generation_candidates SET is_current=TRUE,selection_status='SELECTED',locked_at=NULL,rejected_reason=NULL,human_comment=? WHERE id=?",
       [input.humanComment||candidate.human_comment||null,candidateId]
     );
     await conn.execute(
@@ -378,7 +465,7 @@ export const evaluateAigcImageGate=async(projectId,input={},actorId=null)=>{
         [breakdown.id])
     ]);
     const passJobShotIds=new Set(jobs.map(x=>x.shot_id));
-    const currentSelected=candidates.filter(x=>x.is_current&&x.selection_status==='SELECTED'&&x.job_status==='PASS');
+    const currentSelected=candidates.filter(x=>x.is_current&&['SELECTED','LOCKED'].includes(x.selection_status)&&x.job_status==='PASS');
     const currentByShot=new Map(currentSelected.map(x=>[x.shot_id,x]));
     const shotsWithoutPassJob=shots.filter(x=>!passJobShotIds.has(x.id));
     const shotsWithoutCurrent=shots.filter(x=>!currentByShot.has(x.id));
@@ -397,6 +484,7 @@ export const evaluateAigcImageGate=async(projectId,input={},actorId=null)=>{
     evidence.passKeyframeShotCount=passJobShotIds.size;
     evidence.currentSelectedKeyframeCount=currentSelected.length;
     evidence.currentSelectedShotCount=currentByShot.size;
+    evidence.lockedKeyframeCount=currentSelected.filter(x=>x.selection_status==='LOCKED').length;
     evidence.qaFailedCandidateIds=qaFailed.map(x=>x.id);
     evidence.safetyFailedCandidateIds=safetyFailed.map(x=>x.id);
     evidence.missingLocatorCandidateIds=locatorMissing.map(x=>x.id);
@@ -431,16 +519,16 @@ export const getAigcGenerationState=async projectId=>{
       projectType:project.project_type,projectSubtypeKey:project.project_subtype_key},
     frontend:{
       language:'zh-CN',
-      moduleNames:['生成任务','生成候选','候选选择与恢复','图像 / 关键帧 / 分镜生产'],
+      moduleNames:['生成任务','生成候选','候选选择、恢复与锁定','图像 / 关键帧 / 分镜生产'],
       gateName:'图像 / 关键帧门禁',
-      candidateLabels:{CANDIDATE:'候选',SELECTED:'已选择',REJECTED:'已拒绝',HISTORICAL:'历史候选'}
+      candidateLabels:{CANDIDATE:'候选',SELECTED:'已选择',LOCKED:'已锁定',REJECTED:'已拒绝',HISTORICAL:'历史候选'}
     },
     currentBreakdownPlanId:breakdown?.id||null,
     jobs:jobs.map(x=>({
       id:x.id,breakdownPlanId:x.breakdown_plan_id,shotId:x.shot_id,parentCallSheetId:x.parent_call_sheet_id,
       jobKey:x.job_key,generationKind:x.generation_kind,provider:x.provider,modelTool:x.model_tool,
       modelToolVersion:x.model_tool_version,toolKey:x.tool_key||null,skillKey:x.skill_key||null,mcpKey:x.mcp_key||null,
-      promptVersion:x.prompt_version,referenceBindings:parseJson(x.reference_bindings_json),
+      promptVersion:x.prompt_version,referenceBindings:parseJson(x.reference_bindings_json),preflight:parseJson(x.preflight_json),
       parameters:parseJson(x.parameters_json),inputFingerprintSha256:x.input_fingerprint_sha256,
       requestedOutputCount:Number(x.requested_output_count),startedAt:x.started_at,finishedAt:x.finished_at,
       latencyMs:x.latency_ms==null?null:Number(x.latency_ms),usage:parseJson(x.usage_json),cost:parseJson(x.cost_json),
@@ -452,7 +540,7 @@ export const getAigcGenerationState=async projectId=>{
       outputIndex:Number(x.output_index),candidateVersionNo:Number(x.candidate_version_no),
       contentLocator:parseJson(x.content_locator_json),outputFingerprintSha256:x.output_fingerprint_sha256,
       qa:parseJson(x.qa_json),compareGroup:x.compare_group||null,selectionStatus:x.selection_status,
-      isCurrent:Boolean(x.is_current),rejectedReason:x.rejected_reason||null,humanComment:x.human_comment||null,
+      isCurrent:Boolean(x.is_current),lockedAt:x.locked_at||null,rejectedReason:x.rejected_reason||null,humanComment:x.human_comment||null,
       safety:parseJson(x.safety_json)
     })),
     selectionEvents:events.map(x=>({
