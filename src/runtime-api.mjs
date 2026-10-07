@@ -263,6 +263,11 @@ import {
   createM29DetectionRule,evaluateM29DetectionRule,evaluateM29DataDetectionGate,
   getM29DataDetectionState,resolveM29DataProjectScope,resolveM29DetectionRuleScope
 } from './m29-data-detection.mjs';
+import {
+  createM29DecisionCandidate,executeM29DecisionCandidate,closeM29SelfLoop,
+  evaluateM29SelfLoopGate,getM29SelfLoopState,
+  resolveM29SelfLoopProjectScope,resolveM29DecisionCandidateScope,resolveM29LoopExecutionScope
+} from './m29-decision-self-loop.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1949,6 +1954,62 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:read',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await getAigcDomainFinalState(projectId)});
+    return true;
+  }
+
+  const m29SelfLoopMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-self-loop$/);
+  if (req.method === 'GET' && m29SelfLoopMatch) {
+    const projectId=m29SelfLoopMatch[1],scope=await resolveM29SelfLoopProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getM29SelfLoopState(projectId)});
+    return true;
+  }
+
+  const m29DecisionCreateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-decision-candidates$/);
+  if (req.method === 'POST' && m29DecisionCreateMatch) {
+    const projectId=m29DecisionCreateMatch[1],scope=await resolveM29SelfLoopProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createM29DecisionCandidate(
+      projectId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const m29DecisionExecuteMatch=match(url.pathname,/^\/api\/runtime\/m29-decision-candidates\/([^/]+)\/execute$/);
+  if (req.method === 'POST' && m29DecisionExecuteMatch) {
+    const candidateId=m29DecisionExecuteMatch[1],scope=await resolveM29DecisionCandidateScope(candidateId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await executeM29DecisionCandidate(
+      candidateId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const m29LoopCloseMatch=match(url.pathname,/^\/api\/runtime\/m29-loop-executions\/([^/]+)\/close$/);
+  if (req.method === 'POST' && m29LoopCloseMatch) {
+    const executionId=m29LoopCloseMatch[1],scope=await resolveM29LoopExecutionScope(executionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await closeM29SelfLoop(
+      executionId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const m29SelfLoopGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-gates\/G-M29-SELF-LOOP\/evaluate$/);
+  if (req.method === 'POST' && m29SelfLoopGateMatch) {
+    const projectId=m29SelfLoopGateMatch[1],scope=await resolveM29SelfLoopProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateM29SelfLoopGate(projectId,await readBody(req))});
     return true;
   }
 
