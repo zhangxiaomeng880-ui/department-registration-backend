@@ -72,7 +72,8 @@
     "validate:aigc-video-audio-production": "node test/aigc-video-audio-production.test.mjs",
     "validate:aigc-edit-timeline": "node test/aigc-edit-timeline.test.mjs",
     "validate:aigc-master-acceptance": "node test/aigc-master-acceptance.test.mjs",
-    "validate:aigc-distribution-package": "node test/aigc-distribution-package.test.mjs"
+    "validate:aigc-distribution-package": "node test/aigc-distribution-package.test.mjs",
+    "validate:aigc-release-publishing": "node test/aigc-release-publishing.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
