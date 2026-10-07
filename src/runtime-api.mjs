@@ -232,7 +232,7 @@ import {
   lockAigcMasterVersion,getAigcMasteringState,resolveAigcMasterProjectScope,resolveAigcMasterScope
 } from './aigc-master-acceptance.mjs';
 import {
-  createAigcDistributionVersion,createAigcDistributionPackage,
+  createAigcDerivationScan,createAigcDistributionVersion,createAigcDistributionPackage,
   evaluateAigcDistributionPackageGate,freezeAigcDistributionPackage,
   getAigcDistributionPackageState,resolveAigcDistributionProjectScope,
   resolveAigcDistributionPackageScope
@@ -1894,7 +1894,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-production-requirements',createAigcProductionRequirements],
     ['aigc-timeline-versions',createAigcTimelineVersion],
     ['aigc-master-versions',createAigcMasterVersion],
-    ['aigc-distribution-versions',createAigcDistributionVersion],
+    ['aigc-derivation-scans',createAigcDerivationScan],
+    ['aigc-content-derivation-versions',createAigcDistributionVersion],
     ['aigc-distribution-packages',createAigcDistributionPackage]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
