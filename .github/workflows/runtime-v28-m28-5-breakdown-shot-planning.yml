@@ -87,6 +87,7 @@ jobs:
           npm run validate:aigc-foundation
           npm run validate:novel-skill-binding
           npm run validate:native-trigger-capability-version
+          npm run validate:bridge-executor-reliability
           npm run validate:aigc-story-script
           npm run validate:aigc-breakdown
           node test/railway-compatibility.test.mjs
