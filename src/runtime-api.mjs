@@ -304,6 +304,9 @@ import {
   getWorkspaceAuditEvidence,rebuildWorkspaceSearchAudit,evaluateM30SearchAuditGate,
   getM30SearchAuditState,resolveM30SearchAuditWorkspaceScope
 } from './m30-global-search-audit-evidence.mjs';
+import {
+  recordAiNativeV2FinalRegressionReceipt,evaluateAiNativeV2FinalGate,getAiNativeV2FinalState
+} from './ai-native-v2-final-gate.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2037,6 +2040,24 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/ai-native-v2/final-regression-receipts') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await recordAiNativeV2FinalRegressionReceipt(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/ai-native-v2/gates/G-AI-NATIVE-V2-FINAL/evaluate') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await evaluateAiNativeV2FinalGate(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/ai-native-v2/final') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getAiNativeV2FinalState()});
     return true;
   }
 
