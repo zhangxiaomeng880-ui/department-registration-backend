@@ -276,8 +276,7 @@ export const verifyIncidentAction=async(actionId,input={},actorId=null)=>{
 
 export const createIncidentReview=async(incidentId,input={},actorId=null)=>{
   requireFields(input,[
-    'verificationId','reviewKey','rootCause','timeline','customerImpact','prevention',
-    'backlogItems','knowledgeRefs','evidence'
+    'verificationId','reviewKey','rootCause','timeline','customerImpact','prevention','evidence'
   ],'INVALID_INCIDENT_REVIEW');
   if(!Array.isArray(input.backlogItems)||!input.backlogItems.length)throw errorOf(
     'Incident Review requires at least one Backlog item','INCIDENT_REVIEW_BACKLOG_REQUIRED',409
