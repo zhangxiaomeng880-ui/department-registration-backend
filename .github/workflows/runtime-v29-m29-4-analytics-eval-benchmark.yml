@@ -92,6 +92,7 @@ jobs:
           npm run validate:eval-replay-contract
           npm run validate:eval-runner
           npm run validate:eval-regression-gate
+          npm run validate:shadow-eval
           npm run validate:eval-reliability
           npm run validate:m27-product-development-freeze
           npm run validate:aigc-domain-final
