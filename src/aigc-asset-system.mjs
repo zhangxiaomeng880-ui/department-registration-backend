@@ -254,7 +254,7 @@ export const createAigcAssetCallSheet=async(projectId,input={},actorId=null)=>{
   }
   await insertTrace(db,{projectId,sourceType:'ASSET_REQUIREMENT',sourceId:requirement.id,
     targetType:'ASSET_CALL_SHEET',targetId:id,linkType:'PLANS_PRODUCTION_WITH',actorId,evidence:{status,assetType}});
-  return {id,projectId,breakdownPlanId:breakdown.id,assetRequirementId:requirement.id,callSheetKey:input.callSheetKey,assetType,status,unsupportedRoles,missingRequiredRoles};
+  return {id,projectId,breakdownPlanId:breakdown.id,assetRequirementId:requirement.id,callSheetKey:input.callSheetKey,assetType,status,unsupportedRoles:unsupported,missingRequiredRoles};
 };
 
 export const bindAigcAssetRequirement=async(projectId,input={},actorId=null)=>{
