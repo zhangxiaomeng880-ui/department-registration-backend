@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 
 const parseJson=value=>{
@@ -6,17 +6,6 @@ const parseJson=value=>{
   if(typeof value==='object')return value;
   try{return JSON.parse(value);}catch{return null;}
 };
-const stable=value=>{
-  if(Array.isArray(value))return value.map(stable);
-  if(value&&typeof value==='object'){
-    return Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])]));
-  }
-  return value;
-};
-const sha256=value=>createHash('sha256').update(
-  typeof value==='string'?value:JSON.stringify(stable(value)),'utf8'
-).digest('hex');
-
 const snapshotDefinition=row=>({
   capabilityKey:row.capability_key,
   capabilityType:row.capability_type,
@@ -56,8 +45,19 @@ export const ensureCapabilityVersionSnapshot=async(capabilityKey,db=getRuntimePo
     error.code='CAPABILITY_NOT_FOUND';error.statusCode=404;throw error;
   }
   const cap=caps[0];
-  const definition=snapshotDefinition(cap);
-  const definitionSha256=sha256(definition);
+  const [[hashRow]]=await db.execute(
+    `SELECT SHA2(CONCAT_WS('|',
+      capability_key,capability_type,display_name,version,status,routable,
+      COALESCE(adapter_key,''),COALESCE(CAST(input_contract_json AS CHAR),''),
+      COALESCE(CAST(output_contract_json AS CHAR),''),
+      COALESCE(CAST(capabilities_json AS CHAR),''),
+      COALESCE(CAST(policy_tags_json AS CHAR),''),
+      COALESCE(CAST(metadata_json AS CHAR),'')
+    ),256) AS definition_sha256
+    FROM capability_registry WHERE capability_key=?`,
+    [capabilityKey]
+  );
+  const definitionSha256=hashRow.definition_sha256;
   const [existing]=await db.execute(
     'SELECT * FROM capability_versions WHERE capability_key=? AND version=? LIMIT 1',
     [capabilityKey,cap.version]
