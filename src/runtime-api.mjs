@@ -76,6 +76,7 @@ import {
   bindProjectWorkflow,getProjectLifecycle
 } from './core-meta-registry.mjs';
 import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
+import { syncNovelSkillBinding,getNovelSkillBindingStatus } from './novel-skill-binding.mjs';
 import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvents } from './stage-runtime.mjs';
 import {
   orchestrateProjectWorkflow,getWorkflowOrchestrationSession,listWorkflowOrchestrationSessions
@@ -907,6 +908,18 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   if (req.method === 'POST' && url.pathname === '/api/runtime/capabilities') {
     requirePlatformAdmin(principal);
     json(res,201,{data:await upsertCapability(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/novel-skill-binding') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getNovelSkillBindingStatus()});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/novel-skill-binding/sync') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await syncNovelSkillBinding()});
     return true;
   }
 
