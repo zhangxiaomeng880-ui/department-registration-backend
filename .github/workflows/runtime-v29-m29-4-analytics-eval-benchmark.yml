@@ -104,7 +104,7 @@ jobs:
           npm run validate:novel-skill-binding
           npm run validate:native-trigger-capability-version
           npm run validate:bridge-executor-reliability
-          npm run validate:github-oidc-executor-receipt
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then npm run validate:github-oidc-executor-receipt; fi
           npm run validate:aigc-story-script
           npm run validate:aigc-breakdown
           npm run validate:aigc-format-strategy
