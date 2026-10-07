@@ -131,7 +131,7 @@ export const createAigcProductionMetricSnapshot=async(projectId,input={})=>{
     'INVALID_AIGC_PRODUCTION_METRIC_SNAPSHOT');
   const {start,end}=validateWindow(input.windowStart,input.windowEnd);
   const db=getRuntimePool();
-  const [jobs,candidates]=await Promise.all([
+  const [jobs,candidates,timelines]=await Promise.all([
     listRows(db,
       `SELECT * FROM aigc_generation_jobs
         WHERE project_id=? AND created_at>=? AND created_at<? ORDER BY created_at,id`,
@@ -141,15 +141,22 @@ export const createAigcProductionMetricSnapshot=async(projectId,input={})=>{
          FROM aigc_generation_candidates c
          JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
         WHERE c.project_id=? AND c.created_at>=? AND c.created_at<? ORDER BY c.created_at,c.id`,
-      [projectId,start,end])
+      [projectId,start,end]),
+    listRows(db,
+      `SELECT duration_ms FROM aigc_timeline_versions
+        WHERE project_id=? AND status='LOCKED' AND is_current=TRUE
+        ORDER BY version_no DESC LIMIT 1`,
+      [projectId])
   ]);
   const generationCount=jobs.length,candidateCount=candidates.length;
   const selected=candidates.filter(x=>x.is_current&&['SELECTED','LOCKED'].includes(x.selection_status));
   const selectedCount=selected.length;
   const firstPassCount=candidates.filter(qaPass).length;
   const failedBlockedCount=jobs.filter(x=>['FAIL','BLOCKED'].includes(x.status)).length;
+  const distinctShots=new Set(jobs.map(x=>x.shot_id)).size;
   const shotKindKeys=new Set(jobs.map(x=>x.shot_id+':'+x.generation_kind));
   const regenerationCount=Math.max(0,generationCount-shotKindKeys.size);
+  const durationMs=Math.max(0,Number(timelines[0]?.duration_ms)||0);
   let totalCost=0,latencyTotal=0,latencyCount=0;
   const modelStats=new Map(),referenceUse=new Map();
   for(const job of jobs){
@@ -175,7 +182,12 @@ export const createAigcProductionMetricSnapshot=async(projectId,input={})=>{
     failureBlockedRate:generationCount?failedBlockedCount/generationCount:0,
     totalGenerationCost:totalCost,
     costPerSelectedAsset:selectedCount?totalCost/selectedCount:null,
+    costPerShot:distinctShots?totalCost/distinctShots:null,
+    costPerMinute:durationMs>0?totalCost/(durationMs/60000):null,
     averageGenerationLatencyMs:latencyCount?latencyTotal/latencyCount:null,
+    timePerShotMs:distinctShots?latencyTotal/distinctShots:null,
+    timePerStageMs:latencyTotal,
+    durationMs,
     assetReuseRate:totalReferenceUses?repeatedReferenceUses/totalReferenceUses:0,
     modelToolSuccessRate:Object.fromEntries([...modelStats].map(([key,v])=>[
       key,v.total?v.pass/v.total:0
