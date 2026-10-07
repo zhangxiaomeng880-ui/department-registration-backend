@@ -110,6 +110,7 @@ jobs:
           npm run validate:aigc-performance-experiment
           npm run validate:aigc-review-archive
           npm run validate:aigc-domain-final
+          npm run validate:product-outcome
           npm run validate:m29-data-detection
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
