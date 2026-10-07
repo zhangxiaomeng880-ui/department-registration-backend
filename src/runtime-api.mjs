@@ -279,6 +279,11 @@ import {
 import {
   createM29RealLoopAttestation,evaluateM29FinalGate,getM29FinalState,resolveM29FinalProjectScope
 } from './m29-final-gate.mjs';
+import {
+  upsertPlatformEnvironment,listPlatformEnvironments,upsertPlatformConnection,listPlatformConnections,
+  recordPlatformHealth,getWorkspaceOperationsWorkbench,evaluateM30OpsFoundationGate,
+  getM30OpsFoundationState,resolveM30WorkspaceScope
+} from './m30-ops-foundation.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2012,6 +2017,72 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m30WorkspaceEnvironmentMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/platform-environments$/);
+  if (req.method === 'POST' && m30WorkspaceEnvironmentMatch) {
+    const workspaceId=m30WorkspaceEnvironmentMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await upsertPlatformEnvironment(workspaceId,await readBody(req))});
+    return true;
+  }
+  if (req.method === 'GET' && m30WorkspaceEnvironmentMatch) {
+    const workspaceId=m30WorkspaceEnvironmentMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await listPlatformEnvironments(workspaceId)});
+    return true;
+  }
+
+  const m30WorkspaceConnectionMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/platform-connections$/);
+  if (req.method === 'POST' && m30WorkspaceConnectionMatch) {
+    const workspaceId=m30WorkspaceConnectionMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await upsertPlatformConnection(workspaceId,await readBody(req))});
+    return true;
+  }
+  if (req.method === 'GET' && m30WorkspaceConnectionMatch) {
+    const workspaceId=m30WorkspaceConnectionMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await listPlatformConnections(workspaceId)});
+    return true;
+  }
+
+  const m30EnvironmentHealthMatch=match(url.pathname,/^\/api\/runtime\/platform-environments\/([^/]+)\/health$/);
+  if (req.method === 'POST' && m30EnvironmentHealthMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await recordPlatformHealth('ENVIRONMENT',m30EnvironmentHealthMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const m30ConnectionHealthMatch=match(url.pathname,/^\/api\/runtime\/platform-connections\/([^/]+)\/health$/);
+  if (req.method === 'POST' && m30ConnectionHealthMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await recordPlatformHealth('CONNECTION',m30ConnectionHealthMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const m30WorkbenchMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/operations-workbench$/);
+  if (req.method === 'GET' && m30WorkbenchMatch) {
+    const workspaceId=m30WorkbenchMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getWorkspaceOperationsWorkbench(workspaceId)});
+    return true;
+  }
+
+  const m30OpsGateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-gates\/G-M30-OPS-FOUNDATION\/evaluate$/);
+  if (req.method === 'POST' && m30OpsGateMatch) {
+    const workspaceId=m30OpsGateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await evaluateM30OpsFoundationGate(workspaceId,await readBody(req))});
+    return true;
+  }
+
+  const m30OpsStateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-ops-foundation$/);
+  if (req.method === 'GET' && m30OpsStateMatch) {
+    const workspaceId=m30OpsStateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getM30OpsFoundationState(workspaceId)});
     return true;
   }
 
