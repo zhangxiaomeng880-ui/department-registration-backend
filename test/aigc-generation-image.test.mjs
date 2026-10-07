@@ -55,21 +55,28 @@ const callSheetByShot=new Map();
 for(const row of callSheets) if(!callSheetByShot.has(row.shot_id))callSheetByShot.set(row.shot_id,row.id);
 assert.equal(shots.filter(x=>callSheetByShot.has(x.id)).length,71);
 
-const [[referenceVersion]]=await db.execute(
-  `SELECT v.id,v.version_key,v.state
-     FROM aigc_asset_versions v
-    WHERE v.owner_project_id=? AND v.state IN ('PASS','CURRENT','LOCKED','FROZEN')
-    ORDER BY FIELD(v.state,'LOCKED','FROZEN','CURRENT','PASS'),v.created_at LIMIT 1`,
+const [requiredCallSheetRefs]=await db.execute(
+  `SELECT b.call_sheet_id,b.reference_asset_version_id,b.reference_role,v.version_key
+     FROM aigc_call_sheet_reference_bindings b
+     JOIN aigc_asset_versions v ON v.id=b.reference_asset_version_id
+    WHERE b.project_id=? AND b.required=TRUE AND b.status='READY'
+    ORDER BY b.call_sheet_id,b.reference_role,b.reference_asset_version_id`,
   [projectId]
 );
-assert.ok(referenceVersion);
+const refsByCallSheet=new Map();
+for(const row of requiredCallSheetRefs){
+  const refs=refsByCallSheet.get(row.call_sheet_id)||[];
+  refs.push({referenceId:row.reference_asset_version_id,role:row.reference_role,versionKey:row.version_key});
+  refsByCallSheet.set(row.call_sheet_id,refs);
+}
+assert.equal(shots.filter(x=>(refsByCallSheet.get(callSheetByShot.get(x.id))||[]).length>0).length,71);
 
 let r=await request('GET','/api/runtime/aigc-modules');
 assert.equal(r.status,200,JSON.stringify(r.body));
 const modules=Object.fromEntries(r.body.data.map(x=>[x.moduleKey,x.displayName]));
 assert.equal(modules.AIGC_GENERATION_JOB,'生成任务');
 assert.equal(modules.AIGC_GENERATION_CANDIDATE,'生成候选');
-assert.equal(modules.AIGC_CANDIDATE_SELECTION,'候选选择与恢复');
+assert.equal(modules.AIGC_CANDIDATE_SELECTION,'候选选择、恢复与锁定');
 assert.equal(modules.AIGC_IMAGE_KEYFRAME,'图像 / 关键帧 / 分镜生产');
 
 r=await request('GET','/api/runtime/aigc-ui-labels');
@@ -93,11 +100,8 @@ const qaPass=()=>({
 const qaFail=()=>({...qaPass(),expressionPerformance:'FAIL'});
 const shaFor=(index,char='a')=>String(index).padStart(4,'0').repeat(16).slice(0,64).replace(/[^0-9a-f]/g,char);
 const stableSha=(n)=>n.toString(16).padStart(64,'0').slice(-64);
-const refBinding=[{
-  referenceId:referenceVersion.id,role:'STYLE',versionKey:referenceVersion.version_key
-}];
 
-const createJob=async(shot,index,requestedOutputCount=1,suffix='A')=>{
+const createJob=async(shot,index,requestedOutputCount=1,suffix='A',referenceBindings=null)=>{
   const res=await request('POST',`/api/runtime/projects/${projectId}/aigc-generation-jobs`,{
     jobKey:`M289-${shot.shot_key}-${suffix}`,
     generationKind:'KEYFRAME',
@@ -111,7 +115,7 @@ const createJob=async(shot,index,requestedOutputCount=1,suffix='A')=>{
     prompt:`Generate locked keyframe for ${shot.shot_key}; preserve all upstream Story/Asset locks.`,
     negativePrompt:'no identity drift; no invented story fact; no scene redesign',
     promptVersion:'M28.9-PROMPT-V1',
-    referenceBindings:refBinding,
+    referenceBindings:referenceBindings||refsByCallSheet.get(callSheetByShot.get(shot.id)),
     parameters:{aspect:'1.85:1',resolution:{width:1998,height:1080},fps:24,seed:index},
     inputFingerprintSha256:stableSha(1000+index+(suffix==='B'?1000:0)),
     requestedOutputCount,
@@ -122,6 +126,8 @@ const createJob=async(shot,index,requestedOutputCount=1,suffix='A')=>{
     evidence:{purpose:'M28.9 structural generation validation'}
   });
   assert.equal(res.status,201,JSON.stringify(res.body));
+  assert.equal(res.body.data.preflight.status,'PASS');
+  assert.equal(res.body.data.preflight.requiredInheritedReferenceCount,(refsByCallSheet.get(callSheetByShot.get(shot.id))||[]).length);
   return res.body.data.id;
 };
 const addCandidate=async(jobId,shot,index,qa,outputIndex=1,keySuffix='A')=>{
@@ -161,6 +167,22 @@ const selectCandidate=async(candidateId,eventType='SELECT',reason='QA PASS')=>{
 };
 
 const firstShot=shots[0];
+const firstShotRefs=refsByCallSheet.get(callSheetByShot.get(firstShot.id));
+assert.ok(firstShotRefs.length>0);
+const wrongRole=firstShotRefs[0].role==='AUDIO'?'STYLE':'AUDIO';
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-generation-jobs`,{
+  jobKey:'M2891-MISSING-INHERITED-REF',generationKind:'KEYFRAME',shotId:firstShot.id,
+  parentCallSheetId:callSheetByShot.get(firstShot.id),provider:'CI_TEST_PROVIDER',
+  modelTool:'CI Keyframe Generator',modelToolVersion:'m28.9.1-test',
+  prompt:'negative inherited-reference test',promptVersion:'M28.9.1-PROMPT-V1',
+  referenceBindings:[{...firstShotRefs[0],role:wrongRole}],
+  parameters:{aspect:'1.85:1'},inputFingerprintSha256:stableSha(999999),requestedOutputCount:1,
+  status:'RUNNING',retry:{maxAttempts:1,currentAttempt:1},safety:{policy:'CI'},
+  provenance:{test:true},evidence:{test:'required inherited reference missing'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_GENERATION_REQUIRED_REFERENCE_NOT_INHERITED');
+
 const firstJob=await createJob(firstShot,1,2,'A');
 const badCandidate=await addCandidate(firstJob,firstShot,1,qaFail(),1,'BAD');
 const goodCandidate=await addCandidate(firstJob,firstShot,1,qaPass(),2,'GOOD');
@@ -186,6 +208,17 @@ selection=await selectCandidate(goodCandidate,'RESTORE','restore prior approved 
 assert.equal(selection.eventType,'RESTORE');
 assert.equal(selection.previousCandidateId,secondCandidate);
 
+selection=await selectCandidate(goodCandidate,'LOCK','lock restored formal keyframe');
+assert.equal(selection.eventType,'LOCK');
+assert.equal(selection.selectionStatus,'LOCKED');
+assert.equal(selection.isCurrent,true);
+
+r=await request('POST',`/api/runtime/aigc-generation-candidates/${secondCandidate}/select`,{
+  eventType:'SELECT',reason:'locked candidate must not be silently replaced',evidence:{test:true}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_LOCKED_CANDIDATE_REPLACEMENT_FORBIDDEN');
+
 r=await request('POST',`/api/runtime/aigc-generation-candidates/${badCandidate}/reject`,{
   reason:'expression/performance QA failed',evidence:{test:true}
 });
@@ -209,6 +242,7 @@ assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
 assert.equal(r.body.data.evidenceSnapshot.shotCount,71);
 assert.equal(r.body.data.evidenceSnapshot.passKeyframeShotCount,71);
 assert.equal(r.body.data.evidenceSnapshot.currentSelectedShotCount,71);
+assert.equal(r.body.data.evidenceSnapshot.lockedKeyframeCount,1);
 assert.equal(r.body.data.evidenceSnapshot.qaFailedCandidateIds.length,0);
 assert.equal(r.body.data.evidenceSnapshot.safetyFailedCandidateIds.length,0);
 assert.equal(r.body.data.evidenceSnapshot.missingLocatorCandidateIds.length,0);
@@ -220,29 +254,38 @@ assert.equal(r.body.data.frontend.language,'zh-CN');
 assert.equal(r.body.data.frontend.gateName,'图像 / 关键帧门禁');
 assert.deepEqual(
   r.body.data.frontend.moduleNames,
-  ['生成任务','生成候选','候选选择与恢复','图像 / 关键帧 / 分镜生产']
+  ['生成任务','生成候选','候选选择、恢复与锁定','图像 / 关键帧 / 分镜生产']
 );
 assert.equal(r.body.data.currentBreakdownPlanId,breakdown.id);
 assert.equal(r.body.data.jobs.filter(x=>x.generationKind==='KEYFRAME'&&x.status==='PASS').length,72);
-assert.equal(r.body.data.candidates.filter(x=>x.isCurrent&&x.selectionStatus==='SELECTED').length,71);
+assert.equal(r.body.data.candidates.filter(x=>x.isCurrent&&['SELECTED','LOCKED'].includes(x.selectionStatus)).length,71);
+assert.equal(r.body.data.candidates.filter(x=>x.isCurrent&&x.selectionStatus==='LOCKED').length,1);
+assert.ok(r.body.data.candidates.find(x=>x.id===goodCandidate).lockedAt);
+assert.ok(r.body.data.selectionEvents.some(x=>x.eventType==='LOCK'));
 assert.ok(r.body.data.selectionEvents.some(x=>x.eventType==='RESTORE'));
 
 const [[truth]]=await db.execute(
   `SELECT
     (SELECT COUNT(*) FROM aigc_generation_jobs WHERE project_id=? AND generation_kind='KEYFRAME' AND status='PASS') pass_jobs,
-    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE project_id=? AND is_current=TRUE AND selection_status='SELECTED') current_candidates,
+    (SELECT COUNT(*) FROM aigc_generation_jobs WHERE project_id=? AND JSON_UNQUOTE(JSON_EXTRACT(preflight_json,'$.status'))='PASS') preflight_pass_jobs,
+    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE project_id=? AND is_current=TRUE AND selection_status IN ('SELECTED','LOCKED')) current_candidates,
+    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE project_id=? AND is_current=TRUE AND selection_status='LOCKED') locked_candidates,
     (SELECT COUNT(*) FROM aigc_candidate_selection_events WHERE project_id=? AND event_type='RESTORE') restore_events,
-    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE id=? AND selection_status='SELECTED' AND is_current=TRUE) restored_current,
+    (SELECT COUNT(*) FROM aigc_candidate_selection_events WHERE project_id=? AND event_type='LOCK') lock_events,
+    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE id=? AND selection_status='LOCKED' AND is_current=TRUE AND locked_at IS NOT NULL) restored_locked_current,
     (SELECT COUNT(*) FROM aigc_generation_candidates WHERE id=? AND selection_status='HISTORICAL' AND is_current=FALSE) replaced_historical,
     (SELECT COUNT(*) FROM aigc_generation_candidates WHERE id=? AND selection_status='REJECTED' AND is_current=FALSE) rejected_bad`,
-  [projectId,projectId,projectId,goodCandidate,secondCandidate,badCandidate]
+  [projectId,projectId,projectId,projectId,projectId,projectId,goodCandidate,secondCandidate,badCandidate]
 );
 assert.equal(Number(truth.pass_jobs),72);
+assert.equal(Number(truth.preflight_pass_jobs),72);
 assert.equal(Number(truth.current_candidates),71);
+assert.equal(Number(truth.locked_candidates),1);
 assert.equal(Number(truth.restore_events),1);
-assert.equal(Number(truth.restored_current),1);
+assert.equal(Number(truth.lock_events),1);
+assert.equal(Number(truth.restored_locked_current),1);
 assert.equal(Number(truth.replaced_historical),1);
 assert.equal(Number(truth.rejected_bad),1);
 
 await db.end();
-console.log('M28_9_AIGC_GENERATION_IMAGE_PASS');
+console.log('M28_9_1_AIGC_GENERATION_LOCK_PREFLIGHT_PASS');
