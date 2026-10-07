@@ -5,6 +5,7 @@ import { handleKnowledgeRoute } from './knowledge-api.mjs';
 import { checkRuntimeDbReady } from './runtime-db.mjs';
 import { modelProviderConfigured } from './openai-responses-provider.mjs';
 import { authorizeRuntimeRequest, assertRuntimeSecurityConfig, runtimeAuthRequired } from './runtime-security.mjs';
+import { handleGithubOidcBridgeRoute } from './github-oidc-bridge.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const data = {
@@ -48,6 +49,7 @@ const route = async (req, res) => {
       }
     });
   }
+  if (await handleGithubOidcBridgeRoute(req, res, url, { json, readBody })) return;
   let runtimePrincipal=null;
   if (url.pathname.startsWith('/api/runtime/')) runtimePrincipal=await authorizeRuntimeRequest(req);
   if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
