@@ -268,6 +268,10 @@ import {
   evaluateM29SelfLoopGate,getM29SelfLoopState,
   resolveM29SelfLoopProjectScope,resolveM29DecisionCandidateScope,resolveM29LoopExecutionScope
 } from './m29-decision-self-loop.mjs';
+import {
+  registerM29AutomationTrigger,ingestM29Automation,runM29SchedulerTick,
+  evaluateM29AutomationGate,getM29AutomationState,resolveM29AutomationProjectScope
+} from './m29-automation-intake.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1954,6 +1958,53 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:read',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await getAigcDomainFinalState(projectId)});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/m29-automation-triggers') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await registerM29AutomationTrigger(await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/m29-scheduler/tick') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await runM29SchedulerTick(
+      await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const m29AutomationStateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-automation$/);
+  if (req.method === 'GET' && m29AutomationStateMatch) {
+    const projectId=m29AutomationStateMatch[1],scope=await resolveM29AutomationProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getM29AutomationState(projectId)});
+    return true;
+  }
+
+  const m29AutomationIntakeMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-automation-intakes$/);
+  if (req.method === 'POST' && m29AutomationIntakeMatch) {
+    const projectId=m29AutomationIntakeMatch[1],scope=await resolveM29AutomationProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    const data=await ingestM29Automation(
+      projectId,await readBody(req),principal?.identityId||null
+    );
+    json(res,data.idempotent?200:201,{data});
+    return true;
+  }
+
+  const m29AutomationGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-gates\/G-M29-AUTOMATION\/evaluate$/);
+  if (req.method === 'POST' && m29AutomationGateMatch) {
+    const projectId=m29AutomationGateMatch[1],scope=await resolveM29AutomationProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
     return true;
   }
 
