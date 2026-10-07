@@ -284,6 +284,11 @@ import {
   recordPlatformHealth,getWorkspaceOperationsWorkbench,evaluateM30OpsFoundationGate,
   getM30OpsFoundationState,resolveM30WorkspaceScope
 } from './m30-ops-foundation.mjs';
+import {
+  createPlatformReleaseCandidate,requestPlatformPromotion,executePlatformPromotion,
+  requestPlatformRollback,executePlatformRollback,evaluateM30ReleaseRollbackGate,
+  getM30ReleaseRollbackState,resolveM30ReleaseCandidateScope,resolveM30PromotionScope,resolveM30RollbackScope
+} from './m30-release-promotion-rollback.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2017,6 +2022,62 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m302CandidateCreateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/platform-release-candidates$/);
+  if (req.method === 'POST' && m302CandidateCreateMatch) {
+    const workspaceId=m302CandidateCreateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createPlatformReleaseCandidate(workspaceId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m302PromotionRequestMatch=match(url.pathname,/^\/api\/runtime\/platform-release-candidates\/([^/]+)\/promotions$/);
+  if (req.method === 'POST' && m302PromotionRequestMatch) {
+    const scope=await resolveM30ReleaseCandidateScope(m302PromotionRequestMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await requestPlatformPromotion(m302PromotionRequestMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m302PromotionExecuteMatch=match(url.pathname,/^\/api\/runtime\/platform-promotions\/([^/]+)\/execute$/);
+  if (req.method === 'POST' && m302PromotionExecuteMatch) {
+    const scope=await resolveM30PromotionScope(m302PromotionExecuteMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await executePlatformPromotion(m302PromotionExecuteMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m302RollbackRequestMatch=match(url.pathname,/^\/api\/runtime\/platform-promotions\/([^/]+)\/rollbacks$/);
+  if (req.method === 'POST' && m302RollbackRequestMatch) {
+    const scope=await resolveM30PromotionScope(m302RollbackRequestMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await requestPlatformRollback(m302RollbackRequestMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m302RollbackExecuteMatch=match(url.pathname,/^\/api\/runtime\/platform-rollbacks\/([^/]+)\/execute$/);
+  if (req.method === 'POST' && m302RollbackExecuteMatch) {
+    const scope=await resolveM30RollbackScope(m302RollbackExecuteMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await executePlatformRollback(m302RollbackExecuteMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m302GateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-gates\/G-M30-RELEASE-ROLLBACK\/evaluate$/);
+  if (req.method === 'POST' && m302GateMatch) {
+    const workspaceId=m302GateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await evaluateM30ReleaseRollbackGate(workspaceId,await readBody(req))});
+    return true;
+  }
+
+  const m302StateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-release-rollback$/);
+  if (req.method === 'GET' && m302StateMatch) {
+    const workspaceId=m302StateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getM30ReleaseRollbackState(workspaceId)});
     return true;
   }
 
