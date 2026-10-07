@@ -243,6 +243,11 @@ import {
   verifyAigcPublication,getAigcReleasePublishingState,resolveAigcReleaseProjectScope,
   resolveAigcReleasePlanScope,resolveAigcReleaseItemScope,resolveAigcPublicationScope
 } from './aigc-release-publishing.mjs';
+import {
+  createAigcPerformanceObservation,createAigcProductionMetricSnapshot,
+  createAigcExperimentCandidate,createAigcFeedbackSignal,evaluateAigcPerformanceGate,
+  getAigcPerformanceState,resolveAigcPerformanceProjectScope
+} from './aigc-performance-experiment.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1888,6 +1893,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcPerformanceMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-performance$/);
+  if (req.method === 'GET' && aigcPerformanceMatch) {
+    const projectId=aigcPerformanceMatch[1];
+    const scope=await resolveAigcPerformanceProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcPerformanceState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1915,7 +1931,11 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-content-derivation-versions',createAigcDistributionVersion],
     ['aigc-distribution-packages',createAigcDistributionPackage],
     ['aigc-channel-connections',createAigcChannelConnection],
-    ['aigc-release-plans',createAigcReleasePlan]
+    ['aigc-release-plans',createAigcReleasePlan],
+    ['aigc-performance-observations',createAigcPerformanceObservation],
+    ['aigc-production-metric-snapshots',createAigcProductionMetricSnapshot],
+    ['aigc-experiment-candidates',createAigcExperimentCandidate],
+    ['aigc-feedback-signals',createAigcFeedbackSignal]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1959,7 +1979,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
                       ?await evaluateAigcDistributionPackageGate(projectId,body,principal?.identityId||null)
                       :gateKey==='G-AIGC-PUBLISH'
                         ?await evaluateAigcPublishGate(projectId,body,principal?.identityId||null)
-                        :[
+                        :gateKey==='G-AIGC-PERFORMANCE'
+                          ?await evaluateAigcPerformanceGate(projectId,body,principal?.identityId||null)
+                          :[
                         'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
                         'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
                       ].includes(gateKey)
