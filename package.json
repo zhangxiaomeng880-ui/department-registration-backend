@@ -63,7 +63,8 @@
     "validate:novel-skill-binding": "node test/novel-skill-binding.test.mjs",
     "validate:native-trigger-capability-version": "node test/native-trigger-capability-version.test.mjs",
     "validate:aigc-story-script": "node test/aigc-story-script.test.mjs",
-    "validate:aigc-breakdown": "node test/aigc-breakdown.test.mjs"
+    "validate:aigc-breakdown": "node test/aigc-breakdown.test.mjs",
+    "validate:bridge-executor-reliability": "node test/bridge-executor-reliability.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
