@@ -134,6 +134,16 @@ export const resolveM29DataProjectScope=async projectId=>{
   const p=await loadProject(projectId);return {projectId,workspaceId:p.workspace_id};
 };
 
+export const resolveM29DetectionRuleScope=async ruleId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT r.project_id,p.workspace_id FROM m29_detection_rules r
+      JOIN projects p ON p.id=r.project_id WHERE r.id=?`,[ruleId]
+  );
+  if(!rows.length)throw errorOf('Detection rule not found','M29_DETECTION_RULE_NOT_FOUND',404);
+  return {projectId:rows[0].project_id,workspaceId:rows[0].workspace_id};
+};
+
 export const createM29DataSource=async(input={})=>{
   requireFields(input,[
     'sourceKey','displayName','scopeType','adapterKey','connectionRef','schemaContract',
