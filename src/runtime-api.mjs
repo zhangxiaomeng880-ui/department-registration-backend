@@ -77,6 +77,11 @@ import {
 } from './core-meta-registry.mjs';
 import { invokeStageCapability,getCapabilityInvocation } from './capability-runtime.mjs';
 import { syncNovelSkillBinding,getNovelSkillBindingStatus } from './novel-skill-binding.mjs';
+import { listCapabilityVersions } from './capability-version-runtime.mjs';
+import {
+  listTriggers,getTrigger,setTriggerEnabled,bindTriggerCapability,fireTrigger,
+  listPendingTriggerDispatches,completeTriggerDispatch,getTriggerFire
+} from './trigger-runtime.mjs';
 import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvents } from './stage-runtime.mjs';
 import {
   orchestrateProjectWorkflow,getWorkflowOrchestrationSession,listWorkflowOrchestrationSessions
@@ -931,6 +936,81 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       status:url.searchParams.get('status')||null,
       routable:routable==null?null:routable==='true'
     })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/capability-versions') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listCapabilityVersions({
+      capabilityKey:url.searchParams.get('capabilityKey')||null,
+      status:url.searchParams.get('status')||null
+    })});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/triggers') {
+    requirePlatformAdmin(principal);
+    const enabled=url.searchParams.get('enabled');
+    json(res,200,{data:await listTriggers({
+      enabled:enabled==null?null:enabled==='true',
+      triggerType:url.searchParams.get('triggerType')||null
+    })});
+    return true;
+  }
+
+  const triggerGetMatch=match(url.pathname,/^\/api\/runtime\/triggers\/([^/]+)$/);
+  if (req.method === 'GET' && triggerGetMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getTrigger(decodeURIComponent(triggerGetMatch[1]))});
+    return true;
+  }
+
+  const triggerEnableMatch=match(url.pathname,/^\/api\/runtime\/triggers\/([^/]+)\/enabled$/);
+  if (req.method === 'POST' && triggerEnableMatch) {
+    requirePlatformAdmin(principal);
+    const body=await readBody(req);
+    json(res,200,{data:await setTriggerEnabled(decodeURIComponent(triggerEnableMatch[1]),body.enabled===true)});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/trigger-bindings') {
+    requirePlatformAdmin(principal);
+    json(res,201,{data:await bindTriggerCapability(await readBody(req))});
+    return true;
+  }
+
+  const triggerFireMatch=match(url.pathname,/^\/api\/runtime\/triggers\/([^/]+)\/fire$/);
+  if (req.method === 'POST' && triggerFireMatch) {
+    requirePlatformAdmin(principal);
+    const data=await fireTrigger({
+      ...(await readBody(req)),
+      triggerKey:decodeURIComponent(triggerFireMatch[1])
+    });
+    json(res,data.idempotent?200:201,{data});
+    return true;
+  }
+
+  const triggerFireGetMatch=match(url.pathname,/^\/api\/runtime\/trigger-fires\/([^/]+)$/);
+  if (req.method === 'GET' && triggerFireGetMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getTriggerFire(triggerFireGetMatch[1])});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/trigger-dispatches') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listPendingTriggerDispatches({
+      limit:url.searchParams.get('limit')||50
+    })});
+    return true;
+  }
+
+  const triggerDispatchCompleteMatch=match(url.pathname,/^\/api\/runtime\/trigger-dispatches\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && triggerDispatchCompleteMatch) {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await completeTriggerDispatch(
+      triggerDispatchCompleteMatch[1],await readBody(req)
+    )});
     return true;
   }
 
