@@ -227,6 +227,10 @@ import {
   evaluateAigcEditGate,getAigcEditState,resolveAigcEditProjectScope,
   resolveAigcTimelineScope,resolveAigcReviewThreadScope
 } from './aigc-edit-timeline.mjs';
+import {
+  createAigcMasterVersion,evaluateAigcMasterSubGate,evaluateAigcMasterGate,
+  lockAigcMasterVersion,getAigcMasteringState,resolveAigcMasterProjectScope,resolveAigcMasterScope
+} from './aigc-master-acceptance.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1839,6 +1843,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcMasteringMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-mastering$/);
+  if (req.method === 'GET' && aigcMasteringMatch) {
+    const projectId=aigcMasteringMatch[1];
+    const scope=await resolveAigcMasterProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcMasteringState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1860,7 +1875,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-asset-requirement-bindings',bindAigcAssetRequirement],
     ['aigc-generation-jobs',createAigcGenerationJob],
     ['aigc-production-requirements',createAigcProductionRequirements],
-    ['aigc-timeline-versions',createAigcTimelineVersion]
+    ['aigc-timeline-versions',createAigcTimelineVersion],
+    ['aigc-master-versions',createAigcMasterVersion]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1898,7 +1914,14 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
                 ?await evaluateAigcProductionGate(projectId,body,principal?.identityId||null)
                 :gateKey==='G-AIGC-EDIT'
                   ?await evaluateAigcEditGate(projectId,body,principal?.identityId||null)
-                  :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+                  :gateKey==='G-AIGC-MASTER'
+                    ?await evaluateAigcMasterGate(projectId,body,principal?.identityId||null)
+                    :[
+                      'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
+                      'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
+                    ].includes(gateKey)
+                      ?await evaluateAigcMasterSubGate(projectId,gateKey,body,principal?.identityId||null)
+                      :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
     return true;
   }
@@ -1985,6 +2008,20 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     });
     json(res,200,{data:await resolveAigcProductionFailureAnalysis(
       failureId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+
+  const masterLockMatch=match(url.pathname,/^\/api\/runtime\/aigc-master-versions\/([^/]+)\/lock$/);
+  if (req.method === 'POST' && masterLockMatch) {
+    const masterVersionId=masterLockMatch[1];
+    const scope=await resolveAigcMasterScope(masterVersionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await lockAigcMasterVersion(
+      masterVersionId,await readBody(req),principal?.identityId||null
     )});
     return true;
   }
