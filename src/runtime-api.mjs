@@ -1762,6 +1762,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcFormatMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-format-strategy$/);
+  if (req.method === 'GET' && aigcFormatMatch) {
+    const projectId=aigcFormatMatch[1];
+    const scope=await resolveAigcFormatProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcFormatState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
