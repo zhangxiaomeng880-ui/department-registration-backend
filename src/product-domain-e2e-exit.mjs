@@ -37,7 +37,7 @@ const loadProject=async(projectId,db=getRuntimePool())=>{
   return rows[0];
 };
 const assertProjectRow=async(db,table,id,projectId,code)=>{
-  const [rows]=await db.execute(\`SELECT * FROM \${table} WHERE id=?\`,[id]);
+  const [rows]=await db.execute(`SELECT * FROM ${table} WHERE id=?`,[id]);
   if(!rows.length||rows[0].project_id!==projectId)throw errorOf(
     'Certified object is missing or outside project',code,409,{table,id}
   );
@@ -45,8 +45,8 @@ const assertProjectRow=async(db,table,id,projectId,code)=>{
 };
 const traceExists=async(db,projectId,sourceType,sourceId,targetType,targetId)=>{
   const [rows]=await db.execute(
-    \`SELECT id FROM product_trace_links
-      WHERE project_id=? AND source_type=? AND source_id=? AND target_type=? AND target_id=? LIMIT 1\`,
+    `SELECT id FROM product_trace_links
+      WHERE project_id=? AND source_type=? AND source_id=? AND target_type=? AND target_id=? LIMIT 1`,
     [projectId,sourceType,sourceId,targetType,targetId]
   );
   return rows.length===1;
@@ -209,11 +209,11 @@ export const createProductDevelopmentE2eCertification=async(projectId,input={},a
 
   const id=randomUUID();
   await db.execute(
-    \`INSERT INTO product_development_e2e_certifications
+    `INSERT INTO product_development_e2e_certifications
       (id,project_id,certification_key,project_identity_json,source_repository_json,build_evidence_json,
        staging_deployment_json,code_evidence_json,test_evidence_json,trace_anchors_json,trace_snapshot_json,
        gate_snapshot_json,status,certified_by_identity_id,certified_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'FROZEN',?,?)\`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'FROZEN',?,?)`,
     [id,projectId,input.certificationKey,asJson({...input.projectIdentity,projectName:project.name}),
      asJson(input.sourceRepository),asJson(input.buildEvidence),asJson(input.stagingDeployment),
      asJson(input.codeEvidence),asJson(input.testEvidence),asJson(input.traceAnchors),
@@ -268,9 +268,9 @@ export const evaluateProductDevelopmentFinalGate=async(projectId,input={},actorI
   const result={projectId,gateKey:GATE,status:reasons.length?'HOLD':'PASS',
     reasonCodes:[...new Set(reasons)],evidenceSnapshot:evidence,asOf};
   if(input.persist!==false)await db.execute(
-    \`INSERT INTO product_m2711_gate_evaluations
+    `INSERT INTO product_m2711_gate_evaluations
       (id,project_id,gate_key,status,reason_codes_json,evidence_snapshot_json,as_of,evaluated_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?)\`,
+     VALUES (?,?,?,?,?,?,?,?)`,
     [randomUUID(),projectId,GATE,result.status,asJson(result.reasonCodes),asJson(evidence),asOf,actorId]
   );
   return result;
