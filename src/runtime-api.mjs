@@ -237,6 +237,12 @@ import {
   getAigcDistributionPackageState,resolveAigcDistributionProjectScope,
   resolveAigcDistributionPackageScope
 } from './aigc-distribution-package.mjs';
+import {
+  createAigcChannelConnection,createAigcReleasePlan,approveAigcReleasePlanItem,
+  evaluateAigcPublishGate,freezeAigcReleasePlan,recordAigcPublicationReceipt,
+  verifyAigcPublication,getAigcReleasePublishingState,resolveAigcReleaseProjectScope,
+  resolveAigcReleasePlanScope,resolveAigcReleaseItemScope,resolveAigcPublicationScope
+} from './aigc-release-publishing.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1871,6 +1877,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcReleasePublishingMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-release-publishing$/);
+  if (req.method === 'GET' && aigcReleasePublishingMatch) {
+    const projectId=aigcReleasePublishingMatch[1];
+    const scope=await resolveAigcReleaseProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcReleasePublishingState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1896,7 +1913,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-master-versions',createAigcMasterVersion],
     ['aigc-derivation-scans',createAigcDerivationScan],
     ['aigc-content-derivation-versions',createAigcDistributionVersion],
-    ['aigc-distribution-packages',createAigcDistributionPackage]
+    ['aigc-distribution-packages',createAigcDistributionPackage],
+    ['aigc-channel-connections',createAigcChannelConnection],
+    ['aigc-release-plans',createAigcReleasePlan]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1938,7 +1957,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
                     ?await evaluateAigcMasterGate(projectId,body,principal?.identityId||null)
                     :gateKey==='G-AIGC-DISTRIBUTION-PACKAGE'
                       ?await evaluateAigcDistributionPackageGate(projectId,body,principal?.identityId||null)
-                      :[
+                      :gateKey==='G-AIGC-PUBLISH'
+                        ?await evaluateAigcPublishGate(projectId,body,principal?.identityId||null)
+                        :[
                         'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
                         'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
                       ].includes(gateKey)
@@ -2034,6 +2055,59 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+
+
+  const releaseItemApproveMatch=match(url.pathname,/^\/api\/runtime\/aigc-release-plan-items\/([^/]+)\/approve$/);
+  if (req.method === 'POST' && releaseItemApproveMatch) {
+    const releaseItemId=releaseItemApproveMatch[1];
+    const scope=await resolveAigcReleaseItemScope(releaseItemId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await approveAigcReleasePlanItem(
+      releaseItemId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const releasePlanFreezeMatch=match(url.pathname,/^\/api\/runtime\/aigc-release-plans\/([^/]+)\/freeze$/);
+  if (req.method === 'POST' && releasePlanFreezeMatch) {
+    const releasePlanId=releasePlanFreezeMatch[1];
+    const scope=await resolveAigcReleasePlanScope(releasePlanId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await freezeAigcReleasePlan(
+      releasePlanId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const publicationReceiptMatch=match(url.pathname,/^\/api\/runtime\/aigc-release-plan-items\/([^/]+)\/publication-receipts$/);
+  if (req.method === 'POST' && publicationReceiptMatch) {
+    const releaseItemId=publicationReceiptMatch[1];
+    const scope=await resolveAigcReleaseItemScope(releaseItemId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await recordAigcPublicationReceipt(
+      releaseItemId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const publicationVerifyMatch=match(url.pathname,/^\/api\/runtime\/aigc-publications\/([^/]+)\/verify$/);
+  if (req.method === 'POST' && publicationVerifyMatch) {
+    const publicationId=publicationVerifyMatch[1];
+    const scope=await resolveAigcPublicationScope(publicationId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await verifyAigcPublication(
+      publicationId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
 
   const distributionPackageFreezeMatch=match(url.pathname,/^\/api\/runtime\/aigc-distribution-packages\/([^/]+)\/freeze$/);
   if (req.method === 'POST' && distributionPackageFreezeMatch) {
