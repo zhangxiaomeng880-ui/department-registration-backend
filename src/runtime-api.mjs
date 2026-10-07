@@ -209,6 +209,11 @@ import {
   createAigcAssetLibrary,createAigcAsset,createAigcAssetVersion,createAigcAssetCallSheet,
   bindAigcAssetRequirement,evaluateAigcAssetGate,getAigcAssetState,resolveAigcAssetProjectScope
 } from './aigc-asset-system.mjs';
+import {
+  createAigcImageProductionPlan,createAigcGenerationJob,completeAigcGenerationJob,
+  applyAigcCandidateSelection,evaluateAigcImageGate,getAigcImageState,
+  resolveAigcImageProjectScope,resolveGenerationJobScope,resolveCandidateScope
+} from './aigc-image-generation.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1788,6 +1793,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcImageMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-image-production$/);
+  if (req.method === 'GET' && aigcImageMatch) {
+    const projectId=aigcImageMatch[1];
+    const scope=await resolveAigcImageProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcImageState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1806,7 +1822,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-assets',createAigcAsset],
     ['aigc-asset-versions',createAigcAssetVersion],
     ['aigc-asset-call-sheets',createAigcAssetCallSheet],
-    ['aigc-asset-requirement-bindings',bindAigcAssetRequirement]
+    ['aigc-asset-requirement-bindings',bindAigcAssetRequirement],
+    ['aigc-image-production-plans',createAigcImageProductionPlan],
+    ['aigc-generation-jobs',createAigcGenerationJob]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1838,8 +1856,36 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
           ?await evaluateAigcFormatGate(projectId,body,principal?.identityId||null)
           :gateKey==='G-AIGC-ASSET'
             ?await evaluateAigcAssetGate(projectId,body,principal?.identityId||null)
-            :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+            :gateKey==='G-AIGC-IMAGE'
+              ?await evaluateAigcImageGate(projectId,body,principal?.identityId||null)
+              :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
+    return true;
+  }
+
+  const generationCompleteMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-jobs\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && generationCompleteMatch) {
+    const jobId=generationCompleteMatch[1];
+    const scope=await resolveGenerationJobScope(jobId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await completeAigcGenerationJob(
+      jobId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const candidateSelectionMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-candidates\/([^/]+)\/selection$/);
+  if (req.method === 'POST' && candidateSelectionMatch) {
+    const candidateId=candidateSelectionMatch[1];
+    const scope=await resolveCandidateScope(candidateId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await applyAigcCandidateSelection(
+      candidateId,await readBody(req),principal?.identityId||null
+    )});
     return true;
   }
 
