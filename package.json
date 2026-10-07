@@ -73,7 +73,8 @@
     "validate:aigc-edit-timeline": "node test/aigc-edit-timeline.test.mjs",
     "validate:aigc-master-acceptance": "node test/aigc-master-acceptance.test.mjs",
     "validate:aigc-distribution-package": "node test/aigc-distribution-package.test.mjs",
-    "validate:aigc-release-publishing": "node test/aigc-release-publishing.test.mjs"
+    "validate:aigc-release-publishing": "node test/aigc-release-publishing.test.mjs",
+    "validate:aigc-performance-experiment": "node test/aigc-performance-experiment.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
