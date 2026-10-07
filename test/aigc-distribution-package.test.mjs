@@ -47,6 +47,7 @@ assert.ok(candidateMaster);
 let r=await request('GET','/api/runtime/aigc-modules');
 assert.equal(r.status,200,JSON.stringify(r.body));
 const modules=Object.fromEntries(r.body.data.map(x=>[x.moduleKey,x.displayName]));
+assert.equal(modules.AIGC_DERIVATION_SCAN,'衍生扫描');
 assert.equal(modules.AIGC_DERIVATION_VERSION,'内容衍生版本');
 assert.equal(modules.AIGC_LOCALIZATION_VARIANT,'本地化版本');
 assert.equal(modules.AIGC_DISTRIBUTION_PACKAGE,'发行素材包');
@@ -55,6 +56,44 @@ r=await request('GET','/api/runtime/aigc-ui-labels');
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.find(x=>x.stableKey==='G-AIGC-DISTRIBUTION-PACKAGE').displayName,'发行素材包门禁');
 assert.equal(r.body.data.find(x=>x.labelType==='LOCALIZATION_LEVEL'&&x.stableKey==='SUBTITLE').displayName,'字幕本地化');
+assert.equal(r.body.data.find(x=>x.labelType==='DERIVATION_TYPE'&&x.stableKey==='OST_MV').displayName,'原声 / MV');
+
+const scanApplicability={
+  FULL_MASTER:'REQUIRED',
+  TRAILER:'REQUIRED',
+  HOOK:'REQUIRED',
+  SCENE_CLIP:'OPTIONAL',
+  CHARACTER_POV:'REQUIRED',
+  TOPIC:'N_A',
+  OST_MV:'OPTIONAL',
+  STILL:'OPTIONAL',
+  GRAPHIC:'OPTIONAL',
+  BTS_MAKING_OF:'N_A',
+  AI_PROCESS:'N_A'
+};
+const scanItems=Object.entries(scanApplicability).map(([type,applicability],index)=>({
+  scanKey:`M2813-SCAN-${String(index+1).padStart(2,'0')}-${type}`,
+  derivationType:type,
+  applicability,
+  rationale:applicability==='REQUIRED'
+    ?'Stage 12 首发包必需衍生类型'
+    :applicability==='OPTIONAL'?'可按渠道策略后续补充':'当前首发范围不适用',
+  targetHint:{stage:'AIGC_11_DERIVATION',type,externalSideEffect:false},
+  evidence:{source:'M28.13 explicit derivation scan'}
+}));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-derivation-scans`,{
+  masterVersionId:master.id,items:scanItems,
+  evidence:{source:'M28.13 11-type derivation scan'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'FROZEN');
+assert.equal(r.body.data.scanCount,11);
+assert.equal(r.body.data.requiredCount,4);
+assert.equal(r.body.data.optionalCount,4);
+assert.equal(r.body.data.notApplicableCount,3);
+const scanByType=new Map(r.body.data.items.map(x=>[x.derivationType,x]));
+assert.equal(scanByType.size,11);
 
 const qaPass=(localized=false)=>({
   sourceLineage:'PASS',motherAssetBinding:'PASS',spoilerRisk:'PASS',targetFit:'PASS',
@@ -63,6 +102,7 @@ const qaPass=(localized=false)=>({
 });
 const baseInput=(key,type,versionNo=1)=>({
   distributionKey:key,versionNo,derivationType:type,masterVersionId:master.id,
+  scanItemId:scanByType.get(type).id,
   motherAsset:{masterVersionId:master.id,sourceExportId:master.source_export_id},
   spoilerRisk:type==='FULL_MASTER'?'NONE':'LOW',
   target:{audience:'general',goal:'distribution-ready derivative'},
@@ -76,7 +116,7 @@ const baseInput=(key,type,versionNo=1)=>({
 });
 
 // Candidate/non-current Master must never become a distribution source.
-r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-versions`,{
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-content-derivation-versions`,{
   ...baseInput('STALE-MASTER','TRAILER'),
   masterVersionId:candidateMaster.id,
   motherAsset:{masterVersionId:candidateMaster.id,sourceExportId:candidateMaster.source_export_id}
@@ -84,8 +124,15 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-ver
 assert.equal(r.status,409,JSON.stringify(r.body));
 assert.equal(r.body.error,'AIGC_DISTRIBUTION_CURRENT_MASTER_REQUIRED');
 
+// N_A scan types are explicit and cannot silently produce derivatives.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-content-derivation-versions`,{
+  ...baseInput('TOPIC-NA','TOPIC')
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_DERIVATION_SCAN_NA_FORBIDDEN');
+
 // Incomplete localized QA is rejected before persistence.
-r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-versions`,{
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-content-derivation-versions`,{
   ...baseInput('LOC-BAD','HOOK'),
   localizationLevel:'SUBTITLE',
   localization:{enabled:true,language:'en-US',subtitleFormat:'SRT'},
@@ -94,13 +141,14 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-ver
 assert.equal(r.status,409,JSON.stringify(r.body));
 assert.equal(r.body.error,'AIGC_DISTRIBUTION_LOCALIZATION_QA_REQUIRED');
 
-// A QA-failed derivative is retained as BLOCKED evidence rather than overwritten.
-r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-versions`,{
-  ...baseInput('TRAILER-BLOCKED','TRAILER'),
+// A QA-failed OPTIONAL derivative is retained as BLOCKED evidence and need not enter the release package.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-content-derivation-versions`,{
+  ...baseInput('SCENE-CLIP-BLOCKED','SCENE_CLIP'),
   qa:{...qaPass(false),technicalIntegrity:'FAIL'}
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 assert.equal(r.body.data.status,'BLOCKED');
+assert.equal(r.body.data.scanItemId,scanByType.get('SCENE_CLIP').id);
 
 const created=[];
 for(const spec of [
@@ -116,9 +164,10 @@ for(const spec of [
     body.localization={enabled:true,language:'en-US',mode:'SUBTITLE',subtitleFormat:'SRT'};
     body.qa=qaPass(true);
   }
-  r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-versions`,body);
+  r=await request('POST',`/api/runtime/projects/${projectId}/aigc-content-derivation-versions`,body);
   assert.equal(r.status,201,JSON.stringify(r.body));
   assert.equal(r.body.data.status,'READY');
+  assert.equal(r.body.data.scanItemId,scanByType.get(spec.type).id);
   created.push(r.body.data.id);
 }
 assert.equal(created.length,4);
@@ -145,6 +194,12 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-DIS
 });
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.scanCount,11);
+assert.equal(r.body.data.evidenceSnapshot.requiredScanCount,4);
+assert.equal(r.body.data.evidenceSnapshot.optionalScanCount,4);
+assert.equal(r.body.data.evidenceSnapshot.notApplicableScanCount,3);
+assert.deepEqual(r.body.data.evidenceSnapshot.requiredScanMissingTypes,[]);
+assert.deepEqual(r.body.data.evidenceSnapshot.naIncludedVersionIds,[]);
 assert.equal(r.body.data.evidenceSnapshot.itemCount,4);
 assert.equal(r.body.data.evidenceSnapshot.requiredItemCount,4);
 assert.equal(r.body.data.evidenceSnapshot.readyRequiredCount,4);
@@ -168,7 +223,8 @@ r=await request('GET',`/api/runtime/projects/${projectId}/aigc-distribution-pack
 assert.equal(r.status,200,JSON.stringify(r.body));
 assert.equal(r.body.data.frontend.language,'zh-CN');
 assert.equal(r.body.data.frontend.gateName,'发行素材包门禁');
-assert.deepEqual(r.body.data.frontend.moduleNames,['内容衍生版本','本地化版本','发行素材包']);
+assert.deepEqual(r.body.data.frontend.moduleNames,['衍生扫描','内容衍生版本','本地化版本','发行素材包']);
+assert.equal(r.body.data.scans.length,11);
 assert.equal(r.body.data.versions.filter(x=>x.status==='READY').length,4);
 assert.equal(r.body.data.versions.filter(x=>x.status==='BLOCKED').length,1);
 assert.equal(r.body.data.packages.length,1);
@@ -178,12 +234,16 @@ assert.equal(r.body.data.packages[0].items.length,4);
 
 const [[truth]]=await db.execute(
   `SELECT
+    (SELECT COUNT(*) FROM aigc_derivation_scan_items WHERE project_id=?) scan_count,
+    (SELECT COUNT(*) FROM aigc_derivation_scan_items WHERE project_id=? AND applicability='REQUIRED') required_scan_count,
     (SELECT COUNT(*) FROM aigc_content_derivation_versions WHERE project_id=? AND status='READY') ready_versions,
     (SELECT COUNT(*) FROM aigc_content_derivation_versions WHERE project_id=? AND status='BLOCKED') blocked_versions,
     (SELECT COUNT(*) FROM aigc_distribution_packages WHERE project_id=? AND status='FROZEN' AND is_current=TRUE) current_package,
     (SELECT COUNT(*) FROM aigc_m2813_gate_evaluations WHERE project_id=? AND package_id=? AND gate_key='G-AIGC-DISTRIBUTION-PACKAGE' AND status='PASS') gate_pass`,
-  [projectId,projectId,projectId,projectId,packageId]
+  [projectId,projectId,projectId,projectId,projectId,projectId,packageId]
 );
+assert.equal(Number(truth.scan_count),11);
+assert.equal(Number(truth.required_scan_count),4);
 assert.equal(Number(truth.ready_versions),4);
 assert.equal(Number(truth.blocked_versions),1);
 assert.equal(Number(truth.current_package),1);
