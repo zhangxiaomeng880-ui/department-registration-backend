@@ -3,15 +3,31 @@ import { getRuntimePool } from './runtime-db.mjs';
 import { evaluateAigcAssetGate } from './aigc-asset-system.mjs';
 
 const GATE='G-AIGC-IMAGE';
-const GENERATION_KINDS=new Set(['IMAGE','KEYFRAME','STORYBOARD']);
+const GENERATION_KINDS=new Set(['IMAGE','KEYFRAME','STORYBOARD','VIDEO','DIALOGUE','VOICE','MUSIC','SFX']);
 const JOB_STATUSES=new Set(['QUEUED','RUNNING','PASS','FAIL','BLOCKED']);
 const CANDIDATE_STATUSES=new Set(['CANDIDATE','SELECTED','REJECTED','HISTORICAL']);
 const SHA64=/^[0-9a-f]{64}$/i;
-const QA_DIMENSIONS=[
+const IMAGE_QA_DIMENSIONS=[
   'identity','look','sceneProp','actionPose','expressionPerformance','gazeBlocking',
   'anatomyHands','spatialScalePerspective','compositionCamera','lightingColor',
   'textUi','multiFormatSafety','technicalIntegrity'
 ];
+const VIDEO_QA_DIMENSIONS=[
+  'characterSceneContinuity','actionTrajectory','cameraMovement','timingDuration',
+  'frameArtifact','temporalContinuity','technicalIntegrity'
+];
+const VOICE_QA_DIMENSIONS=[
+  'voiceIdentity','pronunciation','performance','lipSync','clippingNoise','technicalIntegrity'
+];
+const AUDIO_QA_DIMENSIONS=[
+  'sourceRights','cueTiming','mixIntent','loudness','technicalIntegrity'
+];
+const QA_DIMENSIONS_BY_KIND={
+  IMAGE:IMAGE_QA_DIMENSIONS,KEYFRAME:IMAGE_QA_DIMENSIONS,STORYBOARD:IMAGE_QA_DIMENSIONS,
+  VIDEO:VIDEO_QA_DIMENSIONS,DIALOGUE:VOICE_QA_DIMENSIONS,VOICE:VOICE_QA_DIMENSIONS,
+  MUSIC:AUDIO_QA_DIMENSIONS,SFX:AUDIO_QA_DIMENSIONS
+};
+const qaDimensionsForKind=kind=>QA_DIMENSIONS_BY_KIND[upper(kind)]||IMAGE_QA_DIMENSIONS;
 
 const errorOf=(message,code,statusCode=400,details)=>{
   const e=new Error(message);e.code=code;e.statusCode=statusCode;if(details)e.details=details;return e;
@@ -52,11 +68,11 @@ const insertTrace=async(db,{projectId,sourceType,sourceId,targetType,targetId,li
 const validateSha=(value,field)=>{
   if(!SHA64.test(String(value||'')))throw errorOf(field+' must be SHA-256','AIGC_GENERATION_SHA_INVALID',409,{field});
 };
-const qaPass=qa=>QA_DIMENSIONS.every(key=>['PASS','N_A'].includes(upper(qa?.[key])));
-const validateQa=qa=>{
+const qaPass=(qa,kind)=>qaDimensionsForKind(kind).every(key=>['PASS','N_A'].includes(upper(qa?.[key])));
+const validateQa=(qa,kind)=>{
   if(!qa||typeof qa!=='object')throw errorOf('Candidate QA is required','AIGC_CANDIDATE_QA_REQUIRED',409);
-  const missing=QA_DIMENSIONS.filter(key=>!['PASS','N_A','FAIL'].includes(upper(qa[key])));
-  if(missing.length)throw errorOf('Candidate QA dimensions are incomplete','AIGC_CANDIDATE_QA_INCOMPLETE',409,{missing});
+  const missing=qaDimensionsForKind(kind).filter(key=>!['PASS','N_A','FAIL'].includes(upper(qa[key])));
+  if(missing.length)throw errorOf('Candidate QA dimensions are incomplete','AIGC_CANDIDATE_QA_INCOMPLETE',409,{generationKind:upper(kind),missing});
 };
 
 export const resolveAigcGenerationProjectScope=async projectId=>{
@@ -137,20 +153,45 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
     'Generation Call Sheet must be READY','AIGC_GENERATION_CALL_SHEET_NOT_READY',409
   );
 
-  const referenceVersionIds=input.referenceBindings.map(x=>x.referenceId);
-  const [referenceRows]=referenceVersionIds.length
+  const assetRefs=input.referenceBindings.filter(x=>upper(x.referenceType||'ASSET_VERSION')==='ASSET_VERSION');
+  const candidateRefs=input.referenceBindings.filter(x=>upper(x.referenceType||'ASSET_VERSION')==='GENERATION_CANDIDATE');
+  const unsupportedRefs=input.referenceBindings.filter(x=>!['ASSET_VERSION','GENERATION_CANDIDATE'].includes(upper(x.referenceType||'ASSET_VERSION')));
+  if(unsupportedRefs.length)throw errorOf('Unsupported Generation reference type','AIGC_GENERATION_REFERENCE_TYPE_INVALID',409,{
+    referenceTypes:[...new Set(unsupportedRefs.map(x=>upper(x.referenceType)))]
+  });
+
+  const assetIds=assetRefs.map(x=>x.referenceId);
+  const [assetRows]=assetIds.length
     ?await db.query(
       `SELECT id,version_key,state FROM aigc_asset_versions
-        WHERE owner_project_id=? AND id IN (${referenceVersionIds.map(()=>'?').join(',')})`,
-      [projectId,...referenceVersionIds]
+        WHERE owner_project_id=? AND id IN (${assetIds.map(()=>'?').join(',')})`,
+      [projectId,...assetIds]
     )
     :[[]];
-  const refMap=new Map(referenceRows.map(x=>[x.id,x]));
-  for(const ref of input.referenceBindings){
-    const row=refMap.get(ref.referenceId);
+  const assetMap=new Map(assetRows.map(x=>[x.id,x]));
+  for(const ref of assetRefs){
+    const row=assetMap.get(ref.referenceId);
     if(!row||row.version_key!==ref.versionKey||!['PASS','CURRENT','LOCKED','FROZEN'].includes(row.state))
       throw errorOf('Generation reference is not an exact approved asset version',
         'AIGC_GENERATION_REFERENCE_VERSION_INVALID',409,{referenceId:ref.referenceId,versionKey:ref.versionKey});
+  }
+
+  const candidateIds=candidateRefs.map(x=>x.referenceId);
+  const [candidateRows]=candidateIds.length
+    ?await db.query(
+      `SELECT c.id,c.candidate_key,c.selection_status,c.is_current,j.status AS job_status,j.generation_kind
+         FROM aigc_generation_candidates c
+         JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
+        WHERE c.project_id=? AND c.id IN (${candidateIds.map(()=>'?').join(',')})`,
+      [projectId,...candidateIds]
+    )
+    :[[]];
+  const candidateMap=new Map(candidateRows.map(x=>[x.id,x]));
+  for(const ref of candidateRefs){
+    const row=candidateMap.get(ref.referenceId);
+    if(!row||row.candidate_key!==ref.versionKey||row.selection_status!=='SELECTED'||!row.is_current||row.job_status!=='PASS')
+      throw errorOf('Generation candidate reference must be the exact CURRENT selected PASS candidate',
+        'AIGC_GENERATION_CANDIDATE_REFERENCE_INVALID',409,{referenceId:ref.referenceId,versionKey:ref.versionKey});
   }
 
   const id=randomUUID(),status=upper(input.status||'QUEUED');
@@ -190,7 +231,6 @@ export const addAigcGenerationCandidate=async(generationJobId,input={})=>{
     'candidateKey','outputIndex','contentLocator','outputFingerprintSha256','qa','safety','evidence'
   ],'INVALID_AIGC_GENERATION_CANDIDATE');
   validateSha(input.outputFingerprintSha256,'outputFingerprintSha256');
-  validateQa(input.qa);
   const outputIndex=Number(input.outputIndex),candidateVersionNo=Number(input.candidateVersionNo||1);
   if(!Number.isInteger(outputIndex)||outputIndex<1||!Number.isInteger(candidateVersionNo)||candidateVersionNo<1)
     throw errorOf('Candidate output/version index is invalid','AIGC_CANDIDATE_INDEX_INVALID',409);
@@ -200,6 +240,7 @@ export const addAigcGenerationCandidate=async(generationJobId,input={})=>{
   const [jobs]=await db.execute('SELECT * FROM aigc_generation_jobs WHERE id=?',[generationJobId]);
   const job=jobs[0];
   if(!job)throw errorOf('Generation Job not found','AIGC_GENERATION_JOB_NOT_FOUND',404);
+  validateQa(input.qa,job.generation_kind);
   if(['PASS','FAIL','BLOCKED'].includes(job.status))throw errorOf(
     'Cannot add candidates to terminal Generation Job','AIGC_GENERATION_JOB_TERMINAL',409,{status:job.status}
   );
@@ -226,7 +267,7 @@ export const addAigcGenerationCandidate=async(generationJobId,input={})=>{
     targetType:'GENERATION_CANDIDATE',targetId:id,linkType:'OUTPUTS',actorId:null,
     evidence:{candidateKey:input.candidateKey,outputIndex}});
   return {id,generationJobId,shotId:job.shot_id,candidateKey:input.candidateKey,outputIndex,
-    candidateVersionNo,selectionStatus:'CANDIDATE',qaPass:qaPass(input.qa)};
+    candidateVersionNo,selectionStatus:'CANDIDATE',qaPass:qaPass(input.qa,job.generation_kind)};
 };
 
 export const completeAigcGenerationJob=async(generationJobId,input={})=>{
@@ -288,9 +329,10 @@ export const selectAigcGenerationCandidate=async(candidateId,input={},actorId=nu
     'Candidate can be selected only after Generation Job PASS','AIGC_GENERATION_JOB_PASS_REQUIRED',409
   );
   const qa=parseJson(candidate.qa_json)||{};
-  if(!qaPass(qa))throw errorOf(
+  if(!qaPass(qa,candidate.generation_kind))throw errorOf(
     'Candidate QA must PASS before selection','AIGC_CANDIDATE_QA_PASS_REQUIRED',409,
-    {failedDimensions:QA_DIMENSIONS.filter(key=>upper(qa[key])==='FAIL')}
+    {generationKind:candidate.generation_kind,
+     failedDimensions:qaDimensionsForKind(candidate.generation_kind).filter(key=>upper(qa[key])==='FAIL')}
   );
   const safety=parseJson(candidate.safety_json)||{};
   if(upper(safety.status||'PASS')!=='PASS')throw errorOf(
@@ -382,7 +424,7 @@ export const evaluateAigcImageGate=async(projectId,input={},actorId=null)=>{
     const currentByShot=new Map(currentSelected.map(x=>[x.shot_id,x]));
     const shotsWithoutPassJob=shots.filter(x=>!passJobShotIds.has(x.id));
     const shotsWithoutCurrent=shots.filter(x=>!currentByShot.has(x.id));
-    const qaFailed=currentSelected.filter(x=>!qaPass(parseJson(x.qa_json)||{}));
+    const qaFailed=currentSelected.filter(x=>!qaPass(parseJson(x.qa_json)||{},'KEYFRAME'));
     const safetyFailed=currentSelected.filter(x=>upper((parseJson(x.safety_json)||{}).status||'PASS')!=='PASS');
     const locatorMissing=currentSelected.filter(x=>!nonEmpty(parseJson(x.content_locator_json)));
 
