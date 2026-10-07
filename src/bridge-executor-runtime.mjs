@@ -178,6 +178,7 @@ const assertActorOwnsClaim=(row,principal)=>{
 export const claimBridgeDispatch=async(dispatchId,{leaseSeconds=900}={},principal)=>{
   const db=getRuntimePool();
   const conn=await db.getConnection();
+  let claimed=null,exhausted=false;
   try{
     await conn.beginTransaction();
     let row=await selectDispatch(conn,dispatchId,true);
@@ -197,44 +198,59 @@ export const claimBridgeDispatch=async(dispatchId,{leaseSeconds=900}={},principa
         409,{status:row.status,leaseExpiresAt:row.lease_expires_at,nextAttemptAt:row.next_attempt_at}
       );
     }
+
+    const actor=actorOf(principal);
     if(Number(row.attempt_count||0)>=Number(row.max_attempts||3)){
+      // Take a short recovery lease without incrementing attempts, then terminalize
+      // through the same crash-safe dead-letter path used by explicit executor failure.
       await conn.execute(
         `UPDATE trigger_dispatches
-            SET status='DEAD_LETTER',dead_lettered_at=CURRENT_TIMESTAMP(6),
-                last_error_code='BRIDGE_MAX_ATTEMPTS_EXCEEDED',
-                last_error_message='Maximum bridge attempts exceeded',
-                completed_at=CURRENT_TIMESTAMP(6)
+            SET status='CLAIMED',
+                claimed_by_credential_id=?,
+                claimed_by_identity_id=?,
+                claimed_at=CURRENT_TIMESTAMP(6),
+                lease_expires_at=TIMESTAMPADD(SECOND,30,CURRENT_TIMESTAMP(6)),
+                next_attempt_at=NULL
           WHERE id=?`,
-        [dispatchId]
+        [actor.credentialId,actor.identityId,dispatchId]
       );
-      await event(conn,row,'DEAD_LETTER',principal,{reason:'MAX_ATTEMPTS_EXCEEDED'});
-      await conn.commit();
-      throw errorOf('Bridge dispatch exceeded max attempts','BRIDGE_MAX_ATTEMPTS_EXCEEDED',409);
+      row=await selectDispatch(conn,dispatchId,true);
+      await event(conn,row,'CLAIM_EXHAUSTED',principal,{reason:'MAX_ATTEMPTS_EXCEEDED'});
+      exhausted=true;
+    }else{
+      const safeLease=Math.max(30,Math.min(3600,Number(leaseSeconds)||900));
+      await conn.execute(
+        `UPDATE trigger_dispatches
+            SET status='CLAIMED',
+                attempt_count=attempt_count+1,
+                claimed_by_credential_id=?,
+                claimed_by_identity_id=?,
+                claimed_at=CURRENT_TIMESTAMP(6),
+                lease_expires_at=TIMESTAMPADD(SECOND,?,CURRENT_TIMESTAMP(6)),
+                next_attempt_at=NULL
+          WHERE id=?`,
+        [actor.credentialId,actor.identityId,safeLease,dispatchId]
+      );
+      row=await selectDispatch(conn,dispatchId,true);
+      await event(conn,row,leaseExpired?'RECLAIMED':'CLAIMED',principal,{leaseSeconds:safeLease});
+      claimed=normalize(row);
     }
-    const safeLease=Math.max(30,Math.min(3600,Number(leaseSeconds)||900));
-    const actor=actorOf(principal);
-    await conn.execute(
-      `UPDATE trigger_dispatches
-          SET status='CLAIMED',
-              attempt_count=attempt_count+1,
-              claimed_by_credential_id=?,
-              claimed_by_identity_id=?,
-              claimed_at=CURRENT_TIMESTAMP(6),
-              lease_expires_at=TIMESTAMPADD(SECOND,?,CURRENT_TIMESTAMP(6)),
-              next_attempt_at=NULL
-        WHERE id=?`,
-      [actor.credentialId,actor.identityId,safeLease,dispatchId]
-    );
-    row=await selectDispatch(conn,dispatchId,true);
-    await event(conn,row,leaseExpired?'RECLAIMED':'CLAIMED',principal,{leaseSeconds:safeLease});
     await conn.commit();
-    return normalize(row);
   }catch(error){
     try{await conn.rollback();}catch{}
     throw error;
   }finally{
     conn.release();
   }
+
+  if(exhausted){
+    return failBridgeDispatch(dispatchId,{
+      retryable:false,
+      errorCode:'BRIDGE_MAX_ATTEMPTS_EXCEEDED',
+      errorMessage:'Maximum bridge attempts exceeded'
+    },principal);
+  }
+  return claimed;
 };
 
 export const renewBridgeDispatchLease=async(dispatchId,{leaseSeconds=900}={},principal)=>{
