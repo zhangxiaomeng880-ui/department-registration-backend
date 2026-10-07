@@ -1,0 +1,80 @@
+{
+  "milestone": "M27",
+  "title": "Product Development Domain E2E",
+  "status": "FINAL_FROZEN",
+  "frozenAt": "2026-10-07",
+  "basis": {
+    "masterBlueprint": "AI_NATIVE_2.0_MASTER_BLUEPRINT_V1.4_FROZEN",
+    "domainWorkflow": "AI_Native_2.0_产品研发工作流_V1.2_CURRENT",
+    "exitCriterion": "At least one real Product Development project E2E PASS with Requirement -> Code -> Test -> Release -> Metric bidirectional traceability."
+  },
+  "realProject": {
+    "domainKey": "DEPARTMENT_REGISTRATION",
+    "name": "科室挂号",
+    "repository": "zhangxiaomeng880-ui/department-registration-backend",
+    "integrationBranch": "feat/ai-native-runtime-v2.7-m27.11-product-e2e-exit",
+    "mergedPullRequest": {
+      "number": 6,
+      "url": "https://github.com/zhangxiaomeng880-ui/department-registration-backend/pull/6",
+      "state": "MERGED",
+      "mergeCommitSha": "0f0181a8d357f1cda1489c036bbde854038efdb3"
+    },
+    "realBackendCode": "src/server.mjs",
+    "realBackendTest": "test/backend.test.mjs"
+  },
+  "validation": {
+    "finalWorkflow": "Runtime v2.7 M27.11 Product E2E Exit Gate",
+    "finalRunId": "37561607586",
+    "finalRunConclusion": "success",
+    "validationCommitSha": "ab5ad26c658a1cd1ce9f869b7d95ba54511808fd",
+    "gate": "G-PD-FINAL",
+    "gateResult": "PASS",
+    "traceability": [
+      "Requirement -> Engineering Changeset",
+      "Engineering Changeset -> Build Record",
+      "Build Record -> Preview Deployment",
+      "Preview -> Acceptance / QA",
+      "QA -> Release Candidate",
+      "Release Candidate -> Release Rollout",
+      "Release Rollout -> Primary Metric Observation",
+      "Primary Metric -> Outcome Review",
+      "Outcome Review -> Product Review",
+      "Product Review -> Next Version DRAFT"
+    ]
+  },
+  "staging": {
+    "projectId": "8f6bea55-f9a1-4335-849b-d0ba5ad3bbb6",
+    "environmentId": "fc068d5a-6664-42df-8bae-c84cbc569601",
+    "serviceId": "fe463e22-49b6-452e-afb1-c30590298d42",
+    "deploymentId": "fb280f6c-4fe2-4ade-8fc3-0ed53550bf6a",
+    "status": "SUCCESS",
+    "runtimeCommitSha": "0f0181a8d357f1cda1489c036bbde854038efdb3",
+    "migration": "044_product_development_e2e_exit.sql",
+    "migrationCount": 45,
+    "health": "PASS",
+    "readiness": "PASS",
+    "warnings": 0,
+    "criticals": 0,
+    "recentFailures": 0
+  },
+  "production": {
+    "changed": false,
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "commitSha": "34578464f5d19e87978ccb81719fb23a4b79d6f1"
+  },
+  "completedSlices": [
+    "M27.1 Discovery / Product Baseline",
+    "M27.2 Feasibility / Planning",
+    "M27.3 Design / Technical Contract / AI Contract",
+    "M27.4 Engineering / Build / Preview",
+    "M27.5 Acceptance / QA / Defect / Retest / Regression",
+    "M27.6 Release Readiness",
+    "M27.7 Release / Rollout",
+    "M27.8 Post-release Verification / Incident Operations",
+    "M27.9 Data / Experiment / Feedback / Outcome",
+    "M27.10 Decision / Review / Knowledge / Backlog",
+    "M27.11 Real Product E2E Exit"
+  ],
+  "nextMilestone": "M28 AIGC Domain E2E",
+  "commercialBoundary": "Customer-facing commercialization remains frozen; M27 PASS does not reopen Plan/SKU/Payment/Subscription expansion."
+}
