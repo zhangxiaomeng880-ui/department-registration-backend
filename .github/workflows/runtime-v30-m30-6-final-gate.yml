@@ -1,0 +1,141 @@
+name: Runtime v3.0 M30.6 AI Native 2.0 Final Aggregate Gate
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    branches:
+      - feat/ai-native-runtime-v3.0-m30.6-final-gate
+  pull_request:
+    branches:
+      - feat/ai-native-runtime-v3.0-m30.5-search-audit-evidence
+  workflow_dispatch:
+
+jobs:
+  m30-6-final-gate:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: ci
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Apply Runtime migrations twice
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+        run: |
+          npm run migrate:runtime
+          npm run migrate:runtime
+
+      - name: Validate M25-M30.5 baseline through M30.6 final aggregate gate
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+          MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
+          PORT: 5021
+          RUNTIME_API_BASE_URL: http://127.0.0.1:5021
+          RUNTIME_REQUIRE_AUTH: "true"
+          RUNTIME_API_TOKEN: m306-platform-token
+          RUNTIME_COMMIT_SHA: ${{ github.sha }}
+          RUNTIME_ENABLE_INTERNAL_TEST_ADAPTER: "true"
+          OPENAI_API_KEY: test
+          OPENAI_MODEL: test-model
+          OPENAI_BASE_URL: http://127.0.0.1:4010/v1
+          OPENAI_TIMEOUT_MS: 10000
+          GITHUB_OIDC_AUDIENCE: ai-native-runtime-staging-bridge
+          GITHUB_OIDC_EXPECTED_REPOSITORY: zhangxiaomeng880-ui/department-registration-backend
+          GITHUB_OIDC_EXPECTED_REF: refs/heads/feat/ai-native-runtime-v3.0-m30.6-final-gate
+          GITHUB_OIDC_EXPECTED_WORKFLOW_REF: zhangxiaomeng880-ui/department-registration-backend/.github/workflows/runtime-v30-m30-6-final-gate.yml@refs/heads/feat/ai-native-runtime-v3.0-m30.6-final-gate
+        run: |
+          node test/mock-openai-responses-server.mjs > /tmp/m306-mock-openai.log 2>&1 &
+          MOCK_PID=$!
+          node src/server.mjs > /tmp/runtime-v30-m306.log 2>&1 &
+          RUNTIME_PID=$!
+          trap 'kill $RUNTIME_PID $MOCK_PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            grep -q 'MOCK_OPENAI_READY' /tmp/m306-mock-openai.log && break
+            sleep 1
+          done
+          grep -q 'MOCK_OPENAI_READY' /tmp/m306-mock-openai.log
+          for i in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:5021/ready >/dev/null && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:5021/ready >/dev/null
+          npm run validate:eval-replay-contract
+          npm run validate:eval-runner
+          npm run validate:eval-regression-gate
+          npm run validate:shadow-eval
+          npm run validate:eval-reliability
+          npm run validate:capability-runtime
+          npm run validate:m27-product-development-freeze
+          npm run validate:aigc-foundation
+          npm run validate:novel-skill-binding
+          npm run validate:native-trigger-capability-version
+          npm run validate:bridge-executor-reliability
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then npm run validate:github-oidc-executor-receipt; fi
+          npm run validate:aigc-story-script
+          npm run validate:aigc-breakdown
+          npm run validate:aigc-format-strategy
+          npm run validate:aigc-asset-system
+          npm run validate:aigc-generation-image
+          npm run validate:aigc-video-audio-production
+          npm run validate:aigc-edit-timeline
+          npm run validate:aigc-master-acceptance
+          npm run validate:aigc-distribution-package
+          npm run validate:aigc-release-publishing
+          npm run validate:aigc-performance-experiment
+          npm run validate:aigc-review-archive
+          npm run validate:aigc-domain-final
+          npm run validate:product-outcome
+          npm run validate:m29-data-detection
+          npm run validate:m29-decision-self-loop
+          npm run validate:m29-automation-intake
+          npm run validate:m29-analytics-eval
+          npm run validate:m29-final-gate
+          npm run validate:m30-ops-foundation
+          npm run validate:m30-release-rollback
+          npm run validate:m30-alert-incident
+          npm run validate:m30-retention-backup
+          npm run validate:m30-search-audit
+          npm run validate:m30-final-gate
+          node test/railway-compatibility.test.mjs
+          kill $RUNTIME_PID $MOCK_PID
+          trap - EXIT
+
+      - name: Print Runtime logs on failure
+        if: failure()
+        run: |
+          cat /tmp/runtime-v30-m306.log || true
+          cat /tmp/m306-mock-openai.log || true
