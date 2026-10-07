@@ -52,7 +52,7 @@ jobs:
           npm run migrate:runtime
           npm run migrate:runtime
 
-      - name: Validate M27/M28 plus M29.1 data detection and M29.2 decision self-loop
+      - name: Validate M27 freeze through M29.3 automation intake
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
@@ -73,7 +73,7 @@ jobs:
           GITHUB_OIDC_AUDIENCE: ai-native-runtime-staging-bridge
           GITHUB_OIDC_EXPECTED_REPOSITORY: zhangxiaomeng880-ui/department-registration-backend
           GITHUB_OIDC_EXPECTED_REF: refs/heads/feat/ai-native-runtime-v2.9-m29.3-automation-intake
-          GITHUB_OIDC_EXPECTED_WORKFLOW_REF: zhangxiaomeng880-ui/department-registration-backend/.github/workflows/runtime-v29-m29-2-decision-self-loop.yml@refs/heads/feat/ai-native-runtime-v2.9-m29.3-automation-intake
+          GITHUB_OIDC_EXPECTED_WORKFLOW_REF: zhangxiaomeng880-ui/department-registration-backend/.github/workflows/runtime-v29-m29-3-automation-intake.yml@refs/heads/feat/ai-native-runtime-v2.9-m29.3-automation-intake
         run: |
           node test/mock-openai-responses-server.mjs > /tmp/m293-mock-openai.log 2>&1 &
           MOCK_PID=$!
