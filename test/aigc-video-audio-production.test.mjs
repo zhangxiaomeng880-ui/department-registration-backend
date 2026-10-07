@@ -59,7 +59,7 @@ const [keyframes]=await db.execute(
   `SELECT c.id,c.candidate_key,c.shot_id
      FROM aigc_generation_candidates c
      JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
-    WHERE c.project_id=? AND c.is_current=TRUE AND c.selection_status='SELECTED'
+    WHERE c.project_id=? AND c.is_current=TRUE AND c.selection_status IN ('SELECTED','LOCKED')
       AND j.generation_kind='KEYFRAME' AND j.status='PASS'
     ORDER BY c.shot_id`,
   [projectId]
@@ -344,7 +344,7 @@ const [[truth]]=await db.execute(
     (SELECT COUNT(*) FROM aigc_production_failure_analyses WHERE project_id=? AND status='RESOLVED') resolved_failures,
     (SELECT COUNT(*) FROM aigc_generation_jobs WHERE project_id=? AND generation_kind='VIDEO' AND status='PASS') pass_video_jobs,
     (SELECT COUNT(*) FROM aigc_generation_candidates c JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
-      WHERE c.project_id=? AND j.generation_kind='KEYFRAME' AND c.is_current=TRUE AND c.selection_status='SELECTED') current_keyframes`,
+      WHERE c.project_id=? AND j.generation_kind='KEYFRAME' AND c.is_current=TRUE AND c.selection_status IN ('SELECTED','LOCKED')) current_keyframes`,
   [projectId,projectId,projectId,projectId,projectId,projectId]
 );
 assert.equal(Number(truth.requirements),355);
