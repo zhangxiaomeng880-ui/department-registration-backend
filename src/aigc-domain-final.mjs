@@ -147,7 +147,7 @@ export const evaluateAigcDomainFinalGate=async(projectId,input={},actorId=null)=
     count(db,'SELECT COUNT(*) count FROM aigc_model_tool_benchmarks WHERE project_id=?',[projectId]),
     count(db,'SELECT COUNT(*) count FROM aigc_script_change_requests WHERE project_id=?',[projectId]),
     count(db,`SELECT COUNT(*) count FROM aigc_script_change_impacts i
-      JOIN aigc_script_change_requests r ON r.id=i.change_request_id WHERE r.project_id=?`,[projectId]),
+      JOIN aigc_script_change_requests r ON r.id=i.script_change_request_id WHERE r.project_id=?`,[projectId]),
     count(db,'SELECT COUNT(*) count FROM aigc_asset_call_sheets WHERE project_id=?',[projectId]),
     count(db,`SELECT COUNT(*) count FROM aigc_asset_call_sheets
       WHERE project_id=? AND JSON_UNQUOTE(JSON_EXTRACT(preflight_json,'$.status'))='PASS'`,[projectId]),
