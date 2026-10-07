@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "receiptId": "m286-staging-e2e-20261007-0357",
+  "projectKey": "novel-hello-that-summer",
+  "triggerKey": "TRIGGER_NOVEL_CONTINUOUS_UPDATE_0900_CN",
+  "scheduledFireTime": "2026-10-07T09:00:00",
+  "outcome": "PASS",
+  "output": {
+    "status": "PASS",
+    "updatedChapters": [],
+    "reusedPassChapters": [
+      "E2E_TRANSPORT_ONLY"
+    ],
+    "gateStatus": "PASS",
+    "checkpointPath": "/你好那年夏天/小说/00_规划与基线/你好那年夏天_小说持续更新状态_V1.0_CURRENT.md",
+    "resumePoint": "UNCHANGED",
+    "blockingReason": null
+  },
+  "evidence": {
+    "executor": "CHATGPT_LIBRARY_SCHEDULED_TASK",
+    "purpose": "M28.6_STAGING_TRANSPORT_E2E",
+    "sourceFingerprint": "sha256:m286-staging-transport-e2e"
+  }
+}
