@@ -692,7 +692,7 @@ r=await request('POST',`/api/runtime/projects/${projectId}/product-release-candi
 expectStatus(r,201);const releaseCandidateId=r.body.data.id;
 assert.equal(r.body.data.status,'DRAFT');
 assert.equal(r.body.data.exactCommitSha,shaB);
-assert.equal(r.body.data.artifactSha256:artifactSha);
+assert.equal(r.body.data.artifactSha256,artifactSha);
 
 // DRAFT candidate alone is not release-ready.
 r=await request('POST',`/api/runtime/projects/${projectId}/product-gates/G-PD-RELEASE-READY/evaluate`,{});
