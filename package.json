@@ -60,7 +60,8 @@
     "validate:product-development-final": "node test/product-development-final.test.mjs",
     "validate:m27-product-development-freeze": "node test/m27-product-development-freeze.test.mjs",
     "validate:aigc-foundation": "node test/aigc-foundation.test.mjs",
-    "validate:novel-skill-binding": "node test/novel-skill-binding.test.mjs"
+    "validate:novel-skill-binding": "node test/novel-skill-binding.test.mjs",
+    "validate:native-trigger-capability-version": "node test/native-trigger-capability-version.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
