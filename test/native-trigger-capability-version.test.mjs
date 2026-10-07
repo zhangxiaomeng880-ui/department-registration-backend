@@ -123,10 +123,15 @@ assert.equal(r.body.data.selectedCapabilityKey,'SKILL:NOVEL_CONTINUOUS_UPDATE');
 assert.equal(r.body.data.capabilityVersionId,version.capabilityVersionId);
 assert.equal(r.body.data.triggerFireId,fire.id);
 
-// Same version cannot silently mutate.
+// Re-sync is idempotent and must preserve the frozen executable definition.
 r=await request('POST','/api/runtime/novel-skill-binding/sync',{});
-assert.equal(r.status,409,JSON.stringify(r.body));
-assert.equal(r.body.error,'CAPABILITY_VERSION_IMMUTABLE_CONFLICT');
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.capability.adapterKey,'novel-continuous-update-bridge');
+assert.equal(r.body.data.capability.routable,true);
+r=await request('GET','/api/runtime/capability-versions?capabilityKey=SKILL%3ANOVEL_CONTINUOUS_UPDATE');
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.length,1);
+assert.equal(r.body.data[0].capabilityVersionId,version.capabilityVersionId);
 
 const db=mysql.createPool({
   host:process.env.DB_HOST||'127.0.0.1',port:Number(process.env.DB_PORT||3306),
