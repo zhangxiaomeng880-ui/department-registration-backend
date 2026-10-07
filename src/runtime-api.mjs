@@ -289,6 +289,11 @@ import {
   requestPlatformRollback,executePlatformRollback,evaluateM30ReleaseRollbackGate,
   getM30ReleaseRollbackState,resolveM30ReleaseCandidateScope,resolveM30PromotionScope,resolveM30RollbackScope
 } from './m30-release-promotion-rollback.mjs';
+import {
+  createPlatformAlertRule,evaluatePlatformAlertRule,createPlatformIncident,transitionPlatformIncident,
+  evaluateM30AlertIncidentGate,getM30AlertIncidentState,
+  resolveM30AlertRuleScope,resolveM30AlertScope,resolveM30IncidentScope
+} from './m30-alert-incident.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2022,6 +2027,54 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m303AlertRuleCreateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/platform-alert-rules$/);
+  if (req.method === 'POST' && m303AlertRuleCreateMatch) {
+    const workspaceId=m303AlertRuleCreateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createPlatformAlertRule(workspaceId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m303AlertRuleEvalMatch=match(url.pathname,/^\/api\/runtime\/platform-alert-rules\/([^/]+)\/evaluate$/);
+  if (req.method === 'POST' && m303AlertRuleEvalMatch) {
+    const scope=await resolveM30AlertRuleScope(m303AlertRuleEvalMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await evaluatePlatformAlertRule(m303AlertRuleEvalMatch[1],await readBody(req))});
+    return true;
+  }
+
+  const m303IncidentCreateMatch=match(url.pathname,/^\/api\/runtime\/platform-alerts\/([^/]+)\/incidents$/);
+  if (req.method === 'POST' && m303IncidentCreateMatch) {
+    const scope=await resolveM30AlertScope(m303IncidentCreateMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createPlatformIncident(m303IncidentCreateMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m303IncidentTransitionMatch=match(url.pathname,/^\/api\/runtime\/platform-incidents\/([^/]+)\/transition$/);
+  if (req.method === 'POST' && m303IncidentTransitionMatch) {
+    const scope=await resolveM30IncidentScope(m303IncidentTransitionMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await transitionPlatformIncident(m303IncidentTransitionMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m303GateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-gates\/G-M30-ALERT-INCIDENT\/evaluate$/);
+  if (req.method === 'POST' && m303GateMatch) {
+    const workspaceId=m303GateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await evaluateM30AlertIncidentGate(workspaceId,await readBody(req))});
+    return true;
+  }
+
+  const m303StateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-alert-incident$/);
+  if (req.method === 'GET' && m303StateMatch) {
+    const workspaceId=m303StateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getM30AlertIncidentState(workspaceId)});
     return true;
   }
 
