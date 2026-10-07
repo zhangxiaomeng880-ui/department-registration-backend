@@ -236,7 +236,7 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
     targetType:'GENERATION_JOB',targetId:id,linkType:'GENERATES',actorId,
     evidence:{jobKey:input.jobKey,generationKind}});
   return {id,projectId,breakdownPlanId:breakdown.id,shotId:input.shotId,parentCallSheetId:input.parentCallSheetId,
-    jobKey:input.jobKey,generationKind,status,requestedOutputCount};
+    jobKey:input.jobKey,generationKind,status,requestedOutputCount,preflight:generationPreflight};
 };
 
 export const addAigcGenerationCandidate=async(generationJobId,input={})=>{
