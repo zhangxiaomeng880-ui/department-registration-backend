@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0",
+  "milestone": "M27",
+  "domainKey": "PRODUCT_DEVELOPMENT",
+  "status": "FINAL_FROZEN",
+  "frozenDate": "2026-10-07",
+  "exitContract": "At least one real product project completes E2E with Requirement ↔ Code ↔ Test ↔ Release ↔ Metric traceability.",
+  "realProject": {
+    "name": "科室挂号真实产品项目",
+    "domainKey": "DEPARTMENT_REGISTRATION",
+    "flow": "科室→医生→号源→挂号提交→重复号源阻断"
+  },
+  "realSource": {
+    "repositoryFullName": "zhangxiaomeng880-ui/department-registration-backend",
+    "integrationBranch": "feat/ai-native-runtime-v2.7-m27.11-product-e2e-exit",
+    "pullRequest": {
+      "number": 6,
+      "url": "https://github.com/zhangxiaomeng880-ui/department-registration-backend/pull/6",
+      "state": "MERGED",
+      "merged": true,
+      "mergeCommitSha": "0f0181a8d357f1cda1489c036bbde854038efdb3",
+      "mergedAt": "2026-10-07T02:16:04Z"
+    }
+  },
+  "realBuild": {
+    "provider": "GITHUB_ACTIONS",
+    "runId": "37561165842",
+    "runUrl": "https://github.com/zhangxiaomeng880-ui/department-registration-backend/actions/runs/37561165842",
+    "status": "SUCCESS",
+    "commitSha": "0f0181a8d357f1cda1489c036bbde854038efdb3"
+  },
+  "realStaging": {
+    "provider": "RAILWAY",
+    "environment": "staging",
+    "deploymentId": "fb280f6c-4fe2-4ade-8fc3-0ed53550bf6a",
+    "status": "SUCCESS",
+    "sourceCommitSha": "0f0181a8d357f1cda1489c036bbde854038efdb3",
+    "migration": "044_product_development_e2e_exit.sql",
+    "migrationCount": 45,
+    "readinessHttpStatus": 200,
+    "runtimeReplicas": "1/1",
+    "mysqlReplicas": "1/1",
+    "warningCount": 0,
+    "criticalCount": 0
+  },
+  "finalValidation": {
+    "gateKey": "G-PD-FINAL",
+    "status": "PASS",
+    "githubActionsRunId": "37561607586",
+    "githubActionsHeadSha": "ab5ad26c658a1cd1ce9f869b7d95ba54511808fd",
+    "validates": [
+      "real GitHub repository/branch/merged PR",
+      "real exact merge commit",
+      "successful GitHub Actions build",
+      "real Railway staging deployment",
+      "src/server.mjs code evidence",
+      "test/backend.test.mjs passing test evidence",
+      "Requirement→Code→Build→Preview→Acceptance/QA→Release→Metric→Outcome→Review→Next Version traceability"
+    ]
+  },
+  "gates": {
+    "M27.1": "CLOSED",
+    "M27.2": "CLOSED",
+    "M27.3": "CLOSED",
+    "M27.4": "CLOSED",
+    "M27.5": "CLOSED",
+    "M27.6": "CLOSED",
+    "M27.7": "CLOSED",
+    "M27.8": "CLOSED",
+    "M27.9": "CLOSED",
+    "M27.10": "CLOSED",
+    "M27.11": "FINAL_PASS"
+  },
+  "production": {
+    "changed": false,
+    "branch": "feat/ai-native-runtime-v2.3-m23.6-finance-rc-freeze",
+    "commitSha": "34578464f5d19e87978ccb81719fb23a4b79d6f1"
+  },
+  "nextMilestone": "M28_AIGC_DOMAIN_E2E"
+}
