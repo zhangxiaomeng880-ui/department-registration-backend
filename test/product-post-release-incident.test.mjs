@@ -956,7 +956,7 @@ const healthyVerification={
   primaryMetric:{status:'PASS',metric:'registration_success',value:0.97},
   userFeedback:{status:'PASS',signals:[]},
   operationsFeedback:{status:'PASS',signals:[]},
-  evidence:{source:'m278-synthetic'}
+  evidence:{source:'m278-synthetic'},verifiedAt:'2026-10-07T01:55:00Z'
 };
 
 // Exact released deployment identity is mandatory.
