@@ -272,6 +272,10 @@ import {
   registerM29AutomationTrigger,ingestM29Automation,runM29SchedulerTick,
   evaluateM29AutomationGate,getM29AutomationState,resolveM29AutomationProjectScope
 } from './m29-automation-intake.mjs';
+import {
+  createM29AnalyticsSnapshot,bindM29EvalBenchmark,evaluateM29AnalyticsEvalGate,
+  getM29AnalyticsEvalState,resolveM29AnalyticsProjectScope
+} from './m29-analytics-eval-benchmark.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2005,6 +2009,46 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29AnalyticsSnapshotMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-analytics-snapshots$/);
+  if (req.method === 'POST' && m29AnalyticsSnapshotMatch) {
+    const projectId=m29AnalyticsSnapshotMatch[1],scope=await resolveM29AnalyticsProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createM29AnalyticsSnapshot(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29EvalBenchmarkBindingMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-eval-benchmark-bindings$/);
+  if (req.method === 'POST' && m29EvalBenchmarkBindingMatch) {
+    const projectId=m29EvalBenchmarkBindingMatch[1],scope=await resolveM29AnalyticsProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await bindM29EvalBenchmark(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29AnalyticsEvalGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-gates\/G-M29-ANALYTICS-EVAL\/evaluate$/);
+  if (req.method === 'POST' && m29AnalyticsEvalGateMatch) {
+    const projectId=m29AnalyticsEvalGateMatch[1],scope=await resolveM29AnalyticsProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateM29AnalyticsEvalGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29AnalyticsEvalStateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-analytics-eval$/);
+  if (req.method === 'GET' && m29AnalyticsEvalStateMatch) {
+    const projectId=m29AnalyticsEvalStateMatch[1],scope=await resolveM29AnalyticsProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getM29AnalyticsEvalState(projectId)});
     return true;
   }
 
