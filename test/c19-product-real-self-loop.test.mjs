@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
 import mysql from 'mysql2/promise';
 
-const must=name=>{const v=process.env[name];if(!v)throw new Error(`Missing ${name}`);return v;};
-const db=mysql.createPool({
-  host:must('DB_HOST'),port:Number(must('DB_PORT')),database:must('DB_NAME'),
-  user:must('DB_USER'),password:must('DB_PASSWORD')
-});
+const mysqlUrl=process.env.MYSQL_URL;
+if(!mysqlUrl)throw new Error('Missing MYSQL_URL');
+const db=mysql.createPool(mysqlUrl);
 
 const projectKey='c19-product-real-self-loop';
 const [[project]]=await db.execute(
