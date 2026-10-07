@@ -231,6 +231,12 @@ import {
   createAigcMasterVersion,evaluateAigcMasterSubGate,evaluateAigcMasterGate,
   lockAigcMasterVersion,getAigcMasteringState,resolveAigcMasterProjectScope,resolveAigcMasterScope
 } from './aigc-master-acceptance.mjs';
+import {
+  createAigcDistributionVersion,createAigcDistributionPackage,
+  evaluateAigcDistributionPackageGate,freezeAigcDistributionPackage,
+  getAigcDistributionPackageState,resolveAigcDistributionProjectScope,
+  resolveAigcDistributionPackageScope
+} from './aigc-distribution-package.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1854,6 +1860,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcDistributionPackageMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-distribution-package$/);
+  if (req.method === 'GET' && aigcDistributionPackageMatch) {
+    const projectId=aigcDistributionPackageMatch[1];
+    const scope=await resolveAigcDistributionProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcDistributionPackageState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1876,7 +1893,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-generation-jobs',createAigcGenerationJob],
     ['aigc-production-requirements',createAigcProductionRequirements],
     ['aigc-timeline-versions',createAigcTimelineVersion],
-    ['aigc-master-versions',createAigcMasterVersion]
+    ['aigc-master-versions',createAigcMasterVersion],
+    ['aigc-distribution-versions',createAigcDistributionVersion],
+    ['aigc-distribution-packages',createAigcDistributionPackage]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1916,12 +1935,14 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
                   ?await evaluateAigcEditGate(projectId,body,principal?.identityId||null)
                   :gateKey==='G-AIGC-MASTER'
                     ?await evaluateAigcMasterGate(projectId,body,principal?.identityId||null)
-                    :[
-                      'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
-                      'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
-                    ].includes(gateKey)
-                      ?await evaluateAigcMasterSubGate(projectId,gateKey,body,principal?.identityId||null)
-                      :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+                    :gateKey==='G-AIGC-DISTRIBUTION-PACKAGE'
+                      ?await evaluateAigcDistributionPackageGate(projectId,body,principal?.identityId||null)
+                      :[
+                        'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
+                        'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
+                      ].includes(gateKey)
+                        ?await evaluateAigcMasterSubGate(projectId,gateKey,body,principal?.identityId||null)
+                        :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
     return true;
   }
@@ -2012,6 +2033,19 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+
+  const distributionPackageFreezeMatch=match(url.pathname,/^\/api\/runtime\/aigc-distribution-packages\/([^/]+)\/freeze$/);
+  if (req.method === 'POST' && distributionPackageFreezeMatch) {
+    const packageId=distributionPackageFreezeMatch[1];
+    const scope=await resolveAigcDistributionPackageScope(packageId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await freezeAigcDistributionPackage(
+      packageId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
 
   const masterLockMatch=match(url.pathname,/^\/api\/runtime\/aigc-master-versions\/([^/]+)\/lock$/);
   if (req.method === 'POST' && masterLockMatch) {
