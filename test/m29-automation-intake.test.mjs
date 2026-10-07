@@ -92,7 +92,11 @@ for(const spec of triggerSpecs){
     capabilityKey:'SKILL:NOVEL_CONTINUOUS_UPDATE',
     capabilityVersionId:capabilityVersion.capability_version_id,
     priority:10,
-    policy:{executionMode:'BRIDGE',m29Automation:true},
+    stageKey:'AIGC_11_DERIVATION',
+    policy:{
+      executionMode:'BRIDGE',m29Automation:true,
+      checkpointPath:'/你好那年夏天/小说/00_规划与基线/你好那年夏天_小说持续更新状态_V1.0_CURRENT.md'
+    },
     enabled:true
   });
   expect(r,201);
