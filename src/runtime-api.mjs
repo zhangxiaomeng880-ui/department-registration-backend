@@ -201,6 +201,10 @@ import {
   createAigcBreakdownPlan,evaluateAigcBreakdownGate,getAigcBreakdownState,
   resolveAigcBreakdownProjectScope
 } from './aigc-breakdown.mjs';
+import {
+  createAigcVisualFormatStrategy,createAigcAudioStrategy,createAigcDistributionStrategy,
+  evaluateAigcFormatGate,getAigcFormatState,resolveAigcFormatProjectScope
+} from './aigc-format-strategy.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1758,6 +1762,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcFormatMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-format-strategy$/);
+  if (req.method === 'GET' && aigcFormatMatch) {
+    const projectId=aigcFormatMatch[1];
+    const scope=await resolveAigcFormatProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcFormatState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1768,7 +1783,10 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-story-knowledge',createAigcStoryKnowledge],
     ['aigc-script-versions',createAigcScriptVersion],
     ['aigc-script-change-requests',createAigcScriptChangeRequest],
-    ['aigc-breakdown-plans',createAigcBreakdownPlan]
+    ['aigc-breakdown-plans',createAigcBreakdownPlan],
+    ['aigc-visual-format-strategies',createAigcVisualFormatStrategy],
+    ['aigc-audio-strategies',createAigcAudioStrategy],
+    ['aigc-distribution-strategies',createAigcDistributionStrategy]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1796,7 +1814,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       ?await evaluateAigcScriptGate(projectId,body,principal?.identityId||null)
       :gateKey==='G-AIGC-BREAKDOWN'
         ?await evaluateAigcBreakdownGate(projectId,body,principal?.identityId||null)
-        :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+        :gateKey==='G-AIGC-FORMAT'
+          ?await evaluateAigcFormatGate(projectId,body,principal?.identityId||null)
+          :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
     return true;
   }
