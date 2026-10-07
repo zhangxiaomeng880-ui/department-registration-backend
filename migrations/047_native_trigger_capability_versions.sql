@@ -9,6 +9,10 @@ UPDATE capability_registry
 SET
   routable=TRUE,
   adapter_key='novel-continuous-update-bridge',
+  policy_tags_json=JSON_SET(
+    COALESCE(policy_tags_json,JSON_OBJECT()),
+    '$.executionMode','BRIDGE'
+  ),
   metadata_json=JSON_SET(
     COALESCE(metadata_json,JSON_OBJECT()),
     '$.nativeRuntimeExecution','BRIDGE_READY',
@@ -19,6 +23,24 @@ SET
     '$.source','M28.3'
   )
 WHERE capability_key='SKILL:NOVEL_CONTINUOUS_UPDATE';
+
+UPDATE project_type_capability_bindings
+SET constraints_json=JSON_SET(
+  COALESCE(constraints_json,JSON_OBJECT()),
+  '$.executionMode','BRIDGE',
+  '$.nativeRuntimeExecution','BRIDGE_READY'
+)
+WHERE project_type_key='AIGC_CONTENT'
+  AND capability_key='SKILL:NOVEL_CONTINUOUS_UPDATE';
+
+UPDATE agent_capability_grants
+SET constraints_json=JSON_SET(
+  COALESCE(constraints_json,JSON_OBJECT()),
+  '$.executionMode','BRIDGE',
+  '$.nativeRuntimeExecution','BRIDGE_READY'
+)
+WHERE agent_capability_key='AGENT:STANDARD:AIGC_CONTENT:OPERATIONS_CONTENT'
+  AND child_capability_key='SKILL:NOVEL_CONTINUOUS_UPDATE';
 
 CREATE TABLE capability_versions (
   capability_version_id CHAR(36) PRIMARY KEY,
