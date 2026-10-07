@@ -82,6 +82,10 @@ import {
   listTriggers,getTrigger,setTriggerEnabled,bindTriggerCapability,fireTrigger,
   listPendingTriggerDispatches,completeTriggerDispatch,getTriggerFire
 } from './trigger-runtime.mjs';
+import {
+  resolveBridgeDispatchScope,listBridgeDispatches,claimBridgeDispatch,renewBridgeDispatchLease,
+  completeBridgeDispatch,failBridgeDispatch,listBridgeDispatchEvents
+} from './bridge-executor-runtime.mjs';
 import { transitionProjectStage,getStageTransitionEvent,listStageTransitionEvents } from './stage-runtime.mjs';
 import {
   orchestrateProjectWorkflow,getWorkflowOrchestrationSession,listWorkflowOrchestrationSessions
@@ -1020,6 +1024,83 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     json(res,200,{data:await completeTriggerDispatch(
       triggerDispatchCompleteMatch[1],await readBody(req)
     )});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/bridge-dispatches') {
+    const projectId=url.searchParams.get('projectId');
+    if(!projectId) throw Object.assign(new Error('projectId is required'),{code:'BRIDGE_PROJECT_REQUIRED',statusCode:400});
+    const scope=await resolveProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'bridge:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listBridgeDispatches({
+      projectId,status:url.searchParams.get('status')||'CLAIMABLE',
+      limit:url.searchParams.get('limit')||50
+    })});
+    return true;
+  }
+
+  const bridgeClaimMatch=match(url.pathname,/^\/api\/runtime\/bridge-dispatches\/([^/]+)\/claim$/);
+  if (req.method === 'POST' && bridgeClaimMatch) {
+    const scope=await resolveBridgeDispatchScope(bridgeClaimMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'bridge:execute',tenantId:scope.tenantId,workspaceId:scope.workspaceId,
+      method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await claimBridgeDispatch(
+      bridgeClaimMatch[1],await readBody(req),principal
+    )});
+    return true;
+  }
+
+  const bridgeRenewMatch=match(url.pathname,/^\/api\/runtime\/bridge-dispatches\/([^/]+)\/renew$/);
+  if (req.method === 'POST' && bridgeRenewMatch) {
+    const scope=await resolveBridgeDispatchScope(bridgeRenewMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'bridge:execute',tenantId:scope.tenantId,workspaceId:scope.workspaceId,
+      method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await renewBridgeDispatchLease(
+      bridgeRenewMatch[1],await readBody(req),principal
+    )});
+    return true;
+  }
+
+  const bridgeCompleteMatch=match(url.pathname,/^\/api\/runtime\/bridge-dispatches\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && bridgeCompleteMatch) {
+    const scope=await resolveBridgeDispatchScope(bridgeCompleteMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'bridge:execute',tenantId:scope.tenantId,workspaceId:scope.workspaceId,
+      method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await completeBridgeDispatch(
+      bridgeCompleteMatch[1],await readBody(req),principal
+    )});
+    return true;
+  }
+
+  const bridgeFailMatch=match(url.pathname,/^\/api\/runtime\/bridge-dispatches\/([^/]+)\/fail$/);
+  if (req.method === 'POST' && bridgeFailMatch) {
+    const scope=await resolveBridgeDispatchScope(bridgeFailMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'bridge:execute',tenantId:scope.tenantId,workspaceId:scope.workspaceId,
+      method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await failBridgeDispatch(
+      bridgeFailMatch[1],await readBody(req),principal
+    )});
+    return true;
+  }
+
+  const bridgeEventsMatch=match(url.pathname,/^\/api\/runtime\/bridge-dispatches\/([^/]+)\/events$/);
+  if (req.method === 'GET' && bridgeEventsMatch) {
+    const scope=await resolveBridgeDispatchScope(bridgeEventsMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'bridge:read',tenantId:scope.tenantId,workspaceId:scope.workspaceId,
+      method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listBridgeDispatchEvents(bridgeEventsMatch[1])});
     return true;
   }
 
