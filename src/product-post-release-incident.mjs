@@ -160,7 +160,7 @@ export const createIncident=async(projectId,input={},actorId=null)=>{
     `INSERT INTO product_incidents
       (id,project_id,release_rollout_id,release_version_id,detected_verification_id,
        incident_key,title,severity,status,signal_json,affected_scope_json,owner_identity_id,detected_at)
-     VALUES (?,?,?,?,?,?,?,?, 'DETECTED',?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?, 'DETECTED',?,?,?,?)`,
     [id,projectId,rollout.id,rollout.release_version_id,verification.id,input.incidentKey,input.title,severity,
      asJson(input.signal),asJson(input.affectedScope),input.ownerIdentityId,
      input.detectedAt?new Date(input.detectedAt):new Date()]
