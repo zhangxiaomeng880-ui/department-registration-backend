@@ -166,7 +166,7 @@ export const getWorkspaceOperationsWorkbench=async(workspaceId)=>{
     count(db,"SELECT COUNT(*) count FROM runs WHERE workspace_id=? AND status IN ('FAILED','BLOCKED')",[workspaceId]),
     count(db,"SELECT COUNT(*) count FROM workspace_memberships WHERE workspace_id=? AND status='ACTIVE'",[workspaceId]),
     count(db,"SELECT COUNT(*) count FROM authorization_decisions WHERE workspace_id=? AND decision='DENY' AND created_at>=DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 24 HOUR)",[workspaceId]),
-    one(db,"SELECT COUNT(*) events,COALESCE(SUM(cost_amount),0) cost_amount,COALESCE(SUM(token_input+token_output),0) tokens FROM usage_ledger WHERE workspace_id=?",[workspaceId]),
+    one(db,"SELECT COUNT(*) events,COALESCE(SUM(CASE WHEN cost_status='CALCULATED' THEN estimated_cost ELSE 0 END),0) cost_amount,COALESCE(SUM(token_input+token_output),0) tokens FROM usage_ledger WHERE workspace_id=?",[workspaceId]),
     list(db,'SELECT * FROM platform_environments WHERE workspace_id=? ORDER BY environment_type,environment_key',[workspaceId]),
     list(db,'SELECT * FROM platform_connections WHERE workspace_id=? ORDER BY connection_type,connection_key',[workspaceId]),
     list(db,`SELECT provider_key,display_name,enabled,health_status,updated_at FROM provider_registry
