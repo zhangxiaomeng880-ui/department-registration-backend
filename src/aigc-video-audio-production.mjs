@@ -229,8 +229,8 @@ export const lockAigcProductionRequirement=async(requirementId,input={},actorId=
         WHERE c.project_id=? AND c.id IN (${placeholders})`,[req.project_id,...ids]
     );
     if(frameRows.length!==new Set(ids).size||frameRows.some(x=>
-      x.generation_kind!=='KEYFRAME'||x.job_status!=='PASS'||x.selection_status!=='SELECTED'||!x.is_current
-    ))throw errorOf('VIDEO reference must point to CURRENT selected KEYFRAME',
+      x.generation_kind!=='KEYFRAME'||x.job_status!=='PASS'||!['SELECTED','LOCKED'].includes(x.selection_status)||!x.is_current
+    ))throw errorOf('VIDEO reference must point to CURRENT selected/locked KEYFRAME',
       'AIGC_VIDEO_KEYFRAME_REFERENCE_INVALID',409);
   }
 
