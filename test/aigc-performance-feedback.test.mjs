@@ -115,8 +115,8 @@ const feedbackId=r.body.data.id;
 r=await request('POST',`/api/runtime/projects/${projectId}/aigc-experiment-candidates`,{
   experimentKey:'BAD-STORY-RULE',experimentType:'STORY_RULE',
   hypothesis:'should be rejected',
-  sourcePerformanceSnapshotIds:[performanceId],target:{stage:'STORY'},variant:{},
-  successMetrics:{},guardrails:{},evidence:{test:true}
+  sourcePerformanceSnapshotIds:[performanceId],target:{stage:'STORY'},variant:{proposalOnly:true},
+  successMetrics:{evidenceStrength:'TEST'},guardrails:{currentStoryRule:'IMMUTABLE'},evidence:{test:true}
 });
 assert.equal(r.status,409,JSON.stringify(r.body));
 assert.equal(r.body.error,'AIGC_EXPERIMENT_TYPE_INVALID');
