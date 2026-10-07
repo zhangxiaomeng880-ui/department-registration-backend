@@ -1,0 +1,63 @@
+name: Runtime Bridge Receipt Staging
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    branches:
+      - runtime-bridge-receipts
+    paths:
+      - runtime-bridge/receipts/**/*.json
+
+jobs:
+  deliver-receipts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Exchange GitHub OIDC token
+        id: oidc
+        shell: bash
+        env:
+          OIDC_AUDIENCE: ai-native-runtime-staging-bridge
+        run: |
+          set -euo pipefail
+          RESPONSE="$(curl --fail --silent --show-error \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$OIDC_AUDIENCE")"
+          TOKEN="$(node -e 'const fs=require("fs");const body=JSON.parse(fs.readFileSync(0,"utf8"));if(!body.value)process.exit(2);process.stdout.write(body.value)' <<<"$RESPONSE")"
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Deliver changed receipts
+        shell: bash
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+          RUNTIME_BRIDGE_URL: https://runtime-staging-rc1-staging.up.railway.app/api/external/bridge/github-receipts
+        run: |
+          set -euo pipefail
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+          if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]]; then
+            FILES="$(git ls-tree -r --name-only "$AFTER" -- 'runtime-bridge/receipts/**/*.json' 'runtime-bridge/receipts/*.json')"
+          else
+            FILES="$(git diff --name-only --diff-filter=AM "$BEFORE" "$AFTER" -- 'runtime-bridge/receipts/**/*.json' 'runtime-bridge/receipts/*.json')"
+          fi
+          if [[ -z "$FILES" ]]; then
+            echo "No receipt files to deliver."
+            exit 0
+          fi
+          while IFS= read -r file; do
+            [[ -n "$file" ]] || continue
+            echo "Delivering $file"
+            curl --fail --silent --show-error \
+              -X POST "$RUNTIME_BRIDGE_URL" \
+              -H "Authorization: Bearer $OIDC_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data-binary "@$file"
+            echo
+          done <<<"$FILES"
