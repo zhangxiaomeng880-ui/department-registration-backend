@@ -183,7 +183,7 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
   const candidateIds=candidateRefs.map(x=>x.referenceId);
   const [candidateRows]=candidateIds.length
     ?await db.query(
-      `SELECT c.id,c.candidate_key,c.selection_status,c.is_current,j.status AS job_status,j.generation_kind
+      `SELECT c.id,c.candidate_key,c.selection_status,c.is_current,c.shot_id,j.status AS job_status,j.generation_kind
          FROM aigc_generation_candidates c
          JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
         WHERE c.project_id=? AND c.id IN (${candidateIds.map(()=>'?').join(',')})`,
@@ -196,6 +196,18 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
     if(!row||row.candidate_key!==ref.versionKey||row.selection_status!=='SELECTED'||!row.is_current||row.job_status!=='PASS')
       throw errorOf('Generation candidate reference must be the exact CURRENT selected PASS candidate',
         'AIGC_GENERATION_CANDIDATE_REFERENCE_INVALID',409,{referenceId:ref.referenceId,versionKey:ref.versionKey});
+  }
+
+  if(generationKind==='VIDEO'){
+    const keyframeRefs=candidateRefs.filter(ref=>{
+      const row=candidateMap.get(ref.referenceId);
+      return row?.generation_kind==='KEYFRAME' && row?.shot_id===input.shotId &&
+        ['KEYFRAME','FIRST_FRAME','LAST_FRAME'].includes(upper(ref.role));
+    });
+    if(!keyframeRefs.length)throw errorOf(
+      'VIDEO generation requires a CURRENT selected KEYFRAME candidate from the same shot',
+      'AIGC_VIDEO_KEYFRAME_REFERENCE_REQUIRED',409,{shotId:input.shotId}
+    );
   }
 
   const id=randomUUID(),status=upper(input.status||'QUEUED');
