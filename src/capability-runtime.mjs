@@ -554,14 +554,15 @@ export const invokeDirectCapability=async input=>{
 
 export const completeDirectCapabilityInvocation=async(invocationId,input)=>{
   const db=getRuntimePool();
-  const [rows]=await db.execute('SELECT * FROM capability_invocations WHERE id=? FOR UPDATE',[invocationId]);
+  const [rows]=await db.execute('SELECT * FROM capability_invocations WHERE id=?',[invocationId]);
   if(!rows.length) throw errorOf('Capability invocation not found','CAPABILITY_INVOCATION_NOT_FOUND',404);
   const row=rows[0];
-  if(row.status!=='HOLD') throw errorOf(
-    'Only HOLD bridge invocations can be externally completed',
-    'CAPABILITY_INVOCATION_NOT_AWAITING_EXTERNAL_COMPLETION',409,{status:row.status}
-  );
   const status=input?.status==='FAIL'?'FAIL':'PASS';
+  if(row.status===status) return getCapabilityInvocation(invocationId);
+  if(row.status!=='HOLD') throw errorOf(
+    'Bridge invocation is already terminal with a different status',
+    'CAPABILITY_INVOCATION_TERMINAL_CONFLICT',409,{status:row.status,requestedStatus:status}
+  );
   await finalizeInvocation(invocationId,{
     status,
     outputSha256:input?.output==null?null:sha256(input.output),
