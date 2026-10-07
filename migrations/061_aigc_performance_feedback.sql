@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS aigc_feedback_signals (
   CONSTRAINT fk_m2815_feedback_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m2815_feedback_key (project_id,signal_key),
   INDEX idx_m2815_feedback_subject (project_id,feedback_type,subject,created_at),
-  INDEX idx_m2815_feedback_scope (project_id,status,severity,recommended_scope),
+  INDEX idx_m2815_feedback_scope (project_id,severity,recommended_scope),
   INDEX idx_m2815_feedback_severity (project_id,severity,created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
