@@ -55,11 +55,32 @@ const callSheetByShot=new Map();
 for(const row of callSheets) if(!callSheetByShot.has(row.shot_id))callSheetByShot.set(row.shot_id,row.id);
 assert.equal(shots.filter(x=>callSheetByShot.has(x.id)).length,71);
 
+const [requiredCallSheetRefs]=await db.execute(
+  `SELECT b.call_sheet_id,b.reference_asset_version_id,b.reference_role,v.version_key
+     FROM aigc_call_sheet_reference_bindings b
+     JOIN aigc_asset_versions v ON v.id=b.reference_asset_version_id
+    WHERE b.project_id=? AND b.required=TRUE AND b.status='READY'
+    ORDER BY b.call_sheet_id,b.reference_role,b.reference_asset_version_id`,
+  [projectId]
+);
+const refsByCallSheet=new Map();
+for(const row of requiredCallSheetRefs){
+  const refs=refsByCallSheet.get(row.call_sheet_id)||[];
+  refs.push({
+    referenceId:row.reference_asset_version_id,
+    referenceType:'ASSET_VERSION',
+    role:row.reference_role,
+    versionKey:row.version_key
+  });
+  refsByCallSheet.set(row.call_sheet_id,refs);
+}
+assert.equal(shots.filter(x=>(refsByCallSheet.get(callSheetByShot.get(x.id))||[]).length>0).length,71);
+
 const [keyframes]=await db.execute(
   `SELECT c.id,c.candidate_key,c.shot_id
      FROM aigc_generation_candidates c
      JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
-    WHERE c.project_id=? AND c.is_current=TRUE AND c.selection_status='SELECTED'
+    WHERE c.project_id=? AND c.is_current=TRUE AND c.selection_status IN ('SELECTED','LOCKED')
       AND j.generation_kind='KEYFRAME' AND j.status='PASS'
     ORDER BY c.shot_id`,
   [projectId]
@@ -153,15 +174,11 @@ const audioQa=()=>({
 });
 
 const createJob=async({shot,type,suffix='A',status='RUNNING',candidateRef=true,index=1})=>{
-  const refs=[];
+  const refs=(refsByCallSheet.get(callSheetByShot.get(shot.id))||[]).map(x=>({...x}));
   if(type==='VIDEO'&&candidateRef){
     const kf=keyframeByShot.get(shot.id);
     refs.push({
       referenceId:kf.id,referenceType:'GENERATION_CANDIDATE',role:'FIRST_FRAME',versionKey:kf.candidate_key
-    });
-  }else{
-    refs.push({
-      referenceId:assetVersion.id,referenceType:'ASSET_VERSION',role:'AUDIO',versionKey:assetVersion.version_key
     });
   }
   const res=await request('POST',`/api/runtime/projects/${projectId}/aigc-generation-jobs`,{
@@ -324,7 +341,7 @@ const [currentFirstShot]=await db.execute(
   `SELECT j.generation_kind,COUNT(*) count
      FROM aigc_generation_candidates c
      JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
-    WHERE c.project_id=? AND c.shot_id=? AND c.is_current=TRUE AND c.selection_status='SELECTED'
+    WHERE c.project_id=? AND c.shot_id=? AND c.is_current=TRUE AND c.selection_status IN ('SELECTED','LOCKED')
     GROUP BY j.generation_kind ORDER BY j.generation_kind`,
   [projectId,firstShot.id]
 );
@@ -344,7 +361,7 @@ const [[truth]]=await db.execute(
     (SELECT COUNT(*) FROM aigc_production_failure_analyses WHERE project_id=? AND status='RESOLVED') resolved_failures,
     (SELECT COUNT(*) FROM aigc_generation_jobs WHERE project_id=? AND generation_kind='VIDEO' AND status='PASS') pass_video_jobs,
     (SELECT COUNT(*) FROM aigc_generation_candidates c JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
-      WHERE c.project_id=? AND j.generation_kind='KEYFRAME' AND c.is_current=TRUE AND c.selection_status='SELECTED') current_keyframes`,
+      WHERE c.project_id=? AND j.generation_kind='KEYFRAME' AND c.is_current=TRUE AND c.selection_status IN ('SELECTED','LOCKED')) current_keyframes`,
   [projectId,projectId,projectId,projectId,projectId,projectId]
 );
 assert.equal(Number(truth.requirements),355);
