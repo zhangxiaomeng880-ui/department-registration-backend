@@ -64,6 +64,28 @@ export const resolveAigcGenerationProjectScope=async projectId=>{
   return {projectId,workspaceId:p.workspace_id};
 };
 
+export const resolveAigcGenerationJobScope=async generationJobId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT j.project_id,p.workspace_id
+       FROM aigc_generation_jobs j JOIN projects p ON p.id=j.project_id
+      WHERE j.id=?`,[generationJobId]
+  );
+  if(!rows.length)throw errorOf('Generation Job not found','AIGC_GENERATION_JOB_NOT_FOUND',404);
+  return {projectId:rows[0].project_id,workspaceId:rows[0].workspace_id};
+};
+
+export const resolveAigcGenerationCandidateScope=async candidateId=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT c.project_id,p.workspace_id
+       FROM aigc_generation_candidates c JOIN projects p ON p.id=c.project_id
+      WHERE c.id=?`,[candidateId]
+  );
+  if(!rows.length)throw errorOf('Generation Candidate not found','AIGC_GENERATION_CANDIDATE_NOT_FOUND',404);
+  return {projectId:rows[0].project_id,workspaceId:rows[0].workspace_id};
+};
+
 export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
   await loadProject(projectId);
   requireFields(input,[
