@@ -15,8 +15,9 @@ const getOidcToken=async()=>{
   const response=await fetch(url+'&audience='+encodeURIComponent(audience),{
     headers:{authorization:'bearer '+requestToken}
   });
-  assert.equal(response.ok,true,await response.text());
-  const body=await response.json();
+  const raw=await response.text();
+  assert.equal(response.ok,true,raw);
+  const body=JSON.parse(raw);
   assert.ok(body.value);
   return body.value;
 };
