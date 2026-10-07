@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS aigc_derivation_scan_items (
   INDEX idx_m2813_scan_scope (project_id,master_version_id,applicability)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS aigc_distribution_versions (
+CREATE TABLE IF NOT EXISTS aigc_content_derivation_versions (
   id CHAR(36) PRIMARY KEY,
   project_id CHAR(36) NOT NULL,
   master_version_id CHAR(36) NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS aigc_distribution_versions (
   CONSTRAINT fk_m2813_distribution_project FOREIGN KEY (project_id) REFERENCES projects(id),
   CONSTRAINT fk_m2813_distribution_master FOREIGN KEY (master_version_id) REFERENCES aigc_master_versions(id),
   CONSTRAINT fk_m2813_distribution_scan FOREIGN KEY (scan_item_id) REFERENCES aigc_derivation_scan_items(id),
-  CONSTRAINT fk_m2813_distribution_parent FOREIGN KEY (parent_distribution_version_id) REFERENCES aigc_distribution_versions(id),
+  CONSTRAINT fk_m2813_distribution_parent FOREIGN KEY (parent_distribution_version_id) REFERENCES aigc_content_derivation_versions(id),
   CONSTRAINT fk_m2813_distribution_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m2813_distribution_key_version (project_id,distribution_key,version_no),
   INDEX idx_m2813_distribution_master (master_version_id,status,derivation_type),
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS aigc_distribution_package_items (
   evidence_json JSON NOT NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_m2813_package_item_package FOREIGN KEY (package_id) REFERENCES aigc_distribution_packages(id),
-  CONSTRAINT fk_m2813_package_item_version FOREIGN KEY (distribution_version_id) REFERENCES aigc_distribution_versions(id),
+  CONSTRAINT fk_m2813_package_item_version FOREIGN KEY (distribution_version_id) REFERENCES aigc_content_derivation_versions(id),
   UNIQUE KEY uq_m2813_package_item (package_id,distribution_version_id),
   UNIQUE KEY uq_m2813_package_sequence (package_id,sequence_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
