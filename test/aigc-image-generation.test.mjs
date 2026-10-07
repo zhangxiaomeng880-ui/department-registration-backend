@@ -1,0 +1,1032 @@
+import assert from 'node:assert/strict';
+import mysql from 'mysql2/promise';
+import { randomUUID } from 'node:crypto';
+
+const baseUrl=process.env.RUNTIME_API_BASE_URL||'http://127.0.0.1:4800';
+const platformToken=process.env.RUNTIME_API_TOKEN||'m282-platform-token';
+const request=async(method,path,body)=>{
+  const response=await fetch(baseUrl+path,{
+    method,headers:{'content-type':'application/json',authorization:`Bearer ${platformToken}`},
+    ...(body===undefined?{}:{body:JSON.stringify(body)})
+  });
+  let payload={};try{payload=await response.json();}catch{}
+  return {status:response.status,body:payload};
+};
+const suffix=randomUUID().slice(0,8);
+
+let r=await request('GET','/api/runtime/aigc-modules');
+assert.equal(r.status,200,JSON.stringify(r.body));
+const moduleNames=Object.fromEntries(r.body.data.map(x=>[x.moduleKey,x.displayName]));
+assert.equal(moduleNames.AIGC_STORY_KNOWLEDGE,'故事知识库');
+assert.equal(moduleNames.AIGC_SCRIPT_VERSION,'剧本版本');
+assert.equal(moduleNames.AIGC_SCRIPT_LOCK_CHANGE,'剧本锁定与变更');
+
+r=await request('GET','/api/runtime/aigc-ui-labels');
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.find(x=>x.stableKey==='G-AIGC-SCRIPT').displayName,'剧本锁定门禁');
+assert.equal(r.body.data.find(x=>x.labelType==='KNOWLEDGE_STATUS'&&x.stableKey==='FACT').displayName,'事实');
+
+// M28.1 has already compiled the standard AIGC workflow in the full regression chain.
+const planKey=`M282_PLAN_${suffix}`;
+r=await request('POST','/api/runtime/plans',{planKey,name:'M28.2 验证计划'});
+assert.equal(r.status,201,JSON.stringify(r.body));
+r=await request('POST','/api/runtime/plan-entitlements',{planKey,entitlementKey:'MODEL_EXECUTION',enabled:true});
+assert.equal(r.status,201,JSON.stringify(r.body));
+r=await request('POST','/api/runtime/tenants',{tenantKey:`m282-${suffix}`,name:'M28.2 租户',planKey});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const tenantId=r.body.data.id;
+r=await request('POST','/api/runtime/workspaces',{tenantId,workspaceKey:'main',name:'主工作区'});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const workspaceId=r.body.data.id;
+
+r=await request('POST','/api/runtime/projects',{
+  workspaceId,projectKey:`m282-xia-${suffix}`,name:'你好，那年夏天',
+  projectType:'AIGC_CONTENT',projectSubtypeKey:'SHORT_DRAMA',
+  domainPresetKey:'AIGC_CONTENT_STANDARD'
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const projectId=r.body.data.id;
+assert.equal(r.body.data.lifecycle.stages.length,15);
+assert.equal(r.body.data.lifecycle.stages[3].displayName,'故事 / 剧本 / 结构');
+
+// M28.1 prerequisites: initialization -> discovery -> production planning.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-initializations`,{
+  initializationKey:'LX-M282-INIT',workTitle:'你好，那年夏天',
+  targetAudience:{primary:'中文情感叙事受众'},
+  roles:{owner:'作者 / 产品负责人',creativeLead:'创作负责人',productionLead:'AIGC 制作负责人',reviewer:'最终审核人'},
+  knowledgeSources:[
+    {provider:'CHATGPT_LIBRARY',scope:'/你好那年夏天/',role:'PROJECT_CURRENT'},
+    {provider:'CHATGPT_LIBRARY',scope:'/你好那年夏天/剧本/',role:'STORY_KNOWLEDGE'}
+  ],
+  assetStorage:{projectLibrary:'/你好那年夏天/视觉素材/'},
+  capabilityEnvironment:{models:['GPT'],tools:['Image Generation','Runway'],connections:['ChatGPT Library'],credentialBoundary:'平台连接'},
+  budgetGuardrail:{currency:'CNY',maxSpend:5000},
+  timelineStrategy:{milestones:'AG-M0..AG-M9'},
+  rightsBoundary:{copyright:'原创',likeness:'虚构角色',music:'原创/授权',font:'授权',brand:'需确认',aiDisclosure:'按平台要求'},
+  formatDelivery:{masterFormat:{aspect:'1.85:1'},workingFormat:{type:'可重建'},deliveryFormats:['电影版','剧集版','切片']},
+  backupArchive:{backup:'持续备份',export:'最终母版',archive:'版本冻结'},
+  evidence:{source:'《你好，那年夏天》CURRENT 基线'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-market-benchmarks`,{
+  benchmarkKey:'LX-M282-MARKET',platform:'多平台',marketRegion:'中国大陆 / 海外候选',
+  categoryFormat:'情感叙事',workCreatorAccount:{scope:'同类内容'},
+  publishDate:'2026-10-01',snapshotDate:'2026-10-07',freshUntil:'2026-11-07',
+  observablePerformance:{dimensions:['播放','互动','完播']},releaseCadence:{mode:'完整版+切片'},
+  audiencePositioning:{audience:'真实感情与成长叙事受众'},structureHook:{principle:'真实关系细节'},
+  sourceEvidence:{asOf:'2026-10-07'},insight:{statement:'创作母体优先'},limitation:{statement:'表现随时间变化'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const marketId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-creative-references`,{
+  referenceKey:'LX-M282-REF',source:{description:'生活质感与真实情感叙事参考'},
+  rightsStatus:'LIMITED',referenceRoles:['STYLE','PERFORMANCE','EDITING_RHYTHM'],
+  allowedUsage:{scope:'抽象风格研究'},forbiddenCopying:{rules:['不得复制具体镜头/对白/角色']},
+  attributionProvenance:{recorded:true}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const refId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-model-tool-benchmarks`,{
+  benchmarkKey:'LX-M282-MODEL',provider:'多提供商评测',modelTool:'图像 / 视频生成工具组合',
+  modelToolVersion:'2026-10-07-current',capability:{identityConsistency:true},
+  supportedReferenceTypes:['IDENTITY','LOOK','SCENE','MOTION'],outputLimits:{duration:'镜头级分段'},
+  controllability:{identity:'母版锁定'},apiBatchQueue:{batch:true,queue:true},
+  costLatencyReliability:{cost:'按 Job 记录',latency:'实测',reliability:'版本化评测'},
+  rightsTermsDisclosure:{reviewed:true},evalDate:'2026-10-07',freshUntil:'2026-11-07',
+  evidence:{source:'M28.2 capability snapshot'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const modelId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-creative-hypotheses`,{
+  hypothesisKey:'LX-M282-HYP',hypothesisType:'FORMAT',
+  statement:'保持 Story Fact 不变，电影母版优先并派生剧集与平台切片',
+  benchmarkIds:[marketId],creativeReferenceIds:[refId],modelToolBenchmarkIds:[modelId],
+  unknowns:['平台切片长度后续验证'],confidence:'MEDIUM',storyFactMutation:false,
+  decision:{status:'APPROVED'},evidence:{source:'M28.2'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-production-plans`,{
+  planKey:'LX-M282-PLAN',
+  projectHierarchy:{project:'你好，那年夏天',version:'CURRENT',unit:'电影 / 剧集 / 切片',scene:'001—071',shot:'镜头级'},
+  milestoneKeys:['AG-M0','AG-M1','AG-M2','AG-M3','AG-M4','AG-M5','AG-M6','AG-M7','AG-M8','AG-M9'],
+  workBreakdown:{stages:['故事','资产','图像','视频音频','剪辑','母版','分发','表现','复盘']},
+  productionOrder:{principle:'已 PASS 上游不重跑'},dependency:{critical:['Script→Shot→Asset→Generation→Timeline→Master']},
+  assetCoveragePlan:{source:'001—071 全剧资产覆盖矩阵'},modelToolStrategy:{router:'按能力/质量/成本/时延'},
+  budgetAllocation:{currency:'CNY',total:5000,byStage:{script:0,asset:1000,image:1000,video:2500,audio:500}},
+  batchQueueConcurrency:{batch:true,queue:true},humanReviewPoints:{required:['Script Lock','Master QA']},
+  versionStrategy:{master:'电影母版优先',derivatives:['剧集版','切片'],history:'历史不可覆盖'},
+  localizationCandidates:{status:'CANDIDATE',markets:['中文主版本','海外候选']},evidence:{source:'M28.2'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-PLAN/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+
+// Story Knowledge must explicitly classify formal knowledge.
+const storyEntries=[
+  ['WORLD-001','WORLD','RULE','世界与时代规则',{setting:'2022—2026 北京 / 深圳现实都市，不做虚构反转'},true],
+  ['CHAR-LX','CHARACTER','FACT','林夏',{age:25,role:'北漂产品经理',cat:'岁岁'},true],
+  ['CHAR-CM','CHARACTER','FACT','陈默',{age:30,traits:['逃避型','完美主义']},true],
+  ['REL-LX-CM','RELATIONSHIP','FACT','林夏与陈默关系',{type:'恋爱关系',principle:'多年后仍可能相爱，但隔阂会循环'},true],
+  ['TIMELINE-MAIN','TIMELINE','FACT','主时间线',{start:'2022',firstBreakup:'2024夏',shenzhen:'2024',returnBeijing:'2026'},true],
+  ['BEAT-MAIN','BEAT','CURRENT','主要剧情节拍',{range:'001—071',middle:['失业互助','父亲去世','借条翻包','521蓝港','新工作']},false],
+  ['SCENE-INDEX','SCENE','CURRENT','场景索引',{sceneStart:1,sceneEnd:71,sceneCount:71},true],
+  ['DIALOGUE-RULE','DIALOGUE','RULE','对白规则',{style:'自然、克制，不用降智强误会'},true],
+  ['THEME-MAIN','THEME','RULE','主题',{statement:'回去面对不等于复合成功'},true],
+  ['NATURAL-UNIT','NATURAL_UNIT','CURRENT','自然单元',{principle:'自然单元先于固定集数'},true],
+  ['SPOILER-RULE','SPOILER','RULE','剧透规则',{ending:'开放式结局，071不给观众难过的镜头'},true],
+  ['CULTURE-DEP','CULTURAL_DEPENDENCY','CURRENT','文化依赖',{items:['北京城市生活','除夕','家庭关系']},false]
+];
+for(const [key,category,status,title,data,critical] of storyEntries){
+  r=await request('POST',`/api/runtime/projects/${projectId}/aigc-story-knowledge`,{
+    knowledgeKey:key,category,knowledgeStatus:status,title,content:data,
+    scope:{project:'你好，那年夏天'},sourceRef:{source:'CURRENT 项目基线'},
+    gateCritical:critical,immutable:['FACT','RULE'].includes(status),evidence:{verified:true}
+  });
+  assert.equal(r.status,201,JSON.stringify(r.body));
+}
+
+// Gate is HOLD until a script version is actually locked.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-SCRIPT/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('AIGC_CURRENT_LOCKED_SCRIPT_REQUIRED'));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-script-versions`,{
+  versionKey:'LX-SCRIPT-V1',versionNo:1,title:'《你好，那年夏天》001—071 母剧本',
+  scriptFormat:'SCREENPLAY',sourceLocator:{libraryPath:'/你好那年夏天/剧本/',baseline:'001—071 CURRENT'},
+  sceneStart:1,sceneEnd:71,sceneCount:71,
+  naturalUnits:{source:'自然拆集 V0.4 / 19 候选集'},structure:{type:'Narrative',ending:'开放式'},
+  contentSha256:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  evidence:{qa:'001—071 可拍摄性终检 PASS'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const v1=r.body.data.id;
+
+r=await request('POST',`/api/runtime/aigc-script-versions/${v1}/lock`,{
+  lockKey:'LX-SCRIPT-LOCK-V1',
+  continuityQa:{character:'PASS',relationship:'PASS',timeline:'PASS',fact:'PASS',naturalUnit:'PASS'},
+  approval:{status:'APPROVED',approver:'作者 / 最终审核人'},
+  evidence:{source:'001—071 全量冷读 / QA PASS'}
+});
+assert.equal(r.status,200,JSON.stringify(r.body));
+const v1Lock=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-SCRIPT/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.sceneRange.count,71);
+
+// Silent post-lock revision is forbidden.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-script-versions`,{
+  versionKey:'LX-SCRIPT-V2',versionNo:2,title:'《你好，那年夏天》001—071 母剧本 V2',
+  scriptFormat:'SCREENPLAY',sourceLocator:{libraryPath:'/你好那年夏天/剧本/',baseline:'V2'},
+  sceneStart:1,sceneEnd:71,sceneCount:71,naturalUnits:{count:19},structure:{type:'Narrative'},
+  contentSha256:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  evidence:{reason:'测试静默改版拦截'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_SCRIPT_CHANGE_REQUEST_REQUIRED');
+
+// Incomplete impact analysis is also forbidden.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-script-change-requests`,{
+  changeKey:'LX-CR-BAD',fromScriptVersionId:v1,proposedVersionKey:'LX-SCRIPT-V2',
+  reason:'测试缺失影响域',before:{version:'V1'},after:{version:'V2'},
+  impacts:{
+    SCENE:{disposition:'AFFECTED',affectedObjects:['SC055'],rationale:'场景内容调整',revalidation:{required:true}}
+  },
+  approval:{status:'APPROVED',approver:'作者'},evidence:{test:true}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_SCRIPT_CHANGE_IMPACT_INCOMPLETE');
+
+const impacts={
+  SCENE:{disposition:'AFFECTED',affectedObjects:['SC055'],rationale:'对白与冲突节奏调整',revalidation:{required:true,gate:'G-AIGC-SCRIPT'}},
+  SHOT:{disposition:'AFFECTED',affectedObjects:['SC055_SHOTS'],rationale:'后续镜头拆解需重算',revalidation:{required:true,gate:'G-AIGC-BREAKDOWN'}},
+  ASSET:{disposition:'N_A',affectedObjects:[],rationale:'不改变人物/造型/场景母版',revalidation:{required:false}},
+  AUDIO:{disposition:'AFFECTED',affectedObjects:['SC055_DIALOGUE'],rationale:'对白音频需随新剧本重建',revalidation:{required:true,gate:'G-AIGC-PRODUCTION'}},
+  DISTRIBUTION:{disposition:'N_A',affectedObjects:[],rationale:'不改变母体发行结构',revalidation:{required:false}}
+};
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-script-change-requests`,{
+  changeKey:'LX-CR-001',fromScriptVersionId:v1,proposedVersionKey:'LX-SCRIPT-V2',
+  reason:'SC055 对白与冲突节奏精修',
+  before:{scriptVersion:'LX-SCRIPT-V1',scene:'SC055'},after:{scriptVersion:'LX-SCRIPT-V2',scene:'SC055 精修'},
+  impacts,approval:{status:'APPROVED',approver:'作者 / 最终审核人'},
+  evidence:{decision:'允许修改，但不得改变既有硬事实'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const crId=r.body.data.id;
+const projectChangeId=r.body.data.projectChangeId;
+
+// Approved but unapplied change makes Script Gate HOLD.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-SCRIPT/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('AIGC_APPROVED_SCRIPT_CHANGE_PENDING'));
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-script-versions`,{
+  versionKey:'LX-SCRIPT-V2',versionNo:2,title:'《你好，那年夏天》001—071 母剧本 V2',
+  scriptFormat:'SCREENPLAY',sourceLocator:{libraryPath:'/你好那年夏天/剧本/',baseline:'V2'},
+  sceneStart:1,sceneEnd:71,sceneCount:71,naturalUnits:{source:'自然拆集 V0.4',count:19},
+  structure:{type:'Narrative',changeScope:['SC055']},
+  contentSha256:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  changeRequestId:crId,evidence:{changeRequest:'LX-CR-001'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const v2=r.body.data.id;
+assert.equal(r.body.data.parentScriptVersionId,v1);
+assert.equal(r.body.data.changeRequestId,crId);
+
+r=await request('POST',`/api/runtime/aigc-script-versions/${v2}/lock`,{
+  lockKey:'LX-SCRIPT-LOCK-V2',
+  continuityQa:{character:'PASS',relationship:'PASS',timeline:'PASS',fact:'PASS',naturalUnit:'PASS'},
+  approval:{status:'APPROVED',approver:'作者 / 最终审核人'},
+  evidence:{changeRequest:'LX-CR-001',qa:'针对性精修后连续性 QA PASS'}
+});
+assert.equal(r.status,200,JSON.stringify(r.body));
+const v2Lock=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-SCRIPT/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.currentScriptVersionId,v2);
+assert.deepEqual(r.body.data.evidenceSnapshot.pendingApprovedChangeIds,[]);
+
+r=await request('GET',`/api/runtime/projects/${projectId}/aigc-script-domain`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.frontend.language,'zh-CN');
+assert.equal(r.body.data.frontend.gateName,'剧本锁定门禁');
+assert.equal(r.body.data.storyKnowledge.length,12);
+assert.equal(r.body.data.scriptVersions.length,2);
+assert.equal(r.body.data.locks.length,2);
+assert.equal(r.body.data.changeRequests.length,1);
+assert.equal(r.body.data.impacts.length,5);
+const sv1=r.body.data.scriptVersions.find(x=>x.id===v1);
+const sv2=r.body.data.scriptVersions.find(x=>x.id===v2);
+assert.equal(sv1.status,'HISTORICAL');
+assert.equal(sv1.isCurrent,false);
+assert.equal(sv2.status,'LOCKED');
+assert.equal(sv2.isCurrent,true);
+assert.equal(r.body.data.changeRequests[0].status,'APPLIED');
+assert.equal(r.body.data.changeRequests[0].projectChangeId,projectChangeId);
+assert.equal(r.body.data.changeRequests[0].appliedScriptVersionId,v2);
+assert.ok(r.body.data.locks.some(x=>x.id===v1Lock));
+assert.ok(r.body.data.locks.some(x=>x.id===v2Lock));
+
+const db=mysql.createPool({
+  host:process.env.DB_HOST||'127.0.0.1',port:Number(process.env.DB_PORT||3306),
+  database:process.env.DB_NAME||'ai_native_runtime',user:process.env.DB_USER||'ai_native_runtime',
+  password:process.env.DB_PASSWORD||'ci'
+});
+const [[truth]]=await db.execute(
+  `SELECT
+    (SELECT COUNT(*) FROM project_changes WHERE id=? AND project_id=?) generic_change,
+    (SELECT COUNT(*) FROM aigc_script_change_impacts WHERE script_change_request_id=?) impact_count,
+    (SELECT COUNT(*) FROM aigc_trace_links WHERE project_id=? AND target_type='SCRIPT_VERSION' AND target_id=? AND link_type='LOCKS_INTO') story_to_v2,
+    (SELECT COUNT(*) FROM aigc_script_versions WHERE project_id=? AND is_current=TRUE AND status='LOCKED') current_locked`,
+  [projectChangeId,projectId,crId,projectId,v2,projectId]
+);
+assert.equal(Number(truth.generic_change),1);
+assert.equal(Number(truth.impact_count),5);
+assert.equal(Number(truth.story_to_v2),12);
+assert.equal(Number(truth.current_locked),1);
+
+// M28.5: Script Lock passes, but Breakdown Gate stays HOLD until exact Unit/Scene/Shot coverage exists.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-BREAKDOWN/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('AIGC_BREAKDOWN_PLAN_REQUIRED'));
+
+const units=[];
+let cursor=1;
+for(let i=1;i<=19;i++){
+  const size=i<=14?4:3;
+  const start=cursor,end=cursor+size-1;
+  units.push({
+    unitKey:`UNIT-${String(i).padStart(2,'0')}`,
+    title:`自然单元 ${String(i).padStart(2,'0')}`,
+    sequenceNo:i,sceneStart:start,sceneEnd:end,
+    purpose:{type:'NATURAL_UNIT',principle:'保持关系推进与情绪连续性'},
+    continuity:{from:i===1?null:`UNIT-${String(i-1).padStart(2,'0')}`,to:i===19?null:`UNIT-${String(i+1).padStart(2,'0')}`},
+    evidence:{source:'001—071 Script Lock / 自然拆解规划'}
+  });
+  cursor=end+1;
+}
+assert.equal(cursor,72);
+
+const unitForScene=no=>units.find(u=>no>=u.sceneStart&&no<=u.sceneEnd);
+const scenes=Array.from({length:71},(_,i)=>{
+  const no=i+1,sceneKey=`SC${String(no).padStart(3,'0')}`;
+  return {
+    sceneKey,sceneNo:no,unitKey:unitForScene(no).unitKey,title:`场景 ${String(no).padStart(3,'0')}`,
+    scriptScope:{scriptVersionId:v2,sceneKey,locked:true},
+    locationTime:{status:'FROM_SCRIPT_LOCK',sceneKey},
+    purpose:{status:'BREAKDOWN_READY',sceneKey},
+    continuity:{previous:no===1?null:`SC${String(no-1).padStart(3,'0')}`,next:no===71?null:`SC${String(no+1).padStart(3,'0')}`},
+    evidence:{source:'LX-SCRIPT-V2'}
+  };
+});
+
+const shots=scenes.map(scene=>{
+  const shotKey=`${scene.sceneKey}_SH01`;
+  const blocked=scene.sceneNo===55;
+  return {
+    shotKey,sceneKey:scene.sceneKey,sequenceNo:1,
+    shotPurpose:{purpose:'承载本场核心叙事信息与情绪动作'},
+    charactersLooks:{mode:'FROM_SCENE_BREAKDOWN',characters:'按锁定剧本调用',looks:'按资产库 CURRENT 调用'},
+    scenePropUi:{scene:'按 Scene Lock 调用',props:'按剧本需求',ui:{mode:'NONE_OR_SCRIPT_DEFINED'}},
+    actionExpressionPerformance:{action:'按锁定剧本',expression:'镜头级定义',performance:'避免摆拍感'},
+    dialogueVoiceOstSfx:{dialogue:'按锁定剧本',voice:'后续 Audio Stage 绑定',ost:'按场景策略',sfx:'按场景策略'},
+    camera:{framing:'镜头级规划',lensSemantics:'服务叙事而非炫技',movement:'按场景动作'},
+    timing:{durationStrategy:'按对白/动作节奏确定',timingLock:'后续 Timeline 确认'},
+    referenceRequirements:{identity:true,look:true,scene:true,composition:true,motion:'按镜头需求'},
+    generationStrategy:{mode:'REFERENCE_CONTROLLED',candidatePolicy:'保留历史候选，不覆盖'},
+    multiFormat:{master:'1.85:1',safeArea:'保留竖屏派生安全区',cropPolicy:'母版优先后派生'},
+    continuityDependency:{scriptVersionId:v2,previousShot:scene.sceneNo===1?null:`SC${String(scene.sceneNo-1).padStart(3,'0')}_SH01`},
+    priorityCostRetry:{priority:scene.sceneNo===55?'P0':'P1',costTier:'TBD',retryRisk:blocked?'HIGH':'MEDIUM'},
+    qaCriteria:{identity:'PASS_REQUIRED',sceneContinuity:'PASS_REQUIRED',performance:'PASS_REQUIRED',noInventedStoryFact:true},
+    assetRequirements:[
+      {
+        requirementKey:`${shotKey}_SCENE`,requirementType:'SCENE',criticality:'REQUIRED',
+        readinessStatus:'READY',requirement:{sceneKey:scene.sceneKey,role:'SCENE_LOCK'},
+        sourceRef:{provider:'PROJECT_ASSET_LIBRARY',ref:`scene://${scene.sceneKey}/CURRENT`},
+        revalidation:{required:false},evidence:{coverage:'DECLARED'}
+      },
+      {
+        requirementKey:`${shotKey}_PERFORMANCE`,requirementType:'PERFORMANCE',criticality:'REQUIRED',
+        readinessStatus:blocked?'MISSING':'READY',
+        requirement:{shotKey,role:'SHOT_SPECIFIC_PERFORMANCE'},
+        ...(blocked?{
+          missingReason:'镜头级表演资产尚未在资产系统中绑定',
+          revalidation:{required:true,nextGate:'G-AIGC-ASSET'}
+        }:{
+          sourceRef:{provider:'BREAKDOWN_REFERENCE',ref:`performance://${shotKey}/PLANNED`},
+          revalidation:{required:false}
+        }),
+        evidence:{coverage:'DECLARED'}
+      }
+    ],
+    evidence:{source:'M28.5 structural 001—071 coverage validation'}
+  };
+});
+
+// Missing one scene is rejected before anything can be frozen.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-breakdown-plans`,{
+  planKey:'LX-BREAKDOWN-BAD-SCENE',versionNo:1,scriptVersionId:v2,
+  units,scenes:scenes.slice(0,-1),shots:shots.slice(0,-1),evidence:{test:'missing-scene'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_BREAKDOWN_SCENE_COVERAGE_INCOMPLETE');
+
+// A READY requirement without an actual source reference is rejected.
+const badShots=structuredClone(shots);
+delete badShots[0].assetRequirements[0].sourceRef;
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-breakdown-plans`,{
+  planKey:'LX-BREAKDOWN-BAD-ASSET',versionNo:1,scriptVersionId:v2,
+  units,scenes,shots:badShots,evidence:{test:'ready-without-source'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_READY_ASSET_SOURCE_REQUIRED');
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-breakdown-plans`,{
+  planKey:'LX-BREAKDOWN-V1',versionNo:1,scriptVersionId:v2,
+  units,scenes,shots,evidence:{source:'001—071 Script Lock',purpose:'M28.5 exact scene coverage'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const breakdownPlanId=r.body.data.id;
+assert.equal(r.body.data.status,'FROZEN');
+assert.equal(r.body.data.coverageSnapshot.sceneCount,71);
+assert.equal(r.body.data.coverageSnapshot.coveredSceneCount,71);
+assert.equal(r.body.data.coverageSnapshot.unitCount,19);
+assert.equal(r.body.data.coverageSnapshot.shotCount,71);
+assert.equal(r.body.data.coverageSnapshot.assetRequirementCount,142);
+assert.equal(r.body.data.readinessSummary.readyShots,70);
+assert.equal(r.body.data.readinessSummary.blockedShots,1);
+assert.equal(r.body.data.readinessSummary.missingRequired,1);
+
+// Breakdown Gate PASS means coverage is complete and blockers are explicit.
+// It does NOT falsely claim that every shot is already producible.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-BREAKDOWN/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.breakdownPlanId,breakdownPlanId);
+assert.equal(r.body.data.evidenceSnapshot.sceneCount,71);
+assert.equal(r.body.data.evidenceSnapshot.readyShotCount,70);
+assert.equal(r.body.data.evidenceSnapshot.blockedShotCount,1);
+assert.equal(r.body.data.evidenceSnapshot.missingRequiredAssetCount,1);
+assert.equal(r.body.data.evidenceSnapshot.coverageComplete,true);
+
+r=await request('GET',`/api/runtime/projects/${projectId}/aigc-breakdown`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.frontend.language,'zh-CN');
+assert.equal(r.body.data.frontend.gateName,'制作拆解门禁');
+assert.equal(r.body.data.frontend.readinessLabels.READY,'可直接生产');
+assert.equal(r.body.data.frontend.readinessLabels.BLOCKED,'缺失资产阻塞');
+assert.equal(r.body.data.currentCoverage.units.length,19);
+assert.equal(r.body.data.currentCoverage.scenes.length,71);
+assert.equal(r.body.data.currentCoverage.shots.length,71);
+assert.equal(r.body.data.currentCoverage.assetRequirements.length,142);
+const blockedShot=r.body.data.currentCoverage.shots.find(x=>x.readinessStatus==='BLOCKED');
+assert.equal(blockedShot.shotKey,'SC055_SH01');
+assert.equal(blockedShot.blockingReasons[0].requirementType,'PERFORMANCE');
+
+const [[breakdownTruth]]=await db.execute(
+  `SELECT
+    (SELECT COUNT(*) FROM aigc_units WHERE breakdown_plan_id=?) units,
+    (SELECT COUNT(*) FROM aigc_scenes WHERE breakdown_plan_id=?) scenes,
+    (SELECT COUNT(*) FROM aigc_shots WHERE breakdown_plan_id=?) shots,
+    (SELECT COUNT(*) FROM aigc_shot_asset_requirements WHERE breakdown_plan_id=?) requirements,
+    (SELECT COUNT(*) FROM aigc_shots WHERE breakdown_plan_id=? AND readiness_status='READY') ready_shots,
+    (SELECT COUNT(*) FROM aigc_shots WHERE breakdown_plan_id=? AND readiness_status='BLOCKED') blocked_shots,
+    (SELECT COUNT(*) FROM aigc_trace_links WHERE project_id=? AND source_type='SCRIPT_VERSION' AND source_id=? AND target_type='BREAKDOWN_PLAN' AND target_id=?) script_to_breakdown`,
+  [breakdownPlanId,breakdownPlanId,breakdownPlanId,breakdownPlanId,
+   breakdownPlanId,breakdownPlanId,projectId,v2,breakdownPlanId]
+);
+assert.equal(Number(breakdownTruth.units),19);
+assert.equal(Number(breakdownTruth.scenes),71);
+assert.equal(Number(breakdownTruth.shots),71);
+assert.equal(Number(breakdownTruth.requirements),142);
+assert.equal(Number(breakdownTruth.ready_shots),70);
+assert.equal(Number(breakdownTruth.blocked_shots),1);
+assert.equal(Number(breakdownTruth.script_to_breakdown),1);
+
+// M28.7: format/audio/distribution gate is HOLD until all three strategies are frozen.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-FORMAT/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('AIGC_VISUAL_FORMAT_STRATEGY_REQUIRED'));
+assert.ok(r.body.data.reasonCodes.includes('AIGC_AUDIO_STRATEGY_REQUIRED'));
+assert.ok(r.body.data.reasonCodes.includes('AIGC_DISTRIBUTION_STRATEGY_REQUIRED'));
+
+// Master format cannot be treated as a disposable platform target.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-visual-format-strategies`,{
+  strategyKey:'LX-FORMAT-BAD-MASTER',breakdownPlanId,
+  masterFormat:{aspectRatio:'1.85:1',resolution:'4K-class master',frameRate:'24fps-class'},
+  safeZones:{title:'master-safe',action:'master-safe'},
+  cropRecomposePolicy:{masterProtected:true,cropAllowed:true,recomposeAllowed:true},
+  subtitleSafeArea:{policy:'preserve subtitle-safe lower area'},
+  firstLastFrame:{firstFrame:'shot-specific',lastFrame:'shot-specific'},
+  distributionProfiles:[
+    {profileKey:'FILM_MASTER_DERIVED',displayName:'电影横版派生',aspectRatio:'1.85:1',resolution:'master-derived',safeAreaPolicy:'preserve'},
+    {profileKey:'VERTICAL_SHORT',displayName:'竖屏切片',aspectRatio:'9:16',resolution:'platform-derived',safeAreaPolicy:'vertical-safe'}
+  ],
+  derivationPolicy:{masterImmutable:false,deriveFromMaster:true,historyPreserved:true},
+  evidence:{source:'M28.7 invalid policy test'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_MASTER_DERIVATION_POLICY_REQUIRED');
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-visual-format-strategies`,{
+  strategyKey:'LX-FORMAT-V1',breakdownPlanId,
+  masterFormat:{aspectRatio:'1.85:1',resolution:'4K-class master',frameRate:'24fps-class'},
+  safeZones:{
+    master:{title:'preserve narrative frame',action:'preserve character/action area'},
+    derivative:{vertical:'keep key faces/actions inside vertical-safe core'}
+  },
+  cropRecomposePolicy:{
+    masterProtected:true,cropAllowed:true,recomposeAllowed:true,
+    policy:'先锁电影母版，再为平台派生 crop/recompose；不得反向修改母版'
+  },
+  subtitleSafeArea:{master:'lower-safe-zone',vertical:'avoid platform UI overlap'},
+  firstLastFrame:{firstFrame:'shot-specific lock',lastFrame:'shot-specific lock'},
+  distributionProfiles:[
+    {profileKey:'FILM_MASTER_DERIVED',displayName:'电影横版派生',aspectRatio:'1.85:1',resolution:'master-derived',safeAreaPolicy:'master-safe'},
+    {profileKey:'LANDSCAPE_PLATFORM',displayName:'平台横版',aspectRatio:'16:9',resolution:'platform-derived',safeAreaPolicy:'landscape-safe'},
+    {profileKey:'VERTICAL_SHORT',displayName:'竖屏切片',aspectRatio:'9:16',resolution:'platform-derived',safeAreaPolicy:'vertical-safe'}
+  ],
+  derivationPolicy:{masterImmutable:true,deriveFromMaster:true,historyPreserved:true},
+  evidence:{source:'M28.7 Visual Format Strategy'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const visualFormatStrategyId=r.body.data.id;
+assert.equal(r.body.data.masterFormat.aspectRatio,'1.85:1');
+assert.equal(r.body.data.distributionProfiles.length,3);
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-audio-strategies`,{
+  strategyKey:'LX-AUDIO-V1',
+  voiceMaster:{policy:'角色声线保持人物一致性；对白版本化'},
+  dialogue:{source:'锁定剧本对白',sync:'镜头/口型需求时单独校验'},
+  music:{policy:'场景音乐与剪辑节奏解耦保留分轨'},
+  ost:{source:'原创 OST / 已确认有权使用内容'},
+  sfx:{policy:'场景动作与环境细节分轨'},
+  ambience:{policy:'北京/深圳/室内外环境声分轨'},
+  trackSeparation:{tracks:['dialogue','voice','music','ost','sfx','ambience'],mastering:'non-destructive'},
+  loudnessExport:{targetLufs:'delivery-profile-defined',truePeakDbtp:'delivery-profile-defined',exportSpec:'platform-specific derivative from audio master'},
+  rights:{voice:'authorized/project-generated',music:'original-or-cleared',ost:'original-or-cleared',sfx:'cleared-or-generated',ambience:'cleared-or-generated'},
+  evidence:{source:'M28.7 Audio Strategy'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const audioStrategyId=r.body.data.id;
+
+// Distribution target must bind a declared format profile.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-strategies`,{
+  strategyKey:'LX-DIST-BAD',visualFormatStrategyId,audioStrategyId,
+  targets:[{
+    targetKey:'BAD',channel:'测试渠道',market:'测试市场',language:'zh-CN',
+    localizationLevel:'NONE',platformSpec:{delivery:'test'},formatProfileKey:'UNKNOWN',
+    aiDisclosure:{policy:'按平台要求'},rightsBoundary:{status:'CLEARED'}
+  }],
+  localizationMatrix:{default:'zh-CN'},releasePackaging:{policy:'derivative packages'},
+  rightsBoundary:{global:'rights checked'},aiDisclosurePolicy:{global:'platform-specific'},
+  evidence:{test:'unknown format profile'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_DISTRIBUTION_FORMAT_PROFILE_INVALID');
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-distribution-strategies`,{
+  strategyKey:'LX-DIST-V1',visualFormatStrategyId,audioStrategyId,
+  targets:[
+    {
+      targetKey:'FULL_FILM',channel:'完整版发行',market:'中文主市场',language:'zh-CN',
+      localizationLevel:'NONE',platformSpec:{package:'full-master-derived'},
+      formatProfileKey:'FILM_MASTER_DERIVED',
+      aiDisclosure:{policy:'按实际发布平台规则披露'},
+      rightsBoundary:{script:'original',music:'original-or-cleared',visual:'project-generated'}
+    },
+    {
+      targetKey:'LANDSCAPE_LONGFORM',channel:'横版长视频平台',market:'中文主市场',language:'zh-CN',
+      localizationLevel:'NONE',platformSpec:{package:'landscape-longform'},
+      formatProfileKey:'LANDSCAPE_PLATFORM',
+      aiDisclosure:{policy:'按实际发布平台规则披露'},
+      rightsBoundary:{script:'original',music:'original-or-cleared',visual:'project-generated'}
+    },
+    {
+      targetKey:'VERTICAL_CLIP',channel:'竖屏短视频平台',market:'中文主市场',language:'zh-CN',
+      localizationLevel:'NONE',platformSpec:{package:'vertical-clip'},
+      formatProfileKey:'VERTICAL_SHORT',
+      aiDisclosure:{policy:'按实际发布平台规则披露'},
+      rightsBoundary:{script:'original',music:'original-or-cleared',visual:'project-generated'}
+    },
+    {
+      targetKey:'OVERSEAS_CANDIDATE',channel:'海外候选平台',market:'海外候选',language:'en',
+      localizationLevel:'SUBTITLE',platformSpec:{package:'localized-candidate'},
+      formatProfileKey:'LANDSCAPE_PLATFORM',
+      aiDisclosure:{policy:'按目标市场和平台规则复核'},
+      rightsBoundary:{status:'candidate-rights-review-required'}
+    }
+  ],
+  localizationMatrix:{
+    'zh-CN':{level:'NONE',source:'master'},
+    en:{level:'SUBTITLE',status:'CANDIDATE',requires:['subtitle-QA','cultural-dependency-review']}
+  },
+  releasePackaging:{
+    rule:'母版不直接被平台规格覆盖；每个发布包从对应 profile 派生',
+    packageEvidence:['format-profile','audio-export','rights','ai-disclosure']
+  },
+  rightsBoundary:{global:'release-time recheck required',music:'per-track evidence required'},
+  aiDisclosurePolicy:{global:'platform/market-specific at publish time'},
+  evidence:{source:'M28.7 Distribution Strategy'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const distributionStrategyId=r.body.data.id;
+assert.equal(r.body.data.targetCount,4);
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-FORMAT/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.visualFormatStrategyId,visualFormatStrategyId);
+assert.equal(r.body.data.evidenceSnapshot.audioStrategyId,audioStrategyId);
+assert.equal(r.body.data.evidenceSnapshot.distributionStrategyId,distributionStrategyId);
+assert.equal(r.body.data.evidenceSnapshot.masterFormat.aspectRatio,'1.85:1');
+assert.equal(r.body.data.evidenceSnapshot.distributionTargetCount,4);
+
+r=await request('GET',`/api/runtime/projects/${projectId}/aigc-format-strategy`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.frontend.language,'zh-CN');
+assert.equal(r.body.data.frontend.gateName,'格式 / 音频 / 分发门禁');
+assert.deepEqual(r.body.data.frontend.moduleNames,['视觉格式策略','音频策略','分发策略','格式交付矩阵']);
+assert.equal(r.body.data.visualFormats.length,1);
+assert.equal(r.body.data.audioStrategies.length,1);
+assert.equal(r.body.data.distributionStrategies.length,1);
+assert.equal(r.body.data.visualFormats[0].derivationPolicy.masterImmutable,true);
+assert.equal(r.body.data.distributionStrategies[0].targets.length,4);
+
+const [[formatTruth]]=await db.execute(
+  `SELECT
+    (SELECT COUNT(*) FROM aigc_visual_format_strategies WHERE project_id=? AND status='FROZEN') visual_current,
+    (SELECT COUNT(*) FROM aigc_audio_strategies WHERE project_id=? AND status='FROZEN') audio_current,
+    (SELECT COUNT(*) FROM aigc_distribution_strategies WHERE project_id=? AND status='FROZEN') distribution_current`,
+  [projectId,projectId,projectId]
+);
+assert.equal(Number(formatTruth.visual_current),1);
+assert.equal(Number(formatTruth.audio_current),1);
+assert.equal(Number(formatTruth.distribution_current),1);
+
+// M28.8 Asset System: gate HOLD until every required Shot Asset Requirement has an executable path.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-ASSET/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('AIGC_REQUIRED_ASSET_REQUIREMENT_UNBOUND'));
+
+// Workspace reusable library must explicitly opt in to governed cross-project reuse.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-libraries`,{
+  libraryKey:'WS-BAD',displayName:'错误工作区资产库',libraryScope:'WORKSPACE',
+  permissionPolicy:{crossProjectReuse:false},rightsPolicy:{reuseAllowed:true},
+  usageScope:{workspace:true},versionPolicy:{historyPreserved:true},evidence:{test:'missing-governance'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_WORKSPACE_REUSE_POLICY_REQUIRED');
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-libraries`,{
+  libraryKey:'LX-PROJECT-ASSETS',displayName:'《你好，那年夏天》项目资产库',libraryScope:'PROJECT',
+  permissionPolicy:{projectOnly:true},rightsPolicy:{reuseAllowed:false,releaseReviewRequired:true},
+  usageScope:{projectId},versionPolicy:{historyPreserved:true,noOverwrite:true},
+  evidence:{source:'项目 CURRENT 资产库规则'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const projectLibraryId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-libraries`,{
+  libraryKey:'LX-WORKSPACE-REUSE',displayName:'AIGC 工作区可复用资产库',libraryScope:'WORKSPACE',
+  permissionPolicy:{crossProjectReuse:true,approvalRequired:true},
+  rightsPolicy:{reuseAllowed:true,releaseReviewRequired:true},
+  usageScope:{workspace:true,allowedProjectIds:[projectId]},
+  versionPolicy:{historyPreserved:true,exactVersionBinding:true},
+  evidence:{source:'M28.8 reusable library'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const workspaceLibraryId=r.body.data.id;
+
+// Reusable style master gives every Call Sheet a structured STYLE reference.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-assets`,{
+  libraryId:workspaceLibraryId,assetKey:'STYLE_LX_TAIWAN_REALISM',assetType:'STYLE',
+  displayName:'台湾生活质感 / 真实情感叙事风格参考',
+  purpose:{role:'STYLE_REFERENCE'},sourceOfTruth:{source:'视觉风格 CURRENT'},
+  upstreamSource:{type:'CREATIVE_REFERENCE'},immutable:true,
+  onlyVariable:{allowed:['shot-specific composition','lighting adaptation']},
+  rights:{status:'CLEARED_FOR_PROJECT_REFERENCE'},usageScope:{workspace:true},
+  status:'DRAFT',evidence:{source:'M28.8'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const styleAssetId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-versions`,{
+  assetId:styleAssetId,versionKey:'STYLE-LX-V1',versionNo:1,
+  contentLocator:{provider:'PROJECT_LIBRARY',ref:'style://lx/taiwan-realism/v1'},
+  outputSpec:{type:'REFERENCE_SET'},requiredViews:{views:['mood','composition','lighting']},
+  fingerprintSha256:'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+  state:'CURRENT',qaResult:{status:'PASS',identityRisk:'N_A',copyrightBoundary:'PASS'},
+  evidence:{qa:'视觉风格参考边界已确认'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const styleVersionId=r.body.data.id;
+
+// Final/current asset version cannot bypass QA.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-assets`,{
+  libraryId:projectLibraryId,assetKey:'PERF_SC055',assetType:'PERFORMANCE',
+  displayName:'SC055 镜头级表演资产',purpose:{shot:'SC055_SH01'},
+  sourceOfTruth:{source:'LX-SCRIPT-V2'},upstreamSource:{shot:'SC055_SH01'},immutable:false,
+  onlyVariable:{allowed:['micro expression','timing']},rights:{status:'PROJECT_OWNED'},
+  usageScope:{projectId},status:'DRAFT',evidence:{source:'M28.8'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const perfAssetId=r.body.data.id;
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-versions`,{
+  assetId:perfAssetId,versionKey:'PERF-SC055-BAD',versionNo:1,
+  contentLocator:{provider:'PROJECT_LIBRARY',ref:'performance://SC055/bad'},
+  outputSpec:{type:'PERFORMANCE_REFERENCE'},requiredViews:{views:['two-person timing']},
+  fingerprintSha256:'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+  state:'CURRENT',qaResult:{status:'FAIL'},evidence:{test:'QA fail cannot become current'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_ASSET_QA_PASS_REQUIRED');
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-versions`,{
+  assetId:perfAssetId,versionKey:'PERF-SC055-V1',versionNo:1,
+  contentLocator:{provider:'PROJECT_LIBRARY',ref:'performance://SC055/v1'},
+  outputSpec:{type:'PERFORMANCE_REFERENCE'},requiredViews:{views:['two-person timing','expression continuity']},
+  fingerprintSha256:'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+  state:'LOCKED',qaResult:{status:'PASS',continuity:'PASS',performance:'PASS'},
+  evidence:{qa:'SC055 shot-specific performance lock'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const perfVersionId=r.body.data.id;
+
+// Read all 142 current requirements from the frozen Breakdown.
+r=await request('GET',`/api/runtime/projects/${projectId}/aigc-breakdown`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+const assetRequirements=r.body.data.currentCoverage.assetRequirements;
+assert.equal(assetRequirements.length,142);
+const sc055Requirement=assetRequirements.find(x=>x.requirementKey==='SC055_SH01_PERFORMANCE');
+assert.ok(sc055Requirement);
+
+// One blocked preflight is persisted as BLOCKED and cannot be bound as executable.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-call-sheets`,{
+  assetRequirementId:assetRequirements[0].id,callSheetKey:'CALL-BLOCKED-REF',assetType:assetRequirements[0].requirementType,
+  purpose:{requirementKey:assetRequirements[0].requirementKey},sourceOfTruth:{source:'current Breakdown'},
+  upstreamSource:{breakdownPlanId},immutable:false,onlyVariable:{allowed:['shot-specific output']},
+  outputSpec:{master:'match M28.7 format strategy'},requiredViews:{views:['required output']},
+  referenceRoles:['STYLE'],forbidden:{rules:['不得改写 Story Fact']},
+  qaGate:{required:['identity/scene continuity','format compliance']},
+  failAction:{action:'BLOCK_AND_REVIEW'},targetPath:'/你好那年夏天/视觉素材/待生产/BLOCKED',
+  budgetGuardrail:{currency:'CNY',maxPerAttempt:20},
+  preflight:{status:'PASS',provider:'test',modelToolVersion:'no-style-support',supportedReferenceRoles:['SCENE']},
+  references:[{assetVersionId:styleVersionId,referenceRole:'STYLE',compatibility:{status:'PASS'},evidence:{source:'style master'}}],
+  evidence:{test:'unsupported reference role becomes blocked'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const blockedCallSheetId=r.body.data.id;
+assert.equal(r.body.data.status,'BLOCKED');
+assert.deepEqual(r.body.data.unsupportedRoles,['STYLE']);
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-requirement-bindings`,{
+  assetRequirementId:assetRequirements[0].id,resolutionType:'CALL_SHEET',callSheetId:blockedCallSheetId,
+  rightsApproval:{status:'APPROVED'},usageScope:{projectId},versionBinding:{exact:true},
+  evidence:{test:'blocked call sheet cannot bind'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_CALL_SHEET_NOT_READY');
+
+// Resolve SC055 missing PERFORMANCE directly with an exact LOCKED asset version.
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-requirement-bindings`,{
+  assetRequirementId:sc055Requirement.id,resolutionType:'CURRENT_ASSET',assetVersionId:perfVersionId,
+  rightsApproval:{status:'APPROVED',scope:'PROJECT'},usageScope:{projectId},
+  versionBinding:{exact:true,versionKey:'PERF-SC055-V1'},
+  evidence:{source:'SC055 performance QA PASS'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+assert.equal(r.body.data.bindingStatus,'READY');
+
+// Every other required requirement gets a READY Call Sheet with a version-pinned STYLE reference.
+for(const req of assetRequirements){
+  if(req.id===sc055Requirement.id)continue;
+  const safeKey=req.requirementKey.replace(/[^A-Za-z0-9_-]/g,'_');
+  r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-call-sheets`,{
+    assetRequirementId:req.id,callSheetKey:`CALL-${safeKey}`,assetType:req.requirementType,
+    purpose:{requirementKey:req.requirementKey,shotId:req.shotId},
+    sourceOfTruth:{source:'M28.5 Shot Asset Requirement',requirementKey:req.requirementKey},
+    upstreamSource:{breakdownPlanId,formatStrategyId:visualFormatStrategyId},
+    immutable:false,onlyVariable:{allowed:['shot-specific output','framing adaptation','micro performance']},
+    outputSpec:{master:'M28.7 master/derivative policy',requirementType:req.requirementType},
+    requiredViews:{views:['primary','continuity-check']},
+    referenceRoles:['STYLE'],forbidden:{rules:['不得改写 Story Fact','不得重做人脸身份','不得跳过资产母版约束']},
+    qaGate:{required:['reference continuity','format compliance','no invented Story Fact']},
+    failAction:{action:'BLOCK_AND_RETRY_OR_HUMAN_REVIEW'},
+    targetPath:`/你好那年夏天/视觉素材/待生产/${safeKey}`,
+    budgetGuardrail:{currency:'CNY',maxPerAttempt:20,maxRetries:3},
+    preflight:{status:'PASS',provider:'test-provider',modelToolVersion:'test-current',supportedReferenceRoles:['STYLE','SCENE','PERFORMANCE','LOOK','IDENTITY']},
+    references:[{assetVersionId:styleVersionId,referenceRole:'STYLE',required:true,compatibility:{status:'PASS'},evidence:{source:'STYLE-LX-V1'}}],
+    evidence:{source:'M28.8 142 requirement coverage'}
+  });
+  assert.equal(r.status,201,JSON.stringify(r.body));
+  assert.equal(r.body.data.status,'READY');
+  const callSheetId=r.body.data.id;
+  r=await request('POST',`/api/runtime/projects/${projectId}/aigc-asset-requirement-bindings`,{
+    assetRequirementId:req.id,resolutionType:'CALL_SHEET',callSheetId,
+    rightsApproval:{status:'APPROVED',scope:'PROJECT'},
+    usageScope:{projectId},versionBinding:{exact:true,referenceVersions:[styleVersionId]},
+    evidence:{source:'M28.8 call sheet coverage'}
+  });
+  assert.equal(r.status,201,JSON.stringify(r.body));
+  assert.equal(r.body.data.bindingStatus,'PLANNED');
+}
+
+r=await request('POST',`/api/runtime/projects/${projectId}/aigc-gates/G-AIGC-ASSET/evaluate`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.requiredRequirementCount,142);
+assert.equal(r.body.data.evidenceSnapshot.currentBindingCount,142);
+assert.equal(r.body.data.evidenceSnapshot.readyAssetRequirementCount,1);
+assert.equal(r.body.data.evidenceSnapshot.plannedCallSheetRequirementCount,141);
+assert.equal(r.body.data.evidenceSnapshot.blockedRequirementCount,0);
+assert.equal(r.body.data.evidenceSnapshot.unboundRequirementCount,0);
+assert.equal(r.body.data.evidenceSnapshot.productionPathReady,true);
+
+r=await request('GET',`/api/runtime/projects/${projectId}/aigc-asset-system`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.frontend.language,'zh-CN');
+assert.equal(r.body.data.frontend.gateName,'资产系统门禁');
+assert.deepEqual(r.body.data.frontend.moduleNames,['资产库','正式资产与版本','资产调用单','参考继承','资产需求绑定']);
+assert.equal(r.body.data.libraries.length,2);
+assert.equal(r.body.data.assets.length,2);
+assert.equal(r.body.data.versions.length,2);
+assert.equal(r.body.data.callSheets.length,142); // 141 READY + 1 historical blocked preflight
+assert.equal(r.body.data.requirementBindings.filter(x=>x.isCurrent).length,142);
+assert.equal(r.body.data.referenceBindings.length,142);
+
+const [[assetTruth]]=await db.execute(
+  `SELECT
+    (SELECT COUNT(*) FROM aigc_asset_requirement_bindings WHERE project_id=? AND is_current=TRUE) current_bindings,
+    (SELECT COUNT(*) FROM aigc_asset_requirement_bindings WHERE project_id=? AND is_current=TRUE AND binding_status='READY') ready_bindings,
+    (SELECT COUNT(*) FROM aigc_asset_requirement_bindings WHERE project_id=? AND is_current=TRUE AND binding_status='PLANNED') planned_bindings,
+    (SELECT COUNT(*) FROM aigc_asset_call_sheets WHERE project_id=? AND status='READY') ready_callsheets,
+    (SELECT COUNT(*) FROM aigc_asset_call_sheets WHERE project_id=? AND status='BLOCKED') blocked_callsheets`,
+  [projectId,projectId,projectId,projectId,projectId]
+);
+assert.equal(Number(assetTruth.current_bindings),142);
+assert.equal(Number(assetTruth.ready_bindings),1);
+assert.equal(Number(assetTruth.planned_bindings),141);
+assert.equal(Number(assetTruth.ready_callsheets),141);
+assert.equal(Number(assetTruth.blocked_callsheets),1);
+
+// M28.9 Image/Keyframe/Storyboard + Generation History.
+r=await request('POST',\`/api/runtime/projects/\${projectId}/aigc-gates/G-AIGC-IMAGE/evaluate\`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.ok(r.body.data.reasonCodes.includes('AIGC_IMAGE_PRODUCTION_PLAN_REQUIRED'));
+
+r=await request('GET',\`/api/runtime/projects/\${projectId}/aigc-breakdown\`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+const imageShots=r.body.data.currentCoverage.shots;
+const imageRequirements=r.body.data.currentCoverage.assetRequirements;
+assert.equal(imageShots.length,71);
+
+r=await request('GET',\`/api/runtime/projects/\${projectId}/aigc-asset-system\`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+const currentBindings=r.body.data.requirementBindings.filter(x=>x.isCurrent);
+assert.equal(currentBindings.length,142);
+const bindingByRequirement=new Map(currentBindings.map(x=>[x.assetRequirementId,x]));
+const requirementsByShot=new Map();
+for(const req of imageRequirements){
+  const arr=requirementsByShot.get(req.shotId)||[];
+  arr.push(req);requirementsByShot.set(req.shotId,arr);
+}
+const parentCallSheetForShot=shotId=>{
+  const reqs=requirementsByShot.get(shotId)||[];
+  const binding=reqs.map(req=>bindingByRequirement.get(req.id)).find(b=>b?.callSheetId);
+  assert.ok(binding?.callSheetId,\`missing parent call sheet for shot \${shotId}\`);
+  return binding.callSheetId;
+};
+
+r=await request('POST',\`/api/runtime/projects/\${projectId}/aigc-image-production-plans\`,{
+  planKey:'LX-IMAGE-PLAN-V1',
+  targetShotIds:imageShots.map(x=>x.id),
+  requiredOutputType:'KEYFRAME',
+  coveragePolicy:{allTargetShotsRequireCurrentCandidate:true,historyPreserved:true},
+  qaPolicy:{dimensions:[
+    'identityLookSceneProp','actionPose','expressionPerformance','gazeBlocking','anatomyHands',
+    'spatialScalePerspective','compositionCamera','lightingColor','textUi','multiFormat','technicalIntegrity'
+  ],overall:'PASS_REQUIRED'},
+  selectionPolicy:{humanSelection:true,restoreAllowed:true,historyImmutable:true},
+  evidence:{source:'M28.9 001—071 keyframe coverage'}
+});
+assert.equal(r.status,201,JSON.stringify(r.body));
+const imagePlanId=r.body.data.id;
+assert.equal(r.body.data.targetShotCount,71);
+
+// Image Gate remains HOLD until every target Shot has a QA PASS current candidate.
+r=await request('POST',\`/api/runtime/projects/\${projectId}/aigc-gates/G-AIGC-IMAGE/evaluate\`,{asOf:'2026-10-07T02:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'HOLD');
+assert.equal(r.body.data.evidenceSnapshot.targetShotCount,71);
+assert.equal(r.body.data.evidenceSnapshot.currentSelectedShotCount,0);
+
+const qaPass={
+  overallStatus:'PASS',
+  identityLookSceneProp:'PASS',actionPose:'PASS',expressionPerformance:'PASS',
+  gazeBlocking:'PASS',anatomyHands:'PASS',spatialScalePerspective:'PASS',
+  compositionCamera:'PASS',lightingColor:'PASS',textUi:'N_A',
+  multiFormat:'PASS',technicalIntegrity:'PASS'
+};
+const qaFail={...qaPass,overallStatus:'FAIL',anatomyHands:'FAIL'};
+const hex64=n=>Number(n).toString(16).padStart(64,'0').slice(-64);
+const supportedRoles=['IDENTITY','LOOK','SCENE','STYLE','COMPOSITION','MOTION','FIRST_FRAME','LAST_FRAME','AUDIO','PERFORMANCE'];
+
+// Required Reference Roles are fail-closed.
+const firstShot=imageShots[0];
+r=await request('POST',\`/api/runtime/projects/\${projectId}/aigc-generation-jobs\`,{
+  imageProductionPlanId:imagePlanId,shotId:firstShot.id,parentCallSheetId:parentCallSheetForShot(firstShot.id),
+  generationKey:'GEN-BAD-REF',generationType:'KEYFRAME',provider:'test-provider',
+  modelName:'test-image-model',modelVersion:'v1',
+  executionStack:{tool:'Image Generation',skill:'AIGC Image',mcp:null},
+  prompt:'测试必需 Reference Role 门禁',negativePrompt:'不得改写 Story Fact',
+  promptVersion:'P1',parameters:{aspect:'1.85:1',resolution:'master-reference'},
+  requestedOutputCount:1,supportedReferenceRoles:['SCENE'],
+  retry:{attempt:1,maxRetries:3},provenance:{source:'M28.9'},
+  evidence:{test:'unsupported reference roles'}
+});
+assert.equal(r.status,409,JSON.stringify(r.body));
+assert.equal(r.body.error,'AIGC_GENERATION_REFERENCE_ROLE_UNSUPPORTED');
+
+const jobIds=[],candidateIdsByShot=new Map();
+for(let i=0;i<imageShots.length;i++){
+  const shot=imageShots[i];
+  const requested=i<2?2:1;
+  r=await request('POST',\`/api/runtime/projects/\${projectId}/aigc-generation-jobs\`,{
+    imageProductionPlanId:imagePlanId,shotId:shot.id,parentCallSheetId:parentCallSheetForShot(shot.id),
+    generationKey:\`GEN-\${shot.shotKey}\`,generationType:'KEYFRAME',provider:'test-provider',
+    modelName:'test-image-model',modelVersion:'2026-10-07-current',
+    executionStack:{tool:'Image Generation',skill:'AIGC Image',mcp:'runtime-record'},
+    prompt:\`按锁定剧本、Shot Spec 与正式 References 生成 \${shot.shotKey} 关键帧\`,
+    negativePrompt:'不得改写 Story Fact；不得重做人脸身份；不得破坏场景空间连续性',
+    promptVersion:'LX-IMAGE-PROMPT-V1',
+    parameters:{aspect:'1.85:1',resolution:'master-reference',seed:i+1,camera:'shot-spec'},
+    requestedOutputCount:requested,supportedReferenceRoles:supportedRoles,
+    retry:{attempt:1,maxRetries:3},provenance:{project:'你好，那年夏天',shotKey:shot.shotKey},
+    evidence:{source:'M28.9 structural generation validation'}
+  });
+  assert.equal(r.status,201,JSON.stringify(r.body));
+  const jobId=r.body.data.id;jobIds.push(jobId);
+  assert.equal(r.body.data.status,'RUNNING');
+  assert.equal(r.body.data.preflight.status,'PASS');
+
+  const candidates=[];
+  for(let k=0;k<requested;k++){
+    const fail=i===1&&k===0;
+    candidates.push({
+      candidateKey:\`CAND-\${shot.shotKey}-\${k+1}\`,candidateType:'KEYFRAME',
+      contentLocator:{provider:'TEST_OUTPUT',ref:\`image://\${shot.shotKey}/candidate-\${k+1}\`},
+      outputFingerprintSha256:hex64((i+1)*100+k+1),
+      qaResult:fail?qaFail:qaPass,compareGroup:\`CMP-\${shot.shotKey}\`,
+      humanComment:fail?'手部技术完整性失败':'结构化 QA 已完成',
+      provenance:{generationKey:\`GEN-\${shot.shotKey}\`,candidate:k+1},
+      evidence:{qa:'M28.9 image matrix'}
+    });
+  }
+  r=await request('POST',\`/api/runtime/aigc-generation-jobs/\${jobId}/complete\`,{
+    candidates,endedAt:'2026-10-07T03:00:00Z',latencyMs:1200+i,
+    tokenUsage:{input:0,output:0},creditUsage:{credits:1},cost:{currency:'CNY',amount:1.5},
+    safety:{status:'PASS',moderation:'PASS'},provenance:{provider:'test-provider',modelVersion:'2026-10-07-current'},
+    evidence:{status:'generation-complete'}
+  });
+  assert.equal(r.status,200,JSON.stringify(r.body));
+  assert.equal(r.body.data.status,'SUCCEEDED');
+  candidateIdsByShot.set(shot.id,r.body.data.candidateIds);
+
+  const ids=r.body.data.candidateIds;
+  if(i===0){
+    // Select A -> Select B -> Restore A -> Lock A. History is appended, never overwritten.
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[0]}/selection\`,{
+      eventType:'SELECT',reason:'初选 A',humanComment:'第一轮选择',evidence:{step:1}
+    });assert.equal(r.status,200,JSON.stringify(r.body));
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[1]}/selection\`,{
+      eventType:'SELECT',reason:'比较后切换 B',humanComment:'对比候选',evidence:{step:2}
+    });assert.equal(r.status,200,JSON.stringify(r.body));
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[0]}/selection\`,{
+      eventType:'RESTORE',reason:'恢复旧候选 A 为当前',humanComment:'保留全部历史',evidence:{step:3}
+    });assert.equal(r.status,200,JSON.stringify(r.body));
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[0]}/selection\`,{
+      eventType:'LOCK',reason:'正式关键帧锁定',humanComment:'允许进入视频 Reference',evidence:{step:4}
+    });assert.equal(r.status,200,JSON.stringify(r.body));
+    assert.equal(r.body.data.state,'LOCKED');
+  }else if(i===1){
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[0]}/selection\`,{
+      eventType:'SELECT',reason:'错误测试：QA FAIL 不得入选',evidence:{test:true}
+    });
+    assert.equal(r.status,409,JSON.stringify(r.body));
+    assert.equal(r.body.error,'AIGC_CANDIDATE_QA_PASS_REQUIRED');
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[1]}/selection\`,{
+      eventType:'SELECT',reason:'选择 QA PASS 候选',evidence:{selected:true}
+    });assert.equal(r.status,200,JSON.stringify(r.body));
+  }else{
+    r=await request('POST',\`/api/runtime/aigc-generation-candidates/\${ids[0]}/selection\`,{
+      eventType:'SELECT',reason:'选择 QA PASS 当前关键帧',evidence:{selected:true}
+    });
+    assert.equal(r.status,200,JSON.stringify(r.body));
+  }
+}
+
+assert.equal(jobIds.length,71);
+
+// All 71 targets now have a QA PASS current candidate; the formal keyframe is eligible as video reference.
+r=await request('POST',\`/api/runtime/projects/\${projectId}/aigc-gates/G-AIGC-IMAGE/evaluate\`,{asOf:'2026-10-07T04:00:00Z'});
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.status,'PASS',JSON.stringify(r.body));
+assert.equal(r.body.data.evidenceSnapshot.targetShotCount,71);
+assert.equal(r.body.data.evidenceSnapshot.currentSelectedShotCount,71);
+assert.equal(r.body.data.evidenceSnapshot.videoReferenceReadyShotCount,71);
+assert.equal(r.body.data.evidenceSnapshot.lockedShotCount,1);
+assert.equal(r.body.data.evidenceSnapshot.selectedShotCount,70);
+
+r=await request('GET',\`/api/runtime/projects/\${projectId}/aigc-image-production\`);
+assert.equal(r.status,200,JSON.stringify(r.body));
+assert.equal(r.body.data.frontend.language,'zh-CN');
+assert.equal(r.body.data.frontend.gateName,'图像生产门禁');
+assert.deepEqual(r.body.data.frontend.moduleNames,['生成任务','生成候选与历史','图像 / 关键帧 / 分镜生产','图像质量验证']);
+assert.equal(r.body.data.plans.length,1);
+assert.equal(r.body.data.jobs.length,71);
+assert.equal(r.body.data.jobs.every(x=>x.status==='SUCCEEDED'),true);
+assert.equal(r.body.data.candidates.length,73);
+assert.equal(r.body.data.candidates.filter(x=>x.isCurrent).length,71);
+assert.equal(r.body.data.candidates.filter(x=>x.state==='LOCKED').length,1);
+assert.equal(r.body.data.selectionEvents.length,74);
+const firstShotHistory=r.body.data.selectionEvents.filter(x=>x.shotId===firstShot.id);
+assert.deepEqual(firstShotHistory.map(x=>x.eventType),['SELECT','SELECT','RESTORE','LOCK']);
+
+const [[imageTruth]]=await db.execute(
+  \`SELECT
+    (SELECT COUNT(*) FROM aigc_generation_jobs WHERE project_id=? AND status='SUCCEEDED') jobs,
+    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE project_id=?) candidates,
+    (SELECT COUNT(*) FROM aigc_generation_candidates WHERE project_id=? AND is_current=TRUE AND qa_status='PASS') current_pass,
+    (SELECT COUNT(*) FROM aigc_candidate_selection_events WHERE project_id=? AND event_type='RESTORE') restores,
+    (SELECT COUNT(*) FROM aigc_candidate_selection_events WHERE project_id=? AND event_type='LOCK') locks,
+    (SELECT COUNT(*) FROM aigc_trace_links WHERE project_id=? AND source_type='SHOT' AND target_type='GENERATION_JOB') shot_to_generation\`,
+  [projectId,projectId,projectId,projectId,projectId,projectId]
+);
+assert.equal(Number(imageTruth.jobs),71);
+assert.equal(Number(imageTruth.candidates),73);
+assert.equal(Number(imageTruth.current_pass),71);
+assert.equal(Number(imageTruth.restores),1);
+assert.equal(Number(imageTruth.locks),1);
+assert.equal(Number(imageTruth.shot_to_generation),71);
+
+await db.end();
+
+console.log('M28_9_AIGC_IMAGE_GENERATION_PASS');
