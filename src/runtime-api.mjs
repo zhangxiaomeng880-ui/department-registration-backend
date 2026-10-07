@@ -177,6 +177,11 @@ import {
   createProductDevelopmentE2eCertification,evaluateProductDevelopmentFinalGate,
   getProductDevelopmentFinalState,resolveProductFinalScope
 } from './product-domain-e2e-exit.mjs';
+import {
+  listAigcModules,listAigcUiLabels,createAigcInitialization,createAigcMarketBenchmark,
+  createAigcCreativeReference,createAigcModelToolBenchmark,createAigcCreativeHypothesis,
+  createAigcProductionPlan,evaluateAigcFoundationGate,getAigcFoundationState,resolveAigcProjectScope
+} from './aigc-foundation.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1439,6 +1444,16 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/runtime/aigc-modules') {
+    json(res,200,{data:await listAigcModules()});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/aigc-ui-labels') {
+    json(res,200,{data:await listAigcUiLabels()});
+    return true;
+  }
+
   const productEngineeringDomainMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-engineering-domain$/);
   if (req.method === 'GET' && productEngineeringDomainMatch) {
     const projectId=productEngineeringDomainMatch[1];
@@ -1524,6 +1539,52 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:read',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await getProductDevelopmentFinalState(projectId)});
+    return true;
+  }
+
+  const aigcFoundationMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-foundation$/);
+  if (req.method === 'GET' && aigcFoundationMatch) {
+    const projectId=aigcFoundationMatch[1];
+    const scope=await resolveAigcProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcFoundationState(projectId)});
+    return true;
+  }
+
+  const aigcCreateRoutes=[
+    ['aigc-initializations',createAigcInitialization],
+    ['aigc-market-benchmarks',createAigcMarketBenchmark],
+    ['aigc-creative-references',createAigcCreativeReference],
+    ['aigc-model-tool-benchmarks',createAigcModelToolBenchmark],
+    ['aigc-creative-hypotheses',createAigcCreativeHypothesis],
+    ['aigc-production-plans',createAigcProductionPlan]
+  ];
+  for(const [segment,handler] of aigcCreateRoutes){
+    const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
+    if(req.method==='POST'&&m){
+      const projectId=m[1];
+      const scope=await resolveAigcProjectScope(projectId);
+      if(!principal?.platformAdmin) await assertAccess({
+        principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+      });
+      json(res,201,{data:await handler(projectId,await readBody(req),principal?.identityId||null)});
+      return true;
+    }
+  }
+
+  const aigcGateMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-gates\/([^/]+)\/evaluate$/);
+  if (req.method === 'POST' && aigcGateMatch) {
+    const projectId=aigcGateMatch[1];
+    const gateKey=decodeURIComponent(aigcGateMatch[2]);
+    const scope=await resolveAigcProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await evaluateAigcFoundationGate(
+      projectId,gateKey,await readBody(req),principal?.identityId||null
+    )});
     return true;
   }
 
