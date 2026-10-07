@@ -22,8 +22,15 @@ VALUES
   ('EXPERIMENT_TYPE','CREATIVE','创意实验','ACTIVE'),
   ('EXPERIMENT_STATUS','CANDIDATE','候选实验','ACTIVE'),
   ('EXPERIMENT_STATUS','REVIEW_REQUIRED','待复盘 / 人工评审','ACTIVE'),
+  ('DATA_QUALITY','PASS','数据质量通过','ACTIVE'),
+  ('DATA_QUALITY','WARN','数据质量警告','ACTIVE'),
+  ('DATA_QUALITY','FAIL','数据质量失败','ACTIVE'),
   ('FEEDBACK_TYPE','QUANTITATIVE','定量反馈','ACTIVE'),
-  ('FEEDBACK_TYPE','QUALITATIVE','定性反馈','ACTIVE')
+  ('FEEDBACK_TYPE','QUALITATIVE','定性反馈','ACTIVE'),
+  ('FEEDBACK_SEVERITY','LOW','低','ACTIVE'),
+  ('FEEDBACK_SEVERITY','MEDIUM','中','ACTIVE'),
+  ('FEEDBACK_SEVERITY','HIGH','高','ACTIVE'),
+  ('FEEDBACK_SEVERITY','CRITICAL','严重','ACTIVE')
 ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),status='ACTIVE';
 
 CREATE TABLE IF NOT EXISTS aigc_performance_snapshots (
@@ -37,6 +44,9 @@ CREATE TABLE IF NOT EXISTS aigc_performance_snapshots (
   window_start TIMESTAMP(6) NOT NULL,
   window_end TIMESTAMP(6) NOT NULL,
   metrics_json JSON NOT NULL,
+  sample_size BIGINT NOT NULL,
+  data_quality_status VARCHAR(16) NOT NULL,
+  data_quality_json JSON NOT NULL,
   source_json JSON NOT NULL,
   confidence VARCHAR(16) NOT NULL,
   limitations_json JSON NOT NULL,
@@ -48,7 +58,8 @@ CREATE TABLE IF NOT EXISTS aigc_performance_snapshots (
   CONSTRAINT fk_m2815_perf_publication FOREIGN KEY (publication_record_id) REFERENCES aigc_publication_records(id),
   CONSTRAINT fk_m2815_perf_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m2815_perf_key (project_id,snapshot_key),
-  INDEX idx_m2815_perf_window (project_id,platform_key,window_end,observed_at)
+  INDEX idx_m2815_perf_window (project_id,platform_key,window_end,observed_at),
+  INDEX idx_m2815_perf_quality (project_id,data_quality_status,window_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS aigc_production_metric_snapshots (
@@ -74,10 +85,13 @@ CREATE TABLE IF NOT EXISTS aigc_feedback_signals (
   signal_key VARCHAR(200) NOT NULL,
   feedback_type VARCHAR(24) NOT NULL,
   subject VARCHAR(255) NOT NULL,
+  severity VARCHAR(16) NOT NULL,
   signal_json JSON NOT NULL,
   source_json JSON NOT NULL,
   confidence VARCHAR(16) NOT NULL,
   limitation_json JSON NOT NULL,
+  recommended_scope VARCHAR(24) NULL,
+  story_rule_change_requested BOOLEAN NOT NULL DEFAULT FALSE,
   evidence_json JSON NOT NULL,
   created_by_identity_id CHAR(36) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -85,7 +99,8 @@ CREATE TABLE IF NOT EXISTS aigc_feedback_signals (
   CONSTRAINT fk_m2815_feedback_perf FOREIGN KEY (performance_snapshot_id) REFERENCES aigc_performance_snapshots(id),
   CONSTRAINT fk_m2815_feedback_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m2815_feedback_key (project_id,signal_key),
-  INDEX idx_m2815_feedback_subject (project_id,feedback_type,subject,created_at)
+  INDEX idx_m2815_feedback_subject (project_id,feedback_type,subject,created_at),
+  INDEX idx_m2815_feedback_severity (project_id,severity,created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS aigc_experiment_candidates (
