@@ -15,7 +15,7 @@ WHERE project_type_key IN ('PRODUCT_DEVELOPMENT','AIGC_CONTENT');
 UPDATE project_subtype_registry
 SET display_name=CASE subtype_key
   WHEN 'FRONTEND_PROTOTYPE' THEN '前端原型'
-  WHEN 'FULL_STACK_WEB' THEN '全栈 Web'
+  WHEN 'FULL_STACK_WEB' THEN '全栈 Web 应用'
   WHEN 'MOBILE_APP' THEN '移动应用'
   WHEN 'BACKEND_API_SERVICE' THEN '后端 API 服务'
   WHEN 'SAAS_PLATFORM' THEN 'SaaS 平台'
