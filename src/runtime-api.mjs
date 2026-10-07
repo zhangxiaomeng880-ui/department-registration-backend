@@ -248,6 +248,12 @@ import {
   createAigcExperimentCandidate,createAigcFeedbackSignal,evaluateAigcPerformanceGate,
   getAigcPerformanceState,resolveAigcPerformanceProjectScope
 } from './aigc-performance-experiment.mjs';
+import {
+  createAigcReviewCycle,createAigcKnowledgeRecord,createAigcImprovementItem,
+  createAigcNextVersionProposal,decideAigcNextVersionProposal,createAigcArchivePackage,
+  evaluateAigcReviewGate,freezeAigcReviewCycle,getAigcReviewState,
+  resolveAigcReviewProjectScope,resolveAigcReviewScope,resolveAigcProposalScope
+} from './aigc-review-archive.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1904,6 +1910,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcReviewMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-review$/);
+  if (req.method === 'GET' && aigcReviewMatch) {
+    const projectId=aigcReviewMatch[1];
+    const scope=await resolveAigcReviewProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcReviewState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1935,7 +1952,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-performance-observations',createAigcPerformanceObservation],
     ['aigc-production-metric-snapshots',createAigcProductionMetricSnapshot],
     ['aigc-experiment-candidates',createAigcExperimentCandidate],
-    ['aigc-feedback-signals',createAigcFeedbackSignal]
+    ['aigc-feedback-signals',createAigcFeedbackSignal],
+    ['aigc-review-cycles',createAigcReviewCycle]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1981,7 +1999,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
                         ?await evaluateAigcPublishGate(projectId,body,principal?.identityId||null)
                         :gateKey==='G-AIGC-PERFORMANCE'
                           ?await evaluateAigcPerformanceGate(projectId,body,principal?.identityId||null)
-                          :[
+                          :gateKey==='G-AIGC-REVIEW'
+                            ?await evaluateAigcReviewGate(projectId,body,principal?.identityId||null)
+                            :[
                         'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
                         'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
                       ].includes(gateKey)
@@ -2078,6 +2098,50 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
   }
 
 
+
+
+  const reviewKnowledgeMatch=match(url.pathname,/^\/api\/runtime\/aigc-review-cycles\/([^/]+)\/knowledge$/);
+  if (req.method === 'POST' && reviewKnowledgeMatch) {
+    const reviewId=reviewKnowledgeMatch[1],scope=await resolveAigcReviewScope(reviewId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createAigcKnowledgeRecord(reviewId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+  const reviewBacklogMatch=match(url.pathname,/^\/api\/runtime\/aigc-review-cycles\/([^/]+)\/improvements$/);
+  if (req.method === 'POST' && reviewBacklogMatch) {
+    const reviewId=reviewBacklogMatch[1],scope=await resolveAigcReviewScope(reviewId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createAigcImprovementItem(reviewId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+  const reviewProposalMatch=match(url.pathname,/^\/api\/runtime\/aigc-review-cycles\/([^/]+)\/next-version-proposals$/);
+  if (req.method === 'POST' && reviewProposalMatch) {
+    const reviewId=reviewProposalMatch[1],scope=await resolveAigcReviewScope(reviewId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createAigcNextVersionProposal(reviewId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+  const proposalDecisionMatch=match(url.pathname,/^\/api\/runtime\/aigc-next-version-proposals\/([^/]+)\/decide$/);
+  if (req.method === 'POST' && proposalDecisionMatch) {
+    const proposalId=proposalDecisionMatch[1],scope=await resolveAigcProposalScope(proposalId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await decideAigcNextVersionProposal(proposalId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+  const reviewArchiveMatch=match(url.pathname,/^\/api\/runtime\/aigc-review-cycles\/([^/]+)\/archive-packages$/);
+  if (req.method === 'POST' && reviewArchiveMatch) {
+    const reviewId=reviewArchiveMatch[1],scope=await resolveAigcReviewScope(reviewId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createAigcArchivePackage(reviewId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+  const reviewFreezeMatch=match(url.pathname,/^\/api\/runtime\/aigc-review-cycles\/([^/]+)\/freeze$/);
+  if (req.method === 'POST' && reviewFreezeMatch) {
+    const reviewId=reviewFreezeMatch[1],scope=await resolveAigcReviewScope(reviewId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'project:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await freezeAigcReviewCycle(reviewId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
 
   const releaseItemApproveMatch=match(url.pathname,/^\/api\/runtime\/aigc-release-plan-items\/([^/]+)\/approve$/);
   if (req.method === 'POST' && releaseItemApproveMatch) {
