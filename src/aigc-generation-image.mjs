@@ -28,6 +28,8 @@ const QA_DIMENSIONS_BY_KIND={
   MUSIC:AUDIO_QA_DIMENSIONS,SFX:AUDIO_QA_DIMENSIONS
 };
 const qaDimensionsForKind=kind=>QA_DIMENSIONS_BY_KIND[upper(kind)]||IMAGE_QA_DIMENSIONS;
+export const getAigcQaDimensions=kind=>[...qaDimensionsForKind(kind)];
+
 
 const errorOf=(message,code,statusCode=400,details)=>{
   const e=new Error(message);e.code=code;e.statusCode=statusCode;if(details)e.details=details;return e;
@@ -69,6 +71,8 @@ const validateSha=(value,field)=>{
   if(!SHA64.test(String(value||'')))throw errorOf(field+' must be SHA-256','AIGC_GENERATION_SHA_INVALID',409,{field});
 };
 const qaPass=(qa,kind)=>qaDimensionsForKind(kind).every(key=>['PASS','N_A'].includes(upper(qa?.[key])));
+export const isAigcCandidateQaPass=(qa,kind)=>qaPass(qa,kind);
+
 const validateQa=(qa,kind)=>{
   if(!qa||typeof qa!=='object')throw errorOf('Candidate QA is required','AIGC_CANDIDATE_QA_REQUIRED',409);
   const missing=qaDimensionsForKind(kind).filter(key=>!['PASS','N_A','FAIL'].includes(upper(qa[key])));
@@ -343,8 +347,12 @@ export const selectAigcGenerationCandidate=async(candidateId,input={},actorId=nu
   try{
     await conn.beginTransaction();
     const [currentRows]=await conn.execute(
-      "SELECT * FROM aigc_generation_candidates WHERE shot_id=? AND is_current=TRUE LIMIT 1 FOR UPDATE",
-      [candidate.shot_id]
+      `SELECT c.*
+         FROM aigc_generation_candidates c
+         JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
+        WHERE c.shot_id=? AND c.is_current=TRUE AND j.generation_kind=?
+        LIMIT 1 FOR UPDATE`,
+      [candidate.shot_id,candidate.generation_kind]
     );
     const current=currentRows[0]||null;
     if(current?.id===candidateId){
