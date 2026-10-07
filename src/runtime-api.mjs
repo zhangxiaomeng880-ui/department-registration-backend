@@ -276,6 +276,9 @@ import {
   createM29AnalyticsSnapshot,bindM29EvalBenchmark,evaluateM29AnalyticsEvalGate,
   getM29AnalyticsEvalState,resolveM29AnalyticsProjectScope
 } from './m29-analytics-eval-benchmark.mjs';
+import {
+  createM29RealLoopAttestation,evaluateM29FinalGate,getM29FinalState,resolveM29FinalProjectScope
+} from './m29-final-gate.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2009,6 +2012,28 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m29RealLoopAttestationMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/m29-real-loop-attestations$/);
+  if (req.method === 'POST' && m29RealLoopAttestationMatch) {
+    const projectId=m29RealLoopAttestationMatch[1],scope=await resolveM29FinalProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createM29RealLoopAttestation(projectId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/m29-gates/G-M29-FINAL/evaluate') {
+    if(!principal?.platformAdmin) throw Object.assign(new Error('Platform admin required'),{code:'PLATFORM_ADMIN_REQUIRED',statusCode:403});
+    json(res,200,{data:await evaluateM29FinalGate(await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/m29-final') {
+    if(!principal?.platformAdmin) throw Object.assign(new Error('Platform admin required'),{code:'PLATFORM_ADMIN_REQUIRED',statusCode:403});
+    json(res,200,{data:await getM29FinalState()});
     return true;
   }
 

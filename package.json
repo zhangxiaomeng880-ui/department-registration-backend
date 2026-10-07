@@ -80,7 +80,8 @@
     "validate:m29-data-detection": "node test/m29-data-detection.test.mjs",
     "validate:m29-decision-self-loop": "node test/m29-decision-self-loop.test.mjs",
     "validate:m29-automation-intake": "node test/m29-automation-intake.test.mjs",
-    "validate:m29-analytics-eval": "node test/m29-analytics-eval-benchmark.test.mjs"
+    "validate:m29-analytics-eval": "node test/m29-analytics-eval-benchmark.test.mjs",
+    "validate:m29-final-gate": "node test/m29-final-gate.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
