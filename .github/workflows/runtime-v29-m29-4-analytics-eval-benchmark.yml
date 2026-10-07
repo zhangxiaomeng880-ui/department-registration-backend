@@ -73,6 +73,10 @@ jobs:
           OPENAI_MODEL: test-model
           OPENAI_BASE_URL: http://127.0.0.1:4010/v1
           OPENAI_TIMEOUT_MS: 10000
+          GITHUB_OIDC_AUDIENCE: ai-native-runtime-staging-bridge
+          GITHUB_OIDC_EXPECTED_REPOSITORY: zhangxiaomeng880-ui/department-registration-backend
+          GITHUB_OIDC_EXPECTED_REF: refs/heads/feat/ai-native-runtime-v2.9-m29.4-analytics-eval-benchmark
+          GITHUB_OIDC_EXPECTED_WORKFLOW_REF: zhangxiaomeng880-ui/department-registration-backend/.github/workflows/runtime-v29-m29-4-analytics-eval-benchmark.yml@refs/heads/feat/ai-native-runtime-v2.9-m29.4-analytics-eval-benchmark
         run: |
           node test/mock-openai-responses-server.mjs > /tmp/m294-mock-openai.log 2>&1 &
           MOCK_PID=$!
@@ -94,8 +98,27 @@ jobs:
           npm run validate:eval-regression-gate
           npm run validate:shadow-eval
           npm run validate:eval-reliability
+          npm run validate:capability-runtime
           npm run validate:m27-product-development-freeze
+          npm run validate:aigc-foundation
+          npm run validate:novel-skill-binding
+          npm run validate:native-trigger-capability-version
+          npm run validate:bridge-executor-reliability
+          npm run validate:github-oidc-executor-receipt
+          npm run validate:aigc-story-script
+          npm run validate:aigc-breakdown
+          npm run validate:aigc-format-strategy
+          npm run validate:aigc-asset-system
+          npm run validate:aigc-generation-image
+          npm run validate:aigc-video-audio-production
+          npm run validate:aigc-edit-timeline
+          npm run validate:aigc-master-acceptance
+          npm run validate:aigc-distribution-package
+          npm run validate:aigc-release-publishing
+          npm run validate:aigc-performance-experiment
+          npm run validate:aigc-review-archive
           npm run validate:aigc-domain-final
+          npm run validate:product-outcome
           npm run validate:m29-data-detection
           npm run validate:m29-decision-self-loop
           npm run validate:m29-automation-intake
