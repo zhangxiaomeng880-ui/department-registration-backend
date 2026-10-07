@@ -72,8 +72,8 @@ jobs:
           OPENAI_TIMEOUT_MS: 10000
           GITHUB_OIDC_AUDIENCE: ai-native-runtime-staging-bridge
           GITHUB_OIDC_EXPECTED_REPOSITORY: zhangxiaomeng880-ui/department-registration-backend
-          GITHUB_OIDC_EXPECTED_REF: refs/heads/feat/ai-native-runtime-v2.8-m28.8-asset-system
-          GITHUB_OIDC_EXPECTED_WORKFLOW_REF: zhangxiaomeng880-ui/department-registration-backend/.github/workflows/runtime-v28-m28-9-generation-image.yml@refs/heads/feat/ai-native-runtime-v2.8-m28.8-asset-system
+          GITHUB_OIDC_EXPECTED_REF: refs/heads/feat/ai-native-runtime-v2.8-m28.9-generation-image
+          GITHUB_OIDC_EXPECTED_WORKFLOW_REF: zhangxiaomeng880-ui/department-registration-backend/.github/workflows/runtime-v28-m28-9-generation-image.yml@refs/heads/feat/ai-native-runtime-v2.8-m28.9-generation-image
         run: |
           node test/mock-openai-responses-server.mjs > /tmp/m289-mock-openai.log 2>&1 &
           MOCK_PID=$!
