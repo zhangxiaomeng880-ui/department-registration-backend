@@ -302,6 +302,9 @@ import {
 import {
   globalWorkspaceSearch,getWorkspaceAuditEvidence,evaluateM30SearchAuditGate,getM30SearchAuditState
 } from './m30-search-audit-evidence.mjs';
+import {
+  evaluateM30FinalGate,getM30FinalState
+} from './m30-final-gate.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2035,6 +2038,18 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/runtime/m30-gates/G-M30-FINAL/evaluate') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await evaluateM30FinalGate(await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/m30-final') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await getM30FinalState()});
     return true;
   }
 
