@@ -60,6 +60,7 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-performance-snap
   region:pub.region,language:pub.language,
   windowStart:'2026-10-08T03:00:00Z',windowEnd:'2026-10-08T04:00:00Z',
   metrics:{entry:100,retention3s:0.8},
+  sampleSize:100,dataQualityStatus:'PASS',dataQuality:{coverage:'PASS'},
   source:{provider:'CI_ANALYTICS',token:'forbidden'},
   confidence:'HIGH',limitations:{test:true},evidence:{test:true},
   observedAt:'2026-10-08T04:05:00Z'
@@ -76,6 +77,8 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-performance-snap
     watchTimeSeconds:18600,likeCount:88,commentCount:21,saveCount:35,shareCount:17,
     followCount:12,profileVisits:49,ctaConversions:6
   },
+  sampleSize:1000,dataQualityStatus:'PASS',
+  dataQuality:{coverage:'PASS',freshness:'PASS',classification:'CI_STRUCTURAL_FIXTURE'},
   source:{provider:'CI_ANALYTICS_RECEIPT',receiptId:'m2815-perf-01',externalFetch:false},
   confidence:'HIGH',limitations:{sample:'CI structural fixture; not real audience data'},
   evidence:{source:'M28.15 performance contract validation'},
@@ -101,7 +104,9 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-feedback-signals
   feedbackType:'QUALITATIVE',subject:'hook',
   signal:{theme:'前5秒情绪进入速度',observation:'保留当前母内容，仅测试不同开场切片'},
   source:{provider:'CI_REVIEW',receiptId:'feedback-01'},confidence:'MEDIUM',
-  limitation:{notRepresentativeOfPopulation:true},evidence:{test:true}
+  severity:'MEDIUM',recommendedScope:'CREATIVE',storyRuleChangeRequested:false,
+  limitation:{notRepresentativeOfPopulation:true},collectedAt:'2026-10-08T08:06:00Z',
+  evidence:{test:true}
 });
 assert.equal(r.status,201,JSON.stringify(r.body));
 const feedbackId=r.body.data.id;
@@ -154,7 +159,7 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-experiment-candi
   guardrails:{currentStoryFact:'IMMUTABLE',currentScript:'IMMUTABLE'},
   storyRuleEscalation:{
     requested:true,reason:'Only propose for Stage 14 review; do not change current story',
-    reviewGate:'G-AIGC-REVIEW',applied:false
+    reviewGate:'G-AIGC-REVIEW',humanGateRequired:true,applied:false
   },
   evidence:{source:'M28.15 review-required escalation validation'}
 });
@@ -176,6 +181,9 @@ assert.equal(r.body.data.evidenceSnapshot.distributionExperimentCount,1);
 assert.equal(r.body.data.evidenceSnapshot.creativeExperimentCount,1);
 assert.equal(r.body.data.evidenceSnapshot.reviewRequiredStoryEscalationCount,1);
 assert.equal(r.body.data.evidenceSnapshot.storyRuleAppliedCount,0);
+assert.equal(r.body.data.evidenceSnapshot.storyRuleAutoMutationExecuted,false);
+assert.equal(r.body.data.evidenceSnapshot.coveredPublicationCount,r.body.data.evidenceSnapshot.verifiedPublicationCount);
+assert.deepEqual(r.body.data.evidenceSnapshot.dataQualityFailSnapshotIds,[]);
 assert.equal(r.body.data.evidenceSnapshot.readyForReviewAndKnowledge,true);
 
 r=await request('GET',`/api/runtime/projects/${projectId}/aigc-performance-feedback`);
@@ -185,8 +193,12 @@ assert.equal(r.body.data.frontend.gateName,'表现 / 实验 / 反馈门禁');
 assert.deepEqual(r.body.data.frontend.moduleNames,['表现数据快照','生产效率指标','实验候选','反馈信号']);
 assert.match(r.body.data.frontend.storyRulePolicy,/Story Rule.*人工门禁/);
 assert.equal(r.body.data.performanceSnapshots.length,1);
+assert.equal(r.body.data.performanceSnapshots[0].sampleSize,1000);
+assert.equal(r.body.data.performanceSnapshots[0].dataQualityStatus,'PASS');
 assert.equal(r.body.data.productionMetricSnapshots.length,1);
 assert.equal(r.body.data.feedbackSignals.length,1);
+assert.equal(r.body.data.feedbackSignals[0].severity,'MEDIUM');
+assert.equal(r.body.data.feedbackSignals[0].recommendedScope,'CREATIVE');
 assert.equal(r.body.data.experimentCandidates.length,2);
 assert.equal(
   r.body.data.experimentCandidates.find(x=>x.experimentKey==='M2815-CREATIVE-REVIEW-01').storyRuleEscalation.applied,
