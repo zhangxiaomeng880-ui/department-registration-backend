@@ -16,6 +16,66 @@ const actorOf=principal=>({
   credentialId:principal?.credentialId||null,
   identityId:principal?.identityId||null
 });
+const NOVEL_SKILL_KEY='SKILL:NOVEL_CONTINUOUS_UPDATE';
+const novelOutputKeys=new Set([
+  'status','updatedChapters','reusedPassChapters','gateStatus',
+  'checkpointPath','resumePoint','blockingReason'
+]);
+const validateBridgeEvidence=value=>{
+  if(value==null)return null;
+  const encoded=JSON.stringify(value);
+  if(encoded.length>16384)throw errorOf(
+    'Bridge evidence is too large','BRIDGE_EVIDENCE_TOO_LARGE',400
+  );
+  const walk=node=>{
+    if(!node||typeof node!=='object')return;
+    for(const [key,child] of Object.entries(node)){
+      if(/(?:^|_)(?:content|body|text|raw|source_body|chapter_text)(?:$|_)/i.test(key)){
+        throw errorOf(
+          'Bridge evidence must not contain source bodies or generated prose',
+          'BRIDGE_SOURCE_BODY_NOT_ALLOWED',400,{field:key}
+        );
+      }
+      walk(child);
+    }
+  };
+  walk(value);
+  return value;
+};
+const validateBridgeOutput=(row,value)=>{
+  const output=value||{};
+  const request=parseJson(row.request_json)||{};
+  if(request.capabilityKey!==NOVEL_SKILL_KEY)return output;
+  if(!output||typeof output!=='object'||Array.isArray(output))throw errorOf(
+    'Novel bridge output must be an object','BRIDGE_OUTPUT_CONTRACT_VIOLATION',400
+  );
+  const unknown=Object.keys(output).filter(key=>!novelOutputKeys.has(key));
+  if(unknown.length)throw errorOf(
+    'Novel bridge output contains fields outside the status-only contract',
+    'BRIDGE_SOURCE_BODY_NOT_ALLOWED',400,{fields:unknown}
+  );
+  for(const key of ['status','gateStatus','checkpointPath']){
+    if(typeof output[key]!=='string'||!output[key].trim())throw errorOf(
+      'Novel bridge output is missing required status metadata',
+      'BRIDGE_OUTPUT_CONTRACT_VIOLATION',400,{field:key}
+    );
+  }
+  for(const key of ['updatedChapters','reusedPassChapters']){
+    if(output[key]!=null&&(!Array.isArray(output[key])||output[key].some(x=>typeof x!=='string'))){
+      throw errorOf('Novel bridge chapter lists must contain strings','BRIDGE_OUTPUT_CONTRACT_VIOLATION',400,{field:key});
+    }
+  }
+  return {
+    status:output.status,
+    updatedChapters:output.updatedChapters||[],
+    reusedPassChapters:output.reusedPassChapters||[],
+    gateStatus:output.gateStatus,
+    checkpointPath:output.checkpointPath,
+    resumePoint:output.resumePoint??null,
+    blockingReason:output.blockingReason??null
+  };
+};
+
 const normalize=row=>row?({
   id:row.id,
   triggerFireId:row.trigger_fire_id,
@@ -227,9 +287,11 @@ export const completeBridgeDispatch=async(dispatchId,input,principal)=>{
   }
   conn.release();
 
+  const safeOutput=validateBridgeOutput(row,input?.output||null);
+  const safeEvidence=validateBridgeEvidence(input?.evidence||null);
   const completed=await completeDirectCapabilityInvocation(row.capability_invocation_id,{
-    status:'PASS',output:input?.output||null,evidence:{
-      ...(input?.evidence||{}),
+    status:'PASS',output:safeOutput,evidence:{
+      ...(safeEvidence||{}),
       bridgeExecutor:{
         credentialId:principal?.credentialId||null,
         identityId:principal?.identityId||null
@@ -251,7 +313,7 @@ export const completeBridgeDispatch=async(dispatchId,input,principal)=>{
           SET status='COMPLETED',response_evidence_json=?,completed_at=CURRENT_TIMESTAMP(6),
               lease_expires_at=NULL,last_error_code=NULL,last_error_message=NULL
         WHERE id=?`,
-      [asJson(input?.evidence||null),dispatchId]
+      [asJson(safeEvidence||null),dispatchId]
     );
     row=await selectDispatch(conn2,dispatchId,true);
     await event(conn2,row,'COMPLETED',principal,{});
@@ -259,7 +321,7 @@ export const completeBridgeDispatch=async(dispatchId,input,principal)=>{
       `UPDATE trigger_fires
           SET status='PASS',result_json=?,error_code=NULL,error_message=NULL,finished_at=CURRENT_TIMESTAMP(6)
         WHERE id=?`,
-      [asJson(input?.output||null),row.fire_id]
+      [asJson(safeOutput),row.fire_id]
     );
     await conn2.commit();
   }catch(error){
@@ -267,7 +329,7 @@ export const completeBridgeDispatch=async(dispatchId,input,principal)=>{
     throw error;
   }finally{conn2.release();}
 
-  await updateTask(row.task_id,{status:'PASS',output:input?.output||null,finished:true});
+  await updateTask(row.task_id,{status:'PASS',output:safeOutput,finished:true});
   await saveCheckpoint(row.run_id,{
     taskId:row.task_id,checkpointType:'TRIGGER_COMPLETE',status:'VALID',
     stageKey:row.task_stage_key,stepKey:'PASS',
