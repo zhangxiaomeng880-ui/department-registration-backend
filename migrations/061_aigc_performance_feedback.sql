@@ -60,7 +60,6 @@ CREATE TABLE IF NOT EXISTS aigc_performance_snapshots (
   UNIQUE KEY uq_m2815_perf_key (project_id,snapshot_key),
   INDEX idx_m2815_perf_window (project_id,platform_key,window_end,observed_at),
   INDEX idx_m2815_perf_quality (project_id,data_quality_status,window_end),
-  INDEX idx_m2815_perf_quality_secondary (project_id,data_quality_status,window_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS aigc_production_metric_snapshots (
