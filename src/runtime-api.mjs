@@ -182,6 +182,11 @@ import {
   createAigcCreativeReference,createAigcModelToolBenchmark,createAigcCreativeHypothesis,
   createAigcProductionPlan,evaluateAigcFoundationGate,getAigcFoundationState,resolveAigcProjectScope
 } from './aigc-foundation.mjs';
+import {
+  createAigcStoryKnowledge,createAigcScriptVersion,createAigcScriptChangeRequest,
+  lockAigcScriptVersion,evaluateAigcScriptGate,getAigcScriptState,
+  resolveAigcScriptProjectScope,resolveAigcScriptVersionScope
+} from './aigc-story-script.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1553,13 +1558,27 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcScriptMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-script-domain$/);
+  if (req.method === 'GET' && aigcScriptMatch) {
+    const projectId=aigcScriptMatch[1];
+    const scope=await resolveAigcScriptProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcScriptState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
     ['aigc-creative-references',createAigcCreativeReference],
     ['aigc-model-tool-benchmarks',createAigcModelToolBenchmark],
     ['aigc-creative-hypotheses',createAigcCreativeHypothesis],
-    ['aigc-production-plans',createAigcProductionPlan]
+    ['aigc-production-plans',createAigcProductionPlan],
+    ['aigc-story-knowledge',createAigcStoryKnowledge],
+    ['aigc-script-versions',createAigcScriptVersion],
+    ['aigc-script-change-requests',createAigcScriptChangeRequest]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1582,8 +1601,23 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     if(!principal?.platformAdmin) await assertAccess({
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
-    json(res,200,{data:await evaluateAigcFoundationGate(
-      projectId,gateKey,await readBody(req),principal?.identityId||null
+    const body=await readBody(req);
+    const data=gateKey==='G-AIGC-SCRIPT'
+      ?await evaluateAigcScriptGate(projectId,body,principal?.identityId||null)
+      :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+    json(res,200,{data});
+    return true;
+  }
+
+  const aigcScriptLockMatch=match(url.pathname,/^\/api\/runtime\/aigc-script-versions\/([^/]+)\/lock$/);
+  if (req.method === 'POST' && aigcScriptLockMatch) {
+    const scriptVersionId=aigcScriptLockMatch[1];
+    const scope=await resolveAigcScriptVersionScope(scriptVersionId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await lockAigcScriptVersion(
+      scriptVersionId,await readBody(req),principal?.identityId||null
     )});
     return true;
   }
