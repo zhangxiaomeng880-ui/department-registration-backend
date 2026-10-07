@@ -154,7 +154,7 @@ export const recordPlatformRestoreRehearsal=async(backupId,input={},actorId=null
   await db.execute(`INSERT INTO platform_restore_rehearsals
     (id,tenant_id,workspace_id,backup_snapshot_id,target_environment_id,rehearsal_key,execution_mode,is_synthetic,
      restore_receipt_json,verification_json,status,started_at,completed_at,evidence_json,executed_by_identity_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,'PASS',?,?,?,?,?)`,
+    VALUES (?,?,?,?,?,?,?,?,?,?,'PASS',?,?,?,?)`,
     [id,backup.tenant_id,backup.workspace_id,backup.id,env.id,input.rehearsalKey,mode,synthetic?1:0,
      asJson(receipt),asJson(verification),startedAt,completedAt,asJson(input.evidence),actorId]);
   return {id,workspaceId:backup.workspace_id,backupSnapshotId:backup.id,targetEnvironmentId:env.id,
