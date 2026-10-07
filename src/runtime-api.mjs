@@ -294,6 +294,11 @@ import {
   evaluateM30AlertIncidentGate,getM30AlertIncidentState,
   resolveM30AlertRuleScope,resolveM30AlertScope,resolveM30IncidentScope
 } from './m30-alert-incident.mjs';
+import {
+  createPlatformRetentionPolicy,recordPlatformBackupSnapshot,recordPlatformRestoreRehearsal,
+  evaluateM30RetentionBackupGate,getM30RetentionBackupState,
+  resolveM30RetentionPolicyScope,resolveM30BackupScope
+} from './m30-retention-backup-restore.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2027,6 +2032,46 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m304RetentionCreateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/platform-retention-policies$/);
+  if (req.method === 'POST' && m304RetentionCreateMatch) {
+    const workspaceId=m304RetentionCreateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await createPlatformRetentionPolicy(workspaceId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m304BackupCreateMatch=match(url.pathname,/^\/api\/runtime\/platform-retention-policies\/([^/]+)\/backups$/);
+  if (req.method === 'POST' && m304BackupCreateMatch) {
+    const scope=await resolveM30RetentionPolicyScope(m304BackupCreateMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await recordPlatformBackupSnapshot(m304BackupCreateMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m304RestoreCreateMatch=match(url.pathname,/^\/api\/runtime\/platform-backups\/([^/]+)\/restore-rehearsals$/);
+  if (req.method === 'POST' && m304RestoreCreateMatch) {
+    const scope=await resolveM30BackupScope(m304RestoreCreateMatch[1]);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,201,{data:await recordPlatformRestoreRehearsal(m304RestoreCreateMatch[1],await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const m304GateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-gates\/G-M30-RETENTION-BACKUP\/evaluate$/);
+  if (req.method === 'POST' && m304GateMatch) {
+    const workspaceId=m304GateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await evaluateM30RetentionBackupGate(workspaceId,await readBody(req))});
+    return true;
+  }
+
+  const m304StateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-retention-backup$/);
+  if (req.method === 'GET' && m304StateMatch) {
+    const workspaceId=m304StateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getM30RetentionBackupState(workspaceId)});
     return true;
   }
 
