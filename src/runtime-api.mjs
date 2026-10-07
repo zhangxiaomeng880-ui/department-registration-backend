@@ -165,6 +165,11 @@ import {
   verifyIncidentAction,createIncidentReview,getPostReleaseOperationsState,
   resolvePostReleaseProjectScope,resolveIncidentScope,resolveIncidentActionScope
 } from './product-post-release-incident.mjs';
+import {
+  createOutcomeMetric,createOutcomeObservation,createProductExperiment,completeProductExperiment,
+  createFeedbackSignal,decideFeedbackSignal,createOutcomeReview,evaluateOutcomeGate,
+  getProductOutcomeState,resolveOutcomeProjectScope,resolveFeedbackScope,resolveExperimentScope
+} from './product-outcome.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1482,6 +1487,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const productOutcomeMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/product-outcome$/);
+  if (req.method === 'GET' && productOutcomeMatch) {
+    const projectId=productOutcomeMatch[1];
+    const scope=await resolveOutcomeProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getProductOutcomeState(projectId)});
+    return true;
+  }
+
   const productCreateRoutes=[
     ['product-research-studies',createProductResearchStudy],
     ['product-evidence',createProductEvidence],
@@ -1513,7 +1529,12 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['product-release-candidates',createReleaseCandidate],
     ['product-release-rollouts',createReleaseRollout],
     ['product-post-release-verifications',createPostReleaseVerification],
-    ['product-incidents',createIncident]
+    ['product-incidents',createIncident],
+    ['product-outcome-metrics',createOutcomeMetric],
+    ['product-outcome-observations',createOutcomeObservation],
+    ['product-experiments',createProductExperiment],
+    ['product-feedback-signals',createFeedbackSignal],
+    ['product-outcome-reviews',createOutcomeReview]
   ];
   for(const [segment,handler] of productCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1550,6 +1571,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       data=await evaluateReleaseReadyGate(projectId,body,principal?.identityId||null);
     }else if(gateKey==='G-PD-RELEASE'){
       data=await evaluateReleaseGate(projectId,body,principal?.identityId||null);
+    }else if(gateKey==='G-PD-OUTCOME'){
+      data=await evaluateOutcomeGate(projectId,body,principal?.identityId||null);
     }else if(['G-PD-FEASIBILITY','G-PD-PLAN','G-PD-DESIGN','G-PD-CONTRACT'].includes(gateKey)){
       data=await evaluateProductDeliveryGate(projectId,gateKey,body,principal?.identityId||null);
     }else{
@@ -1600,6 +1623,32 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await completeReleaseRollout(rolloutId,await readBody(req),principal?.identityId||null)});
+    return true;
+  }
+
+  const experimentCompleteMatch=match(url.pathname,/^\/api\/runtime\/product-experiments\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && experimentCompleteMatch) {
+    const experimentId=experimentCompleteMatch[1];
+    const scope=await resolveExperimentScope(experimentId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await completeProductExperiment(
+      experimentId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const feedbackDecisionMatch=match(url.pathname,/^\/api\/runtime\/product-feedback-signals\/([^/]+)\/decide$/);
+  if (req.method === 'POST' && feedbackDecisionMatch) {
+    const feedbackId=feedbackDecisionMatch[1];
+    const scope=await resolveFeedbackScope(feedbackId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await decideFeedbackSignal(
+      feedbackId,await readBody(req),principal?.identityId||null
+    )});
     return true;
   }
 
