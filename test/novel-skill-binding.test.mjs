@@ -20,19 +20,19 @@ assert.equal(r.body.data.capability.capabilityKey,'SKILL:NOVEL_CONTINUOUS_UPDATE
 assert.equal(r.body.data.capability.capabilityType,'SKILL');
 assert.equal(r.body.data.capability.version,'1.0');
 assert.equal(r.body.data.capability.status,'ACTIVE');
-assert.equal(r.body.data.capability.routable,false);
-assert.equal(r.body.data.capability.adapterKey,'external-chatgpt-scheduler');
+assert.equal(r.body.data.capability.routable,true);
+assert.equal(r.body.data.capability.adapterKey,'novel-continuous-update-bridge');
 assert.equal(r.body.data.capability.metadata.sourceOfTruth,undefined);
-assert.equal(r.body.data.capability.metadata.nativeRuntimeExecution,false);
-assert.equal(r.body.data.capability.metadata.bindingStatus,'EXTERNAL_BOUND');
+assert.equal(r.body.data.capability.metadata.nativeRuntimeExecution,'BRIDGE_READY');
+assert.equal(r.body.data.capability.metadata.bindingStatus,'NATIVE_TRIGGER_SHADOW');
 assert.equal(r.body.data.projectTypeBinding.projectTypeKey,'AIGC_CONTENT');
 assert.equal(r.body.data.projectTypeBinding.bindingMode,'ALLOWED');
-assert.equal(r.body.data.nativeRuntimeExecution,false);
-assert.equal(r.body.data.nativeTriggerRegistry,false);
+assert.equal(r.body.data.nativeRuntimeExecution,'BRIDGE_READY');
+assert.equal(r.body.data.nativeTriggerRegistry,true);
 
 r=await request('POST','/api/runtime/novel-skill-binding/sync',{});
 assert.equal(r.status,200,JSON.stringify(r.body));
-assert.equal(r.body.data.bindingStatus,'EXTERNAL_BOUND');
+assert.equal(r.body.data.bindingStatus,'NATIVE_TRIGGER_SHADOW');
 assert.ok(r.body.data.agentGrant,JSON.stringify(r.body));
 assert.equal(r.body.data.agentGrant.agentCapabilityKey,'AGENT:STANDARD:AIGC_CONTENT:OPERATIONS_CONTENT');
 assert.equal(r.body.data.agentGrant.childCapabilityKey,'SKILL:NOVEL_CONTINUOUS_UPDATE');
@@ -42,7 +42,7 @@ r=await request('GET','/api/runtime/capabilities?capabilityType=SKILL&status=ACT
 assert.equal(r.status,200,JSON.stringify(r.body));
 const skill=r.body.data.find(x=>x.capabilityKey==='SKILL:NOVEL_CONTINUOUS_UPDATE');
 assert.ok(skill,JSON.stringify(r.body.data));
-assert.equal(skill.routable,false);
-assert.equal(skill.adapterKey,'external-chatgpt-scheduler');
+assert.equal(skill.routable,true);
+assert.equal(skill.adapterKey,'novel-continuous-update-bridge');
 
-console.log('Runtime V2.8 M28.2 novel continuous-update Skill external binding validation passed');
+console.log('Runtime V2.8 M28.2 binding compatibility under M28.3 bridge validation passed');
