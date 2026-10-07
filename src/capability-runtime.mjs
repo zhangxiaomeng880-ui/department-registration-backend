@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
+import { ensureCapabilityVersionSnapshot,getCapabilityVersion } from './capability-version-runtime.mjs';
 import { selectProviderModel } from './policy-router-v2.mjs';
 import { invokeOpenAiResponses, classifyProviderError } from './openai-responses-provider.mjs';
 import { recordToolExecution } from './runtime-evidence.mjs';
@@ -60,6 +61,7 @@ const normalizeInvocation=row=>({
   agentCapabilityKey:row.agent_capability_key||null,capabilityType:row.capability_type,
   routingMode:row.routing_mode,policyMode:row.policy_mode||null,
   requestedCapabilityKey:row.requested_capability_key||null,selectedCapabilityKey:row.selected_capability_key,
+  capabilityVersionId:row.capability_version_id||null,triggerFireId:row.trigger_fire_id||null,
   adapterKey:row.adapter_key,status:row.status,decision:parseJson(row.decision_json),
   inputSha256:row.input_sha256,outputSha256:row.output_sha256||null,
   outputEvidence:parseJson(row.output_evidence_json),toolExecutionId:row.tool_execution_id||null,
@@ -229,25 +231,35 @@ export const resolveStageCapability=async input=>{
   };
 };
 
-const insertInvocation=async(resolution,inputSha256,db=getRuntimePool())=>{
+const insertInvocation=async(resolution,inputSha256,db=getRuntimePool(),extra={})=>{
   const id=randomUUID(),c=resolution.context;
+  const version=extra.capabilityVersionId
+    ? await getCapabilityVersion(extra.capabilityVersionId)
+    : await ensureCapabilityVersionSnapshot(resolution.selected.capabilityKey,db);
+  if(version.capabilityKey!==resolution.selected.capabilityKey) throw errorOf(
+    'Capability version does not belong to selected capability',
+    'CAPABILITY_VERSION_SCOPE_MISMATCH',409
+  );
   await db.execute(
     `INSERT INTO capability_invocations (
       id,tenant_id,workspace_id,project_id,run_id,task_id,project_stage_instance_id,workflow_stage_id,
       requirement_id,agent_capability_key,capability_type,routing_mode,policy_mode,requested_capability_key,
-      selected_capability_key,adapter_key,status,decision_json,input_sha256
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'RUNNING',?,?)`,
+      selected_capability_key,capability_version_id,trigger_fire_id,adapter_key,status,decision_json,input_sha256
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'RUNNING',?,?)`,
     [
-      id,c.tenantId,c.workspaceId,c.projectId,c.runId,c.taskId,c.projectStageInstanceId,c.workflowStageId,
-      c.requirementId,c.agentCapabilityKey,resolution.capabilityType,resolution.routingMode,resolution.policyMode,
-      resolution.requestedCapabilityKey,resolution.selected.capabilityKey,resolution.selected.adapterKey,
+      id,c.tenantId,c.workspaceId,c.projectId,c.runId,c.taskId,c.projectStageInstanceId||null,c.workflowStageId||null,
+      c.requirementId||null,c.agentCapabilityKey||null,resolution.capabilityType,resolution.routingMode,resolution.policyMode||null,
+      resolution.requestedCapabilityKey||null,resolution.selected.capabilityKey,version.capabilityVersionId,
+      extra.triggerFireId||null,resolution.selected.adapterKey,
       asJson({
-        projectType:c.projectType,stageKey:c.stageKey,requirementKey:c.requirementKey,
-        selected:resolution.selected,fallbackChain:resolution.fallbackChain
+        projectType:c.projectType,stageKey:c.stageKey||null,requirementKey:c.requirementKey||null,
+        selected:resolution.selected,fallbackChain:resolution.fallbackChain||[],
+        capabilityVersionId:version.capabilityVersionId,capabilityVersion:version.version,
+        triggerFireId:extra.triggerFireId||null
       }),inputSha256
     ]
   );
-  return id;
+  return {id,version};
 };
 const finalizeInvocation=async(id,input,db=getRuntimePool())=>{
   await db.execute(
@@ -285,6 +297,59 @@ const invokeInternalTestAdapter=async({resolution,input})=>{
     },
     evidence:{adapter:'internal-test',testOnly:true}
   };
+};
+
+const invokeNovelContinuousUpdateBridge=async({resolution,input})=>{
+  const required=['projectKey','checkpointPath','sourceScopes'];
+  const missing=required.filter(key=>{
+    const value=input?.[key];
+    return value==null||(Array.isArray(value)&&value.length===0)||(typeof value==='string'&&!value.trim());
+  });
+  if(missing.length) throw errorOf(
+    'Novel continuous-update bridge input is incomplete',
+    'NOVEL_SKILL_BRIDGE_INPUT_REQUIRED',400,{missing}
+  );
+  return {
+    status:'HOLD',
+    output:{
+      status:'AWAITING_EXTERNAL_CONTEXT',
+      gateStatus:'HOLD',
+      checkpointPath:input.checkpointPath,
+      resumePoint:input.resumePoint||null,
+      blockingReason:'CHATGPT_LIBRARY_NATIVE_TRANSPORT_REQUIRED',
+      bridgeRequest:{
+        executor:'CHATGPT_LIBRARY_BRIDGE',
+        projectKey:input.projectKey,
+        sourceScopes:input.sourceScopes,
+        checkpointPath:input.checkpointPath,
+        resumePoint:input.resumePoint||null,
+        triggerReason:input.triggerReason||null,
+        skillKey:resolution.selected.capabilityKey
+      }
+    },
+    evidence:{
+      adapter:'novel-continuous-update-bridge',
+      nativeRuntimeLifecycle:true,
+      externalKnowledgeTransportRequired:true,
+      sourceBodyPersisted:false
+    }
+  };
+};
+
+const invokeResolvedAdapter=async({resolution,input,invocationId})=>{
+  if(resolution.capabilityType==='MODEL'){
+    return invokeModelAdapter({resolution,input,invocationId});
+  }
+  if(resolution.selected.adapterKey==='internal-test'){
+    return invokeInternalTestAdapter({resolution,input});
+  }
+  if(resolution.selected.adapterKey==='novel-continuous-update-bridge'){
+    return invokeNovelContinuousUpdateBridge({resolution,input});
+  }
+  throw errorOf(
+    'Capability adapter is not implemented','CAPABILITY_ADAPTER_NOT_IMPLEMENTED',503,
+    {capabilityKey:resolution.selected.capabilityKey,adapterKey:resolution.selected.adapterKey}
+  );
 };
 
 const invokeModelAdapter=async({resolution,input,invocationId})=>{
@@ -377,24 +442,10 @@ const invokeModelAdapter=async({resolution,input,invocationId})=>{
   };
 };
 
-export const invokeStageCapability=async input=>{
-  const resolution=await resolveStageCapability(input);
-  const db=getRuntimePool();
-  const inputSha256=sha256(input.input??null);
-  const invocationId=await insertInvocation(resolution,inputSha256,db);
+const executeInvocation=async({resolution,input,invocationId,db})=>{
   const startedAt=performance.now();
   try{
-    let result;
-    if(resolution.capabilityType==='MODEL'){
-      result=await invokeModelAdapter({resolution,input:input.input||{},invocationId});
-    }else if(resolution.selected.adapterKey==='internal-test'){
-      result=await invokeInternalTestAdapter({resolution,input:input.input||{}});
-    }else{
-      throw errorOf(
-        'Capability adapter is not implemented','CAPABILITY_ADAPTER_NOT_IMPLEMENTED',503,
-        {capabilityKey:resolution.selected.capabilityKey,adapterKey:resolution.selected.adapterKey}
-      );
-    }
+    const result=await invokeResolvedAdapter({resolution,input:input||{},invocationId});
     const outputSha256=result.outputSha256||sha256(result.output??null);
     const durationMs=result.durationMs??Math.max(0,Math.round(performance.now()-startedAt));
     await finalizeInvocation(invocationId,{
@@ -404,9 +455,7 @@ export const invokeStageCapability=async input=>{
     },db);
     return {
       invocation:await getCapabilityInvocation(invocationId),
-      resolution,
-      output:result.output,
-      outputPersisted:false
+      resolution,output:result.output,outputPersisted:false
     };
   }catch(error){
     await finalizeInvocation(invocationId,{
@@ -419,4 +468,111 @@ export const invokeStageCapability=async input=>{
     error.details={...(error.details||{}),capabilityInvocationId:invocationId};
     throw error;
   }
+};
+
+export const invokeStageCapability=async input=>{
+  const resolution=await resolveStageCapability(input);
+  const db=getRuntimePool();
+  const created=await insertInvocation(resolution,sha256(input.input??null),db);
+  return executeInvocation({
+    resolution,input:input.input||{},invocationId:created.id,db
+  });
+};
+
+export const invokeDirectCapability=async input=>{
+  if(!input?.projectId||!input?.runId||!input?.taskId||!input?.capabilityKey){
+    throw errorOf(
+      'projectId, runId, taskId and capabilityKey are required',
+      'INVALID_DIRECT_CAPABILITY_INVOCATION'
+    );
+  }
+  const db=getRuntimePool();
+  const [rows]=await db.execute(
+    `SELECT
+       p.id AS project_id,p.tenant_id,p.workspace_id,p.project_type,p.status AS project_status,
+       r.id AS run_id,r.project_id AS run_project_id,r.status AS run_status,
+       t.id AS task_id,t.run_id AS task_run_id,t.stage_key,
+       c.capability_key,c.capability_type,c.display_name,c.adapter_key,c.status,c.routable,
+       b.binding_mode,b.priority AS project_priority
+      FROM projects p
+      JOIN runs r ON r.id=? AND r.project_id=p.id
+      JOIN tasks t ON t.id=? AND t.run_id=r.id
+      JOIN capability_registry c ON c.capability_key=?
+      JOIN project_type_capability_bindings b
+        ON b.project_type_key=p.project_type AND b.capability_key=c.capability_key
+     WHERE p.id=?`,
+    [input.runId,input.taskId,input.capabilityKey,input.projectId]
+  );
+  if(!rows.length) throw errorOf(
+    'Direct capability is not allowed for the project scope',
+    'DIRECT_CAPABILITY_NOT_ALLOWED',409,{capabilityKey:input.capabilityKey}
+  );
+  const row=rows[0];
+  if(row.project_status!=='ACTIVE') throw errorOf('Project is not active','PROJECT_NOT_ACTIVE',409);
+  if(row.status!=='ACTIVE'||!Boolean(row.routable)) throw errorOf(
+    'Direct capability is not active and routable','DIRECT_CAPABILITY_NOT_EXECUTABLE',409
+  );
+  if(!INVOCABLE_TYPES.has(row.capability_type)) throw errorOf(
+    'Capability type is not directly invocable','CAPABILITY_TYPE_NOT_INVOCABLE',409
+  );
+  const currentVersion=await ensureCapabilityVersionSnapshot(row.capability_key,db);
+  const exactVersion=input.capabilityVersionId
+    ? await getCapabilityVersion(input.capabilityVersionId)
+    : currentVersion;
+  if(exactVersion.capabilityKey!==row.capability_key) throw errorOf(
+    'Direct capability version scope mismatch','CAPABILITY_VERSION_SCOPE_MISMATCH',409
+  );
+  if(exactVersion.capabilityVersionId!==currentVersion.capabilityVersionId) throw errorOf(
+    'Historical capability version cannot execute through the current adapter',
+    'CAPABILITY_VERSION_NOT_CURRENTLY_EXECUTABLE',409,
+    {capabilityKey:row.capability_key,requestedVersionId:exactVersion.capabilityVersionId,currentVersionId:currentVersion.capabilityVersionId}
+  );
+  const resolution={
+    context:{
+      tenantId:row.tenant_id,workspaceId:row.workspace_id,projectId:row.project_id,
+      runId:row.run_id,taskId:row.task_id,projectStageInstanceId:null,workflowStageId:null,
+      requirementId:null,projectType:row.project_type,stageKey:row.stage_key,
+      requirementKey:null,agentCapabilityKey:null
+    },
+    capabilityType:row.capability_type,routingMode:'FIXED',policyMode:'TRIGGER_FIXED',
+    requestedCapabilityKey:row.capability_key,
+    selected:{
+      capabilityKey:row.capability_key,capabilityType:row.capability_type,displayName:row.display_name,
+      adapterKey:row.adapter_key,bindingMode:row.binding_mode,projectPriority:Number(row.project_priority||100),
+      agentPriority:null,providerKey:null,modelKey:null
+    },
+    fallbackChain:[]
+  };
+  const created=await insertInvocation(
+    resolution,sha256(input.input??null),db,
+    {capabilityVersionId:exactVersion.capabilityVersionId,triggerFireId:input.triggerFireId||null}
+  );
+  return executeInvocation({
+    resolution,input:input.input||{},invocationId:created.id,db
+  });
+};
+
+export const completeDirectCapabilityInvocation=async(invocationId,input)=>{
+  const db=getRuntimePool();
+  const [rows]=await db.execute('SELECT * FROM capability_invocations WHERE id=? FOR UPDATE',[invocationId]);
+  if(!rows.length) throw errorOf('Capability invocation not found','CAPABILITY_INVOCATION_NOT_FOUND',404);
+  const row=rows[0];
+  if(row.status!=='HOLD') throw errorOf(
+    'Only HOLD bridge invocations can be externally completed',
+    'CAPABILITY_INVOCATION_NOT_AWAITING_EXTERNAL_COMPLETION',409,{status:row.status}
+  );
+  const status=input?.status==='FAIL'?'FAIL':'PASS';
+  await finalizeInvocation(invocationId,{
+    status,
+    outputSha256:input?.output==null?null:sha256(input.output),
+    outputEvidence:{
+      externalBridgeCompletion:true,
+      evidence:input?.evidence||null,
+      outputPersisted:false
+    },
+    errorCode:input?.errorCode||null,
+    errorCategory:status==='FAIL'?'EXTERNAL_EXECUTOR':null,
+    errorMessage:input?.errorMessage||null
+  },db);
+  return getCapabilityInvocation(invocationId);
 };
