@@ -401,7 +401,7 @@ r=await request('POST',`/api/runtime/projects/${projectId}/aigc-breakdown-plans`
 assert.equal(r.status,201,JSON.stringify(r.body));
 const breakdownPlanId=r.body.data.id;
 assert.equal(r.body.data.status,'FROZEN');
-assert.equal(r.body.data.coverageSnapshot.sceneCount,71);
+assert.equal(r.body.data.coverageSnapshot.sceneRange.count,71);
 assert.equal(r.body.data.coverageSnapshot.coveredSceneCount,71);
 assert.equal(r.body.data.coverageSnapshot.unitCount,19);
 assert.equal(r.body.data.coverageSnapshot.shotCount,71);
