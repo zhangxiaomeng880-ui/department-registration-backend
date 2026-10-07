@@ -179,7 +179,7 @@ export const evaluateM29FinalGate=async(workspaceId,input={},actorId=null)=>{
     ...(realAigc?[]:['M29_REAL_AIGC_LOOP_REQUIRED'])
   ];
   const evidence={
-    workspaceId,projectCounts:{product:productProjects.length,aigc:aigcProjects.length},
+    scopeKey:'PLATFORM',projectCounts:{product:productProjects.length,aigc:aigcProjects.length},
     implementationCriteriaPassed:implementationCriteria.filter(x=>x.pass).length,
     implementationCriteriaTotal:implementationCriteria.length,
     implementationStatus,blueprintExitStatus,
@@ -188,12 +188,12 @@ export const evaluateM29FinalGate=async(workspaceId,input={},actorId=null)=>{
   };
   const id=randomUUID();
   if(input.persist!==false)await db.execute(`INSERT INTO m29_final_gate_evaluations
-    (id,workspace_id,gate_key,implementation_status,blueprint_exit_status,implementation_criteria_json,
+    (id,scope_key,gate_key,implementation_status,blueprint_exit_status,implementation_criteria_json,
      exit_criteria_json,reason_codes_json,evidence_snapshot_json,as_of,evaluated_by_identity_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    [id,workspaceId,GATE,implementationStatus,blueprintExitStatus,asJson(implementationCriteria),
+    VALUES (?,'PLATFORM',?,?,?,?,?,?,?,?,?)`,
+    [id,GATE,implementationStatus,blueprintExitStatus,asJson(implementationCriteria),
      asJson(exitCriteria),asJson(reasons),asJson(evidence),asOf,actorId]);
-  return {id,workspaceId,gateKey:GATE,implementationStatus,blueprintExitStatus,
+  return {id,scopeKey:'PLATFORM',gateKey:GATE,implementationStatus,blueprintExitStatus,
     implementationCriteria,exitCriteria,reasonCodes:reasons,evidenceSnapshot:evidence,asOf};
 };
 
