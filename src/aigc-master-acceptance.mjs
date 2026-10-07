@@ -212,7 +212,7 @@ export const evaluateAigcMasterSubGate=async(projectId,gateKey,input={},actorId=
   await loadProject(projectId);
   if(!SUB_GATES.has(gateKey))throw errorOf('Unsupported Master sub-gate',
     'AIGC_MASTER_SUB_GATE_INVALID',409,{gateKey});
-  requireFields(input,['masterVersionId','checks','evidence'],'INVALID_AIGC_MASTER_SUB_GATE_INPUT');
+  requireFields(input,['masterVersionId','evidence'],'INVALID_AIGC_MASTER_SUB_GATE_INPUT');
   const db=getRuntimePool(),master=await loadMaster(projectId,input.masterVersionId,db);
   if(TERMINAL_MASTER_STATUSES.has(master.status)&&master.status!=='LOCKED')
     throw errorOf('Historical Master cannot be re-evaluated','AIGC_MASTER_HISTORICAL_IMMUTABLE',409);
@@ -233,6 +233,7 @@ export const evaluateAigcMasterSubGate=async(projectId,gateKey,input={},actorId=
     return result;
   }
 
+  requireFields(input,['checks'],'INVALID_AIGC_MASTER_SUB_GATE_INPUT');
   const conditions=validateConditions(input.conditions);
   const derived=deriveGateStatus(input.checks,SUB_GATES.get(gateKey),conditions);
   await db.execute(
