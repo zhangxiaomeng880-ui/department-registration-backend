@@ -215,6 +215,12 @@ import {
   getAigcGenerationState,resolveAigcGenerationProjectScope,resolveAigcGenerationJobScope,
   resolveAigcGenerationCandidateScope
 } from './aigc-generation-image.mjs';
+import {
+  createAigcProductionRequirements,lockAigcProductionRequirement,
+  createAigcProductionFailureAnalysis,resolveAigcProductionFailureAnalysis,
+  evaluateAigcProductionGate,getAigcProductionState,resolveAigcProductionProjectScope,
+  resolveAigcProductionRequirementScope,resolveAigcProductionFailureScope
+} from './aigc-video-audio-production.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1805,6 +1811,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcProductionMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-video-audio-production$/);
+  if (req.method === 'GET' && aigcProductionMatch) {
+    const projectId=aigcProductionMatch[1];
+    const scope=await resolveAigcProductionProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcProductionState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1824,7 +1841,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-asset-versions',createAigcAssetVersion],
     ['aigc-asset-call-sheets',createAigcAssetCallSheet],
     ['aigc-asset-requirement-bindings',bindAigcAssetRequirement],
-    ['aigc-generation-jobs',createAigcGenerationJob]
+    ['aigc-generation-jobs',createAigcGenerationJob],
+    ['aigc-production-requirements',createAigcProductionRequirements]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1858,7 +1876,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
             ?await evaluateAigcAssetGate(projectId,body,principal?.identityId||null)
             :gateKey==='G-AIGC-IMAGE'
               ?await evaluateAigcImageGate(projectId,body,principal?.identityId||null)
-              :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+              :gateKey==='G-AIGC-PRODUCTION'
+                ?await evaluateAigcProductionGate(projectId,body,principal?.identityId||null)
+                :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
     return true;
   }
@@ -1907,6 +1927,45 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await rejectAigcGenerationCandidate(candidateId,await readBody(req))});
+    return true;
+  }
+
+  const productionLockMatch=match(url.pathname,/^\/api\/runtime\/aigc-production-requirements\/([^/]+)\/lock$/);
+  if (req.method === 'POST' && productionLockMatch) {
+    const requirementId=productionLockMatch[1];
+    const scope=await resolveAigcProductionRequirementScope(requirementId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await lockAigcProductionRequirement(
+      requirementId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const productionFailureCreateMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-jobs\/([^/]+)\/failure-analysis$/);
+  if (req.method === 'POST' && productionFailureCreateMatch) {
+    const generationJobId=productionFailureCreateMatch[1];
+    const scope=await resolveAigcGenerationJobScope(generationJobId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await createAigcProductionFailureAnalysis(
+      generationJobId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const productionFailureResolveMatch=match(url.pathname,/^\/api\/runtime\/aigc-production-failures\/([^/]+)\/resolve$/);
+  if (req.method === 'POST' && productionFailureResolveMatch) {
+    const failureId=productionFailureResolveMatch[1];
+    const scope=await resolveAigcProductionFailureScope(failureId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await resolveAigcProductionFailureAnalysis(
+      failureId,await readBody(req),principal?.identityId||null
+    )});
     return true;
   }
 
