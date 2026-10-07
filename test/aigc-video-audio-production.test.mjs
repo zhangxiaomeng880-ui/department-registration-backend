@@ -341,7 +341,7 @@ const [currentFirstShot]=await db.execute(
   `SELECT j.generation_kind,COUNT(*) count
      FROM aigc_generation_candidates c
      JOIN aigc_generation_jobs j ON j.id=c.generation_job_id
-    WHERE c.project_id=? AND c.shot_id=? AND c.is_current=TRUE AND c.selection_status='SELECTED'
+    WHERE c.project_id=? AND c.shot_id=? AND c.is_current=TRUE AND c.selection_status IN ('SELECTED','LOCKED')
     GROUP BY j.generation_kind ORDER BY j.generation_kind`,
   [projectId,firstShot.id]
 );
