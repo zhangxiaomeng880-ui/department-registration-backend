@@ -218,7 +218,7 @@ export const createAigcGenerationJob=async(projectId,input={},actorId=null)=>{
        prompt_version,reference_bindings_json,preflight_json,parameters_json,input_fingerprint_sha256,requested_output_count,
        started_at,usage_json,cost_json,status,retry_json,safety_json,provenance_json,evidence_json,
        created_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       id,projectId,breakdown.id,input.shotId,input.parentCallSheetId,input.jobKey,generationKind,
       input.provider,input.modelTool,input.modelToolVersion,input.toolKey||null,input.skillKey||null,input.mcpKey||null,
