@@ -205,6 +205,10 @@ import {
   createAigcVisualFormatStrategy,createAigcAudioStrategy,createAigcDistributionStrategy,
   evaluateAigcFormatGate,getAigcFormatState,resolveAigcFormatProjectScope
 } from './aigc-format-strategy.mjs';
+import {
+  createAigcAssetLibrary,createAigcAsset,createAigcAssetVersion,createAigcAssetCallSheet,
+  bindAigcAssetRequirement,evaluateAigcAssetGate,getAigcAssetState,resolveAigcAssetProjectScope
+} from './aigc-asset-system.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1773,6 +1777,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcAssetMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-asset-system$/);
+  if (req.method === 'GET' && aigcAssetMatch) {
+    const projectId=aigcAssetMatch[1];
+    const scope=await resolveAigcAssetProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcAssetState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1786,7 +1801,12 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-breakdown-plans',createAigcBreakdownPlan],
     ['aigc-visual-format-strategies',createAigcVisualFormatStrategy],
     ['aigc-audio-strategies',createAigcAudioStrategy],
-    ['aigc-distribution-strategies',createAigcDistributionStrategy]
+    ['aigc-distribution-strategies',createAigcDistributionStrategy],
+    ['aigc-asset-libraries',createAigcAssetLibrary],
+    ['aigc-assets',createAigcAsset],
+    ['aigc-asset-versions',createAigcAssetVersion],
+    ['aigc-asset-call-sheets',createAigcAssetCallSheet],
+    ['aigc-asset-requirement-bindings',bindAigcAssetRequirement]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1816,7 +1836,9 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
         ?await evaluateAigcBreakdownGate(projectId,body,principal?.identityId||null)
         :gateKey==='G-AIGC-FORMAT'
           ?await evaluateAigcFormatGate(projectId,body,principal?.identityId||null)
-          :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+          :gateKey==='G-AIGC-ASSET'
+            ?await evaluateAigcAssetGate(projectId,body,principal?.identityId||null)
+            :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
     return true;
   }
