@@ -283,7 +283,7 @@ export const ingestM29Automation=async(projectId,input={},actorId=null)=>{
   try{
     const fire=await fireTrigger({
       triggerKey:input.triggerKey,projectId,
-      ...(scheduledFireTime?{scheduledFireTime:scheduledFireTime.toISOString()}:{}),
+      ...(scheduledFireTime?{scheduledFireTime:scheduledFireTime.toISOString().slice(0,23).replace('T',' ')}:{}),
       ...(eventId?{eventId}:{}),
       ...(input.capabilityInput?{capabilityInput:input.capabilityInput}:{}),
       triggerReason:`M29_AUTOMATION_${intakeType}`
