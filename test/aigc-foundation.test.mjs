@@ -399,7 +399,7 @@ assert.equal(r.status,200,JSON.stringify(r.body));
 assert.ok(r.body.data.length>=10);
 assert.ok(r.body.data.every(x=>/[\u4e00-\u9fff]/.test(x.displayName)));
 assert.equal(r.body.data.find(x=>x.stableKey==='G-AIGC-INIT').displayName,'项目初始化门禁');
-assert.equal(r.body.data.find(x=>x.stableKey==='PASS').displayName,'通过');
+assert.equal(r.body.data.find(x=>x.labelType==='STATUS'&&x.stableKey==='PASS').displayName,'通过');
 
 // The real AIGC validation sample uses the existing 你好，那年夏天 SHORT_DRAMA project.
 r=await request('POST',`/api/runtime/projects/${aigcProjectId}/aigc-gates/G-AIGC-INIT/evaluate`,{});
