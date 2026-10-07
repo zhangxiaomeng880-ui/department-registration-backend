@@ -254,6 +254,10 @@ import {
   evaluateAigcReviewGate,freezeAigcReviewCycle,getAigcReviewState,
   resolveAigcReviewProjectScope,resolveAigcReviewScope,resolveAigcProposalScope
 } from './aigc-review-archive.mjs';
+import {
+  resolveAigcDomainFinalProjectScope,createAigcRealProjectE2EAttestation,
+  evaluateAigcDomainFinalGate,getAigcDomainFinalState
+} from './aigc-domain-final.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1921,6 +1925,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcDomainFinalMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-domain-final$/);
+  if (req.method === 'GET' && aigcDomainFinalMatch) {
+    const projectId=aigcDomainFinalMatch[1];
+    const scope=await resolveAigcDomainFinalProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcDomainFinalState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1953,7 +1968,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-production-metric-snapshots',createAigcProductionMetricSnapshot],
     ['aigc-experiment-candidates',createAigcExperimentCandidate],
     ['aigc-feedback-signals',createAigcFeedbackSignal],
-    ['aigc-review-cycles',createAigcReviewCycle]
+    ['aigc-review-cycles',createAigcReviewCycle],
+    ['aigc-real-project-e2e-attestations',createAigcRealProjectE2EAttestation]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -2001,6 +2017,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
                           ?await evaluateAigcPerformanceGate(projectId,body,principal?.identityId||null)
                           :gateKey==='G-AIGC-REVIEW'
                             ?await evaluateAigcReviewGate(projectId,body,principal?.identityId||null)
+                            :gateKey==='G-AIGC-DOMAIN-FINAL'
+                              ?await evaluateAigcDomainFinalGate(projectId,body,principal?.identityId||null)
                             :[
                         'G-AIGC-CREATIVE-ACCEPTANCE','G-AIGC-PRODUCTION-QA',
                         'G-AIGC-TECHNICAL-QA','G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
