@@ -83,8 +83,9 @@ jobs:
           done
           curl --fail --silent http://127.0.0.1:4999/ready >/dev/null
           npm run validate:capability-runtime
-          npm run validate:domain-workflow-templates
           npm run validate:m27-product-development-freeze
+          # M28.1 AIGC foundation already exercises domain preset readiness/compile on a clean capability state.
+          # Do not pre-run validate:domain-workflow-templates in the same DB: it intentionally seeds all required capabilities.
           npm run validate:aigc-foundation
           npm run validate:novel-skill-binding
           node test/railway-compatibility.test.mjs
