@@ -58,7 +58,8 @@
     "validate:product-outcome": "node test/product-outcome.test.mjs",
     "validate:product-review": "node test/product-review.test.mjs",
     "validate:product-development-final": "node test/product-development-final.test.mjs",
-    "validate:m27-product-development-freeze": "node test/m27-product-development-freeze.test.mjs"
+    "validate:m27-product-development-freeze": "node test/m27-product-development-freeze.test.mjs",
+    "validate:aigc-foundation": "node test/aigc-foundation.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
