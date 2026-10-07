@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { getRuntimePool } from './runtime-db.mjs';
 
 const GATE='G-AIGC-DISTRIBUTION-PACKAGE';
-const DERIVATION_TYPES=new Set([
+const DERIVATION_TYPE_LIST=[
   'FULL_MASTER','TRAILER','HOOK','SCENE_CLIP','CHARACTER_POV','TOPIC',
-  'OST_MV','STILL','GRAPHIC','BTS_AI_PROCESS'
-]);
+  'OST_MV','STILL','GRAPHIC','BTS_MAKING_OF','AI_PROCESS'
+];
+const DERIVATION_TYPES=new Set(DERIVATION_TYPE_LIST);
+const APPLICABILITY=new Set(['REQUIRED','OPTIONAL','N_A']);
 const LOCALIZATION_LEVELS=new Set([
   'NONE','SUBTITLE','COPY_LOCALIZATION','DUB','RE_EDIT','RE_COMPOSE'
 ]);
@@ -81,6 +83,76 @@ const qaPass=qa=>QA_DIMENSIONS.every(k=>['PASS','N_A'].includes(upper(qa?.[k])))
 export const resolveAigcDistributionProjectScope=async projectId=>{
   const p=await loadProject(projectId);return {projectId,workspaceId:p.workspace_id};
 };
+
+export const createAigcDerivationScan=async(projectId,input={},actorId=null)=>{
+  await loadProject(projectId);
+  requireFields(input,['masterVersionId','items','evidence'],'INVALID_AIGC_DERIVATION_SCAN');
+  if(!Array.isArray(input.items)||!input.items.length)throw errorOf(
+    'Derivation scan items are required','AIGC_DERIVATION_SCAN_ITEMS_REQUIRED',409
+  );
+  const db=getRuntimePool(),master=await currentMaster(projectId,db);
+  if(!master||master.id!==input.masterVersionId)throw errorOf(
+    'Derivation scan must use current locked Master','AIGC_DERIVATION_CURRENT_MASTER_REQUIRED',409
+  );
+  const [existing]=await db.execute(
+    'SELECT id FROM aigc_derivation_scan_items WHERE project_id=? AND master_version_id=? LIMIT 1',
+    [projectId,master.id]
+  );
+  if(existing.length)throw errorOf(
+    'Derivation scan already exists for current Master','AIGC_DERIVATION_SCAN_EXISTS',409
+  );
+
+  const byType=new Map();
+  for(const item of input.items){
+    requireFields(item,['scanKey','derivationType','applicability','rationale','targetHint','evidence'],
+      'INVALID_AIGC_DERIVATION_SCAN_ITEM');
+    const derivationType=upper(item.derivationType),applicability=upper(item.applicability);
+    if(!DERIVATION_TYPES.has(derivationType))throw errorOf(
+      'Unsupported derivation type','AIGC_DERIVATION_TYPE_INVALID',409,{derivationType}
+    );
+    if(!APPLICABILITY.has(applicability))throw errorOf(
+      'Derivation applicability must be REQUIRED/OPTIONAL/N_A',
+      'AIGC_DERIVATION_APPLICABILITY_INVALID',409,{applicability}
+    );
+    if(byType.has(derivationType))throw errorOf(
+      'Derivation scan type duplicated','AIGC_DERIVATION_SCAN_DUPLICATE',409,{derivationType}
+    );
+    byType.set(derivationType,{...item,derivationType,applicability});
+  }
+  const missing=DERIVATION_TYPE_LIST.filter(type=>!byType.has(type));
+  if(missing.length)throw errorOf(
+    'Derivation scan must explicitly cover every derivation type',
+    'AIGC_DERIVATION_SCAN_COVERAGE_INCOMPLETE',409,{missing}
+  );
+
+  const conn=await db.getConnection(),created=[];
+  try{
+    await conn.beginTransaction();
+    for(const type of DERIVATION_TYPE_LIST){
+      const item=byType.get(type),id=randomUUID();
+      await conn.execute(
+        `INSERT INTO aigc_derivation_scan_items
+          (id,project_id,master_version_id,scan_key,derivation_type,applicability,rationale,
+           target_hint_json,evidence_json,created_by_identity_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [id,projectId,master.id,item.scanKey,type,item.applicability,item.rationale,
+         asJson(item.targetHint),asJson(item.evidence),actorId]
+      );
+      await insertTrace(conn,{projectId,sourceType:'MASTER_VERSION',sourceId:master.id,
+        targetType:'DERIVATION_SCAN_ITEM',targetId:id,linkType:'SCANS_AS',actorId,
+        evidence:{derivationType:type,applicability:item.applicability}});
+      created.push({id,scanKey:item.scanKey,derivationType:type,applicability:item.applicability});
+    }
+    await conn.commit();
+  }catch(e){try{await conn.rollback();}catch{}throw e;}finally{conn.release();}
+  return {
+    projectId,masterVersionId:master.id,scanCount:created.length,
+    requiredCount:created.filter(x=>x.applicability==='REQUIRED').length,
+    optionalCount:created.filter(x=>x.applicability==='OPTIONAL').length,
+    notApplicableCount:created.filter(x=>x.applicability==='N_A').length,
+    items:created,evidence:input.evidence,status:'FROZEN'
+  };
+};
 export const resolveAigcDistributionPackageScope=async packageId=>{
   const db=getRuntimePool();
   const [rows]=await db.execute(
@@ -95,7 +167,7 @@ export const resolveAigcDistributionPackageScope=async packageId=>{
 export const createAigcDistributionVersion=async(projectId,input={},actorId=null)=>{
   await loadProject(projectId);
   requireFields(input,[
-    'distributionKey','versionNo','derivationType','masterVersionId','motherAsset',
+    'distributionKey','versionNo','derivationType','masterVersionId','scanItemId','motherAsset',
     'spoilerRisk','target','platform','format','localizationLevel','localization',
     'cta','qa','rights','contentLocator','evidence'
   ],'INVALID_AIGC_DISTRIBUTION_VERSION');
@@ -132,6 +204,20 @@ export const createAigcDistributionVersion=async(projectId,input={},actorId=null
       'AIGC_DISTRIBUTION_MOTHER_ASSET_INVALID',409
     );
 
+  const [scanRows]=await db.execute(
+    'SELECT * FROM aigc_derivation_scan_items WHERE id=? AND project_id=? AND master_version_id=?',
+    [input.scanItemId,projectId,master.id]
+  );
+  const scan=scanRows[0];
+  if(!scan||scan.derivation_type!==derivationType)throw errorOf(
+    'Distribution version must bind matching derivation scan item',
+    'AIGC_DERIVATION_SCAN_BINDING_INVALID',409,{scanItemId:input.scanItemId,derivationType}
+  );
+  if(scan.applicability==='N_A')throw errorOf(
+    'N_A derivation scan item cannot produce a content derivative',
+    'AIGC_DERIVATION_SCAN_NA_FORBIDDEN',409,{scanItemId:scan.id,derivationType}
+  );
+
   if(localizationLevel==='NONE'){
     if(input.localization?.enabled===true)throw errorOf(
       'Localization NONE cannot be enabled','AIGC_LOCALIZATION_CONTRACT_INVALID',409
@@ -161,13 +247,13 @@ export const createAigcDistributionVersion=async(projectId,input={},actorId=null
   const id=randomUUID();
   await db.execute(
     `INSERT INTO aigc_content_derivation_versions
-      (id,project_id,master_version_id,parent_distribution_version_id,distribution_key,version_no,
+      (id,project_id,master_version_id,scan_item_id,parent_distribution_version_id,distribution_key,version_no,
        derivation_type,mother_asset_json,spoiler_risk,target_json,platform_json,format_json,
        localization_level,localization_json,cta_json,qa_json,rights_json,content_locator_json,
        status,change_ref_json,evidence_json,created_by_identity_id)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
-      id,projectId,master.id,input.parentDistributionVersionId||null,input.distributionKey,versionNo,
+      id,projectId,master.id,scan.id,input.parentDistributionVersionId||null,input.distributionKey,versionNo,
       derivationType,asJson(input.motherAsset),spoilerRisk,asJson(input.target),asJson(input.platform),
       asJson(input.format),localizationLevel,asJson(input.localization),asJson(input.cta),asJson(input.qa),
       asJson(input.rights),asJson(input.contentLocator),status,input.changeRef?asJson(input.changeRef):null,
@@ -177,7 +263,7 @@ export const createAigcDistributionVersion=async(projectId,input={},actorId=null
   await insertTrace(db,{projectId,sourceType:'MASTER_VERSION',sourceId:master.id,
     targetType:'DISTRIBUTION_VERSION',targetId:id,linkType:'DERIVES_AS',actorId,
     evidence:{distributionKey:input.distributionKey,versionNo,derivationType,localizationLevel}});
-  return {id,projectId,masterVersionId:master.id,distributionKey:input.distributionKey,
+  return {id,projectId,masterVersionId:master.id,scanItemId:scan.id,distributionKey:input.distributionKey,
     versionNo,derivationType,localizationLevel,spoilerRisk,status};
 };
 
@@ -241,10 +327,10 @@ export const createAigcDistributionPackage=async(projectId,input={},actorId=null
     await conn.execute(
       `INSERT INTO aigc_distribution_packages
         (id,project_id,master_version_id,parent_package_id,package_key,version_no,title,
-         package_intent_json,status,is_current,evidence_json,created_by_identity_id)
-       VALUES (?,?,?,?,?,?,?,?, 'CANDIDATE',FALSE,?,?)`,
+         package_intent_json,change_ref_json,status,is_current,evidence_json,created_by_identity_id)
+       VALUES (?,?,?,?,?,?,?,?,?, 'CANDIDATE',FALSE,?,?)`,
       [id,projectId,master.id,input.parentPackageId||null,input.packageKey,versionNo,input.title,
-       asJson({...input.packageIntent,changeRef:input.changeRef||null}),asJson(input.evidence),actorId]
+       asJson(input.packageIntent),input.changeRef?asJson(input.changeRef):null,asJson(input.evidence),actorId]
     );
     for(let i=0;i<ids.length;i++){
       await conn.execute(
@@ -292,6 +378,18 @@ export const evaluateAigcDistributionPackageGate=async(projectId,input={},actorI
        JOIN aigc_content_derivation_versions v ON v.id=i.distribution_version_id
       WHERE i.package_id=? ORDER BY i.sequence_no`,[pkg.id]
   );
+  const scanItems=master?await listRows(db,
+    'SELECT * FROM aigc_derivation_scan_items WHERE project_id=? AND master_version_id=? ORDER BY derivation_type',
+    [projectId,master.id]
+  ):[];
+  const requiredScans=scanItems.filter(x=>x.applicability==='REQUIRED');
+  const optionalScans=scanItems.filter(x=>x.applicability==='OPTIONAL');
+  const notApplicableScans=scanItems.filter(x=>x.applicability==='N_A');
+  const packageScanIds=new Set(items.map(x=>x.scan_item_id));
+  const requiredScanMissing=requiredScans.filter(x=>!packageScanIds.has(x.id));
+  if(requiredScanMissing.length)reasons.push('AIGC_DISTRIBUTION_REQUIRED_SCAN_MISSING');
+  const naIncluded=items.filter(x=>notApplicableScans.some(s=>s.id===x.scan_item_id));
+  if(naIncluded.length)reasons.push('AIGC_DISTRIBUTION_NA_DERIVATION_INCLUDED');
   if(!items.length)reasons.push('AIGC_DISTRIBUTION_PACKAGE_EMPTY');
   const required=items.filter(x=>Boolean(x.required));
   const blocked=required.filter(x=>x.status!=='READY');
@@ -326,6 +424,12 @@ export const evaluateAigcDistributionPackageGate=async(projectId,input={},actorI
 
   evidence.masterVersionId=master?.id||null;
   evidence.packageId=pkg.id;
+  evidence.scanCount=scanItems.length;
+  evidence.requiredScanCount=requiredScans.length;
+  evidence.optionalScanCount=optionalScans.length;
+  evidence.notApplicableScanCount=notApplicableScans.length;
+  evidence.requiredScanMissingTypes=requiredScanMissing.map(x=>x.derivation_type);
+  evidence.naIncludedVersionIds=naIncluded.map(x=>x.id);
   evidence.itemCount=items.length;
   evidence.requiredItemCount=required.length;
   evidence.readyRequiredCount=required.filter(x=>x.status==='READY').length;
@@ -396,7 +500,8 @@ export const freezeAigcDistributionPackage=async(packageId,input={},actorId=null
 export const getAigcDistributionPackageState=async projectId=>{
   const project=await loadProject(projectId);
   const db=getRuntimePool();
-  const [versions,packages,items,gates]=await Promise.all([
+  const [scans,versions,packages,items,gates]=await Promise.all([
+    listRows(db,'SELECT * FROM aigc_derivation_scan_items WHERE project_id=? ORDER BY master_version_id,derivation_type',[projectId]),
     listRows(db,'SELECT * FROM aigc_content_derivation_versions WHERE project_id=? ORDER BY created_at,id',[projectId]),
     listRows(db,'SELECT * FROM aigc_distribution_packages WHERE project_id=? ORDER BY version_no,id',[projectId]),
     listRows(db,
@@ -410,15 +515,21 @@ export const getAigcDistributionPackageState=async projectId=>{
       projectType:project.project_type,projectSubtypeKey:project.project_subtype_key},
     frontend:{
       language:'zh-CN',
-      moduleNames:['内容衍生版本','本地化版本','发行素材包'],
+      moduleNames:['衍生扫描','内容衍生版本','本地化版本','发行素材包'],
       gateName:'发行素材包门禁',
       localizationLevels:{
         NONE:'不本地化',SUBTITLE:'字幕本地化',COPY_LOCALIZATION:'文案本地化',
         DUB:'配音本地化',RE_EDIT:'重新剪辑',RE_COMPOSE:'重新编曲 / 重构'
       }
     },
+    scans:scans.map(x=>({
+      id:x.id,masterVersionId:x.master_version_id,scanKey:x.scan_key,
+      derivationType:x.derivation_type,applicability:x.applicability,rationale:x.rationale,
+      targetHint:parseJson(x.target_hint_json)
+    })),
     versions:versions.map(x=>({
-      id:x.id,masterVersionId:x.master_version_id,parentDistributionVersionId:x.parent_distribution_version_id||null,
+      id:x.id,masterVersionId:x.master_version_id,scanItemId:x.scan_item_id,
+      parentDistributionVersionId:x.parent_distribution_version_id||null,
       distributionKey:x.distribution_key,versionNo:Number(x.version_no),derivationType:x.derivation_type,
       motherAsset:parseJson(x.mother_asset_json),spoilerRisk:x.spoiler_risk,target:parseJson(x.target_json),
       platform:parseJson(x.platform_json),format:parseJson(x.format_json),
@@ -429,7 +540,8 @@ export const getAigcDistributionPackageState=async projectId=>{
     packages:packages.map(x=>({
       id:x.id,masterVersionId:x.master_version_id,parentPackageId:x.parent_package_id||null,
       packageKey:x.package_key,versionNo:Number(x.version_no),title:x.title,
-      packageIntent:parseJson(x.package_intent_json),status:x.status,isCurrent:Boolean(x.is_current),
+      packageIntent:parseJson(x.package_intent_json),changeRef:parseJson(x.change_ref_json),
+      status:x.status,isCurrent:Boolean(x.is_current),
       approval:parseJson(x.approval_json),frozenAt:x.frozen_at,
       items:items.filter(i=>i.package_id===x.id).map(i=>({
         distributionVersionId:i.distribution_version_id,sequenceNo:Number(i.sequence_no),required:Boolean(i.required)
