@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS aigc_asset_call_sheets (
   CONSTRAINT fk_m288_callsheet_asset FOREIGN KEY (asset_id) REFERENCES aigc_assets(id),
   CONSTRAINT fk_m288_callsheet_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m288_callsheet_key (project_id,call_sheet_key),
-  UNIQUE KEY uq_m288_callsheet_req (asset_requirement_id),
+  INDEX idx_m288_callsheet_req (asset_requirement_id,status,created_at),
   INDEX idx_m288_callsheet_status (project_id,status,asset_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS aigc_asset_requirement_bindings (
   asset_version_id CHAR(36) NULL,
   call_sheet_id CHAR(36) NULL,
   binding_status VARCHAR(24) NOT NULL,
+  is_current BOOLEAN NOT NULL DEFAULT TRUE,
   rights_approval_json JSON NOT NULL,
   usage_scope_json JSON NOT NULL,
   version_binding_json JSON NOT NULL,
@@ -195,8 +196,8 @@ CREATE TABLE IF NOT EXISTS aigc_asset_requirement_bindings (
   CONSTRAINT fk_m288_binding_version FOREIGN KEY (asset_version_id) REFERENCES aigc_asset_versions(id),
   CONSTRAINT fk_m288_binding_callsheet FOREIGN KEY (call_sheet_id) REFERENCES aigc_asset_call_sheets(id),
   CONSTRAINT fk_m288_binding_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
-  UNIQUE KEY uq_m288_binding_req (asset_requirement_id),
-  INDEX idx_m288_binding_status (project_id,binding_status,resolution_type)
+  INDEX idx_m288_binding_req (asset_requirement_id,is_current,created_at),
+  INDEX idx_m288_binding_status (project_id,binding_status,resolution_type,is_current)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS aigc_m288_gate_evaluations (
