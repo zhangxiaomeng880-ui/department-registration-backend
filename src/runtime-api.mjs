@@ -209,6 +209,12 @@ import {
   createAigcAssetLibrary,createAigcAsset,createAigcAssetVersion,createAigcAssetCallSheet,
   bindAigcAssetRequirement,evaluateAigcAssetGate,getAigcAssetState,resolveAigcAssetProjectScope
 } from './aigc-asset-system.mjs';
+import {
+  createAigcGenerationJob,addAigcGenerationCandidate,completeAigcGenerationJob,
+  selectAigcGenerationCandidate,rejectAigcGenerationCandidate,evaluateAigcImageGate,
+  getAigcGenerationState,resolveAigcGenerationProjectScope,resolveAigcGenerationJobScope,
+  resolveAigcGenerationCandidateScope
+} from './aigc-generation-image.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -1788,6 +1794,17 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  const aigcGenerationMatch=match(url.pathname,/^\/api\/runtime\/projects\/([^/]+)\/aigc-generation-image$/);
+  if (req.method === 'GET' && aigcGenerationMatch) {
+    const projectId=aigcGenerationMatch[1];
+    const scope=await resolveAigcGenerationProjectScope(projectId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await getAigcGenerationState(projectId)});
+    return true;
+  }
+
   const aigcCreateRoutes=[
     ['aigc-initializations',createAigcInitialization],
     ['aigc-market-benchmarks',createAigcMarketBenchmark],
@@ -1806,7 +1823,8 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     ['aigc-assets',createAigcAsset],
     ['aigc-asset-versions',createAigcAssetVersion],
     ['aigc-asset-call-sheets',createAigcAssetCallSheet],
-    ['aigc-asset-requirement-bindings',bindAigcAssetRequirement]
+    ['aigc-asset-requirement-bindings',bindAigcAssetRequirement],
+    ['aigc-generation-jobs',createAigcGenerationJob]
   ];
   for(const [segment,handler] of aigcCreateRoutes){
     const m=match(url.pathname,new RegExp('^/api/runtime/projects/([^/]+)/'+segment+'$'));
@@ -1838,8 +1856,57 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
           ?await evaluateAigcFormatGate(projectId,body,principal?.identityId||null)
           :gateKey==='G-AIGC-ASSET'
             ?await evaluateAigcAssetGate(projectId,body,principal?.identityId||null)
-            :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
+            :gateKey==='G-AIGC-IMAGE'
+              ?await evaluateAigcImageGate(projectId,body,principal?.identityId||null)
+              :await evaluateAigcFoundationGate(projectId,gateKey,body,principal?.identityId||null);
     json(res,200,{data});
+    return true;
+  }
+
+
+  const aigcGenerationCandidateMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-jobs\/([^/]+)\/candidates$/);
+  if (req.method === 'POST' && aigcGenerationCandidateMatch) {
+    const generationJobId=aigcGenerationCandidateMatch[1];
+    const scope=await resolveAigcGenerationJobScope(generationJobId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,201,{data:await addAigcGenerationCandidate(generationJobId,await readBody(req))});
+    return true;
+  }
+
+  const aigcGenerationCompleteMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-jobs\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && aigcGenerationCompleteMatch) {
+    const generationJobId=aigcGenerationCompleteMatch[1];
+    const scope=await resolveAigcGenerationJobScope(generationJobId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await completeAigcGenerationJob(generationJobId,await readBody(req))});
+    return true;
+  }
+
+  const aigcCandidateSelectMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-candidates\/([^/]+)\/select$/);
+  if (req.method === 'POST' && aigcCandidateSelectMatch) {
+    const candidateId=aigcCandidateSelectMatch[1];
+    const scope=await resolveAigcGenerationCandidateScope(candidateId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await selectAigcGenerationCandidate(
+      candidateId,await readBody(req),principal?.identityId||null
+    )});
+    return true;
+  }
+
+  const aigcCandidateRejectMatch=match(url.pathname,/^\/api\/runtime\/aigc-generation-candidates\/([^/]+)\/reject$/);
+  if (req.method === 'POST' && aigcCandidateRejectMatch) {
+    const candidateId=aigcCandidateRejectMatch[1];
+    const scope=await resolveAigcGenerationCandidateScope(candidateId);
+    if(!principal?.platformAdmin) await assertAccess({
+      principal,permission:'project:write',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await rejectAigcGenerationCandidate(candidateId,await readBody(req))});
     return true;
   }
 
