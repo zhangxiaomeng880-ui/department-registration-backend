@@ -49,7 +49,7 @@ jobs:
           npm run migrate:runtime
           npm run migrate:runtime
 
-      - name: Validate V2.3 through M27.11 pre-exit
+      - name: Validate V2.3 through M27.11 FINAL
         env:
           DB_HOST: 127.0.0.1
           DB_PORT: 3306
@@ -119,6 +119,7 @@ jobs:
           npm run validate:product-outcome
           npm run validate:product-review
           node --check src/product-domain-e2e-exit.mjs
+          npm run validate:product-development-final
           node test/railway-compatibility.test.mjs
           kill $RUNTIME_PID $MOCK_PID
           trap - EXIT
