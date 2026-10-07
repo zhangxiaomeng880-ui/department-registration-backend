@@ -292,17 +292,11 @@ export const failBridgeDispatch=async(dispatchId,input={},principal)=>{
     const retryable=input.retryable!==false;
     terminal=!retryable||Number(row.attempt_count)>=Number(row.max_attempts);
     if(terminal){
-      await conn.execute(
-        `UPDATE trigger_dispatches
-            SET status='DEAD_LETTER',dead_lettered_at=CURRENT_TIMESTAMP(6),completed_at=CURRENT_TIMESTAMP(6),
-                lease_expires_at=NULL,last_error_code=?,last_error_message=?
-          WHERE id=?`,
-        [input.errorCode||'BRIDGE_EXECUTOR_FAILED',input.errorMessage||'Bridge executor failed',dispatchId]
-      );
-      row=await selectDispatch(conn,dispatchId,true);
-      await event(conn,row,'DEAD_LETTER',principal,{retryable,errorCode:input.errorCode||null});
+      // Keep the dispatch CLAIMED until the exact invocation is terminal.
+      // This makes a retry safe if the process stops between invocation finalization and dispatch finalization.
     }else{
-      const retryAfter=Math.max(0,Math.min(86400,Number(input.retryAfterSeconds)||60));
+      const requestedRetry=input.retryAfterSeconds==null?60:Number(input.retryAfterSeconds);
+      const retryAfter=Math.max(0,Math.min(86400,Number.isFinite(requestedRetry)?requestedRetry:60));
       await conn.execute(
         `UPDATE trigger_dispatches
             SET status='RETRY',lease_expires_at=NULL,claimed_at=NULL,
@@ -334,6 +328,32 @@ export const failBridgeDispatch=async(dispatchId,input={},principal)=>{
     errorCode:input.errorCode||'BRIDGE_EXECUTOR_FAILED',
     errorMessage:input.errorMessage||'Bridge executor failed'
   });
+
+  const terminalConn=await db.getConnection();
+  try{
+    await terminalConn.beginTransaction();
+    let terminalRow=await selectDispatch(terminalConn,dispatchId,true);
+    if(terminalRow.status!=='DEAD_LETTER'){
+      assertActorOwnsClaim(terminalRow,principal);
+      await terminalConn.execute(
+        `UPDATE trigger_dispatches
+            SET status='DEAD_LETTER',dead_lettered_at=CURRENT_TIMESTAMP(6),completed_at=CURRENT_TIMESTAMP(6),
+                lease_expires_at=NULL,last_error_code=?,last_error_message=?
+          WHERE id=?`,
+        [input.errorCode||'BRIDGE_EXECUTOR_FAILED',input.errorMessage||'Bridge executor failed',dispatchId]
+      );
+      terminalRow=await selectDispatch(terminalConn,dispatchId,true);
+      await event(terminalConn,terminalRow,'DEAD_LETTER',principal,{
+        retryable:input.retryable!==false,errorCode:input.errorCode||null
+      });
+    }
+    await terminalConn.commit();
+    row=terminalRow;
+  }catch(error){
+    try{await terminalConn.rollback();}catch{}
+    throw error;
+  }finally{terminalConn.release();}
+
   await updateTask(row.task_id,{
     status:'FAIL',errorCode:input.errorCode||'BRIDGE_EXECUTOR_FAILED',
     errorCategory:'EXTERNAL_EXECUTOR',errorMessage:input.errorMessage||'Bridge executor failed',finished:true
