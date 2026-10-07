@@ -77,7 +77,8 @@
     "validate:aigc-performance-experiment": "node test/aigc-performance-experiment.test.mjs",
     "validate:aigc-review-archive": "node test/aigc-review-archive.test.mjs",
     "validate:aigc-domain-final": "node test/aigc-domain-final.test.mjs",
-    "validate:m29-data-detection": "node test/m29-data-detection.test.mjs"
+    "validate:m29-data-detection": "node test/m29-data-detection.test.mjs",
+    "validate:m29-decision-self-loop": "node test/m29-decision-self-loop.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
