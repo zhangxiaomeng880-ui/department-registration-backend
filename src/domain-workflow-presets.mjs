@@ -182,54 +182,54 @@ const AIGC_PRESET={
   presetKey:'AIGC_CONTENT_STANDARD',
   projectTypeKey:'AIGC_CONTENT',
   version:'2.4',
-  displayName:'AIGC Content Production Standard Workflow',
+  displayName:'AIGC 内容生产标准工作流',
   sourceRefs:[
     {name:'AI_Native_2.0_AIGC工作流升级说明_V2.4_CURRENT.md',status:'CURRENT',date:'2026-10-05'},
     {name:'AI_NATIVE_2.0_MASTER_BLUEPRINT_V1.4_FROZEN.md',status:'FROZEN'}
   ],
   milestones:[
-    m('AG-M0','Project / Rights / Environment Ready',1),
-    m('AG-M1','Creative Direction / Market Hypothesis Approved',2),
-    m('AG-M2','Story / Script / Structure Locked',3),
-    m('AG-M3','Master Asset System Ready',4),
-    m('AG-M4','Storyboard / Shot / Production Plan Ready',5),
-    m('AG-M5','Core Production Complete',6),
-    m('AG-M6','Edit / Picture / Audio Master Locked',7),
-    m('AG-M7','Distribution / Localization Package Ready',8),
-    m('AG-M8','Published / Distributed',9),
-    m('AG-M9','Performance Review / Knowledge Backwrite Complete',10)
+    m('AG-M0','项目 / 权利 / 环境就绪',1),
+    m('AG-M1','创意方向 / 市场假设已批准',2),
+    m('AG-M2','故事 / 剧本 / 结构已锁定',3),
+    m('AG-M3','母版资产系统就绪',4),
+    m('AG-M4','分镜 / 镜头 / 制作计划就绪',5),
+    m('AG-M5','核心内容生产完成',6),
+    m('AG-M6','剪辑 / 画面 / 音频母版已锁定',7),
+    m('AG-M7','分发 / 本地化交付包就绪',8),
+    m('AG-M8','已发布 / 已分发',9),
+    m('AG-M9','表现复盘 / 知识回写完成',10)
   ],
   stages:[
-    s('AIGC_00_INIT','Project Initialization / Rights / Environment',1,'AG-M0','G-AIGC-INIT','AIGC_PROJECT_INITIALIZATION',['RIGHTS','SECURITY','OPERATIONS'],{
+    s('AIGC_00_INIT','项目初始化 / 权利 / 环境',1,'AG-M0','G-AIGC-INIT','AIGC_PROJECT_INITIALIZATION',['RIGHTS','SECURITY','OPERATIONS'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('AIGC_PROJECT_INITIALIZATION')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load current project/work/version baseline, target audience, budget and production constraints.','PROJECT_CONTEXT'),
         k('RIGHTS_COMPLIANCE','RIGHTS_COMPLIANCE','Load rights, license, likeness, brand, font, music and AI disclosure constraints.','COMPLIANCE_CONTEXT')
       ]
     }),
-    s('AIGC_01_DISCOVERY','Discovery / Market / Creative Benchmark',2,'AG-M1','G-AIGC-DISCOVERY','CREATOR_RESEARCH',['DATA','CONTENT_STRATEGY'],{
+    s('AIGC_01_DISCOVERY','创意发现 / 市场 / 创意基准',2,'AG-M1','G-AIGC-DISCOVERY','CREATOR_RESEARCH',['DATA','CONTENT_STRATEGY'],{
       capabilityRequirements:[modelReq('AIGC_DISCOVERY')],
       knowledgePolicies:[
         k('MARKET_RESEARCH','MARKET_RESEARCH','Load dated market, platform, creator, competitor and creative reference evidence.','RESEARCH_CONTEXT'),
         k('RIGHTS_COMPLIANCE','RIGHTS_COMPLIANCE','Load rights constraints that affect reference use and distribution.','COMPLIANCE_CONTEXT',false)
       ]
     }),
-    s('AIGC_02_PLAN','Planning / Milestone / Budget / Production Strategy',3,'AG-M1','G-AIGC-PLAN','CONTENT_STRATEGY_PROJECT',['PRODUCTION','OPERATIONS'],{
+    s('AIGC_02_PLAN','制作规划 / 里程碑 / 预算 / 制作策略',3,'AG-M1','G-AIGC-PLAN','CONTENT_STRATEGY_PROJECT',['PRODUCTION','OPERATIONS'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('AIGC_PLANNING')],
       knowledgePolicies:[k('PROJECT_CURRENT','PROJECT_CURRENT','Load approved creative direction, hierarchy, budget, milestones, dependencies and production constraints.','PROJECT_CONTEXT')]
     }),
-    s('AIGC_03_SCRIPT','Story / Script / Structure',4,'AG-M2','G-AIGC-SCRIPT','SCRIPT',['RESEARCH','REVIEW'],{
+    s('AIGC_03_SCRIPT','故事 / 剧本 / 结构',4,'AG-M2','G-AIGC-SCRIPT','SCRIPT',['RESEARCH','REVIEW'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('SCRIPT_CONTINUITY')],
       knowledgePolicies:[k('STORY_KNOWLEDGE','STORY_KNOWLEDGE','Load CURRENT/FACT/RULE story, character, relationship, timeline, scene and dialogue knowledge.','STORY_CONTEXT')]
     }),
-    s('AIGC_04_BREAKDOWN','Breakdown / Shot / Production Planning',5,'AG-M4','G-AIGC-BREAKDOWN','PRODUCTION_PLANNING',['ASSET','VISUAL','AUDIO'],{
+    s('AIGC_04_BREAKDOWN','拆解 / 镜头 / 制作规划',5,'AG-M4','G-AIGC-BREAKDOWN','PRODUCTION_PLANNING',['ASSET','VISUAL','AUDIO'],{
       capabilityRequirements:[modelReq('SHOT_BREAKDOWN')],
       knowledgePolicies:[
         k('STORY_KNOWLEDGE','STORY_KNOWLEDGE','Load locked script, scene, character, dialogue and continuity facts.','STORY_CONTEXT'),
         k('PRODUCTION_KNOWLEDGE','PRODUCTION_KNOWLEDGE','Load existing shot, asset coverage, production dependency and retry constraints.','PRODUCTION_CONTEXT',false)
       ]
     }),
-    s('AIGC_05_FORMAT','Visual Format / Audio / Distribution Strategy',6,'AG-M1','G-AIGC-FORMAT','CONTENT_VISUAL_STRATEGY',['VISUAL','AUDIO','OPERATIONS'],{
+    s('AIGC_05_FORMAT','视觉格式 / 音频 / 分发策略',6,'AG-M1','G-AIGC-FORMAT','CONTENT_VISUAL_STRATEGY',['VISUAL','AUDIO','OPERATIONS'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('AIGC_FORMAT_STRATEGY')],
       knowledgePolicies:[
         k('VISUAL_KNOWLEDGE','VISUAL_KNOWLEDGE','Load current visual style, format, camera, crop and safe-area rules.','VISUAL_CONTEXT'),
@@ -237,7 +237,7 @@ const AIGC_PRESET={
         k('DISTRIBUTION_KNOWLEDGE','DISTRIBUTION_KNOWLEDGE','Load target channel, market, language and platform specification.','DISTRIBUTION_CONTEXT',false)
       ]
     }),
-    s('AIGC_06_ASSET','Asset System / Master Creation',7,'AG-M3','G-AIGC-ASSET','ASSET_SYSTEM',['VISUAL','AUDIO','RIGHTS'],{
+    s('AIGC_06_ASSET','资产系统 / 母版制作',7,'AG-M3','G-AIGC-ASSET','ASSET_SYSTEM',['VISUAL','AUDIO','RIGHTS'],{
       capabilityRequirements:[taggedReq('ASSET_GENERATION','TOOL','ASSET_GENERATION')],
       knowledgePolicies:[
         k('STORY_KNOWLEDGE','STORY_KNOWLEDGE','Load asset identity facts and immutable story constraints.','STORY_CONTEXT'),
@@ -245,7 +245,7 @@ const AIGC_PRESET={
         k('RIGHTS_COMPLIANCE','RIGHTS_COMPLIANCE','Load rights and usage-scope constraints for master assets.','COMPLIANCE_CONTEXT')
       ]
     }),
-    s('AIGC_07_IMAGE','Image / Keyframe / Storyboard Production',8,'AG-M5','G-AIGC-IMAGE','VISUAL_PRODUCTION',['ASSET','QA'],{
+    s('AIGC_07_IMAGE','图像 / 关键帧 / 分镜生产',8,'AG-M5','G-AIGC-IMAGE','VISUAL_PRODUCTION',['ASSET','QA'],{
       capabilityRequirements:[taggedReq('IMAGE_GENERATION','TOOL','IMAGE_GENERATION')],
       knowledgePolicies:[
         k('STORY_KNOWLEDGE','STORY_KNOWLEDGE','Load shot-level story, character, action and continuity facts.','STORY_CONTEXT'),
@@ -253,7 +253,7 @@ const AIGC_PRESET={
         k('PRODUCTION_KNOWLEDGE','PRODUCTION_KNOWLEDGE','Load current call sheet, reference roles, only-variable and QA constraints.','PRODUCTION_CONTEXT')
       ]
     }),
-    s('AIGC_08_VIDEO_AUDIO','Video / Motion / Dialogue / Music / SFX Production',9,'AG-M5','G-AIGC-PRODUCTION','AIGC_PRODUCTION',['VISUAL','AUDIO','QA'],{
+    s('AIGC_08_VIDEO_AUDIO','视频 / 动作 / 对白 / 音乐 / 音效生产',9,'AG-M5','G-AIGC-PRODUCTION','AIGC_PRODUCTION',['VISUAL','AUDIO','QA'],{
       capabilityRequirements:[
         taggedReq('VIDEO_GENERATION','TOOL','VIDEO_GENERATION'),
         taggedReq('AUDIO_GENERATION','TOOL','AUDIO_GENERATION')
@@ -264,14 +264,14 @@ const AIGC_PRESET={
         k('PRODUCTION_KNOWLEDGE','PRODUCTION_KNOWLEDGE','Load generation history, failure modes and retry scope.','PRODUCTION_CONTEXT')
       ]
     }),
-    s('AIGC_09_EDIT','Edit / Timeline / Composite / Post-production',10,'AG-M6','G-AIGC-EDIT','EDITING',['AUDIO','VISUAL','QA'],{
+    s('AIGC_09_EDIT','剪辑 / 时间线 / 合成 / 后期',10,'AG-M6','G-AIGC-EDIT','EDITING',['AUDIO','VISUAL','QA'],{
       capabilityRequirements:[taggedReq('MEDIA_EDITING','TOOL','MEDIA_EDITING')],
       knowledgePolicies:[
         k('PRODUCTION_KNOWLEDGE','PRODUCTION_KNOWLEDGE','Load selected/locked assets, timeline, source lineage and post-production constraints.','PRODUCTION_CONTEXT'),
         k('AUDIO_KNOWLEDGE','AUDIO_KNOWLEDGE','Load dialogue/music/SFX/ambience track intent and lock state.','AUDIO_CONTEXT',false)
       ]
     }),
-    s('AIGC_10_MASTER','Mastering / Acceptance / QA / Compliance',11,'AG-M6','G-AIGC-MASTER','AIGC_ACCEPTANCE_QA',['REVIEW','COMPLIANCE','RIGHTS'],{
+    s('AIGC_10_MASTER','母版 / 验收 / QA / 合规',11,'AG-M6','G-AIGC-MASTER','AIGC_ACCEPTANCE_QA',['REVIEW','COMPLIANCE','RIGHTS'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[taggedReq('MEDIA_QA','TOOL','MEDIA_QA')],
       knowledgePolicies:[
         k('STORY_KNOWLEDGE','STORY_KNOWLEDGE','Load frozen story/script/creative intent and continuity facts.','STORY_CONTEXT'),
@@ -284,25 +284,25 @@ const AIGC_PRESET={
         'G-AIGC-COMPLIANCE','G-AIGC-LOCALIZATION-QA'
       ]}
     }),
-    s('AIGC_11_DERIVATION','Content Derivation / Localization / Platform Adaptation',12,'AG-M7','G-AIGC-DISTRIBUTION-PACKAGE','OPERATIONS_CONTENT',['LOCALIZATION','EDITING'],{
+    s('AIGC_11_DERIVATION','内容派生 / 本地化 / 平台适配',12,'AG-M7','G-AIGC-DISTRIBUTION-PACKAGE','OPERATIONS_CONTENT',['LOCALIZATION','EDITING'],{
       capabilityRequirements:[modelReq('CONTENT_DERIVATION')],
       knowledgePolicies:[
         k('DISTRIBUTION_KNOWLEDGE','DISTRIBUTION_KNOWLEDGE','Load channel, market, format, localization and spoiler constraints.','DISTRIBUTION_CONTEXT'),
         k('PERFORMANCE_KNOWLEDGE','PERFORMANCE_KNOWLEDGE','Load prior content performance patterns that may inform derivation hypotheses.','PERFORMANCE_CONTEXT',false)
       ]
     }),
-    s('AIGC_12_PUBLISH','Release / Distribution / Publishing',13,'AG-M8','G-AIGC-PUBLISH','OPERATIONS_RELEASE',['COMPLIANCE'],{
+    s('AIGC_12_PUBLISH','发布 / 分发 / 上线',13,'AG-M8','G-AIGC-PUBLISH','OPERATIONS_RELEASE',['COMPLIANCE'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[taggedReq('PUBLISHING','MCP','PUBLISHING')],
       knowledgePolicies:[
         k('DISTRIBUTION_KNOWLEDGE','DISTRIBUTION_KNOWLEDGE','Load release plan, account/channel, platform, region and publication constraints.','DISTRIBUTION_CONTEXT'),
         k('RIGHTS_COMPLIANCE','RIGHTS_COMPLIANCE','Load rights/disclosure constraints for the selected channel and region.','COMPLIANCE_CONTEXT')
       ]
     }),
-    s('AIGC_13_PERFORMANCE','Performance / Experiment / Feedback',14,'AG-M9','G-AIGC-PERFORMANCE','DATA_ANALYSIS',['OPERATIONS','CONTENT'],{
+    s('AIGC_13_PERFORMANCE','表现 / 实验 / 反馈',14,'AG-M9','G-AIGC-PERFORMANCE','DATA_ANALYSIS',['OPERATIONS','CONTENT'],{
       capabilityRequirements:[taggedReq('DATA_ANALYTICS','TOOL','DATA_ANALYTICS')],
       knowledgePolicies:[k('PERFORMANCE_KNOWLEDGE','PERFORMANCE_KNOWLEDGE','Load production and distribution metrics, experiment results and feedback.','PERFORMANCE_CONTEXT')]
     }),
-    s('AIGC_14_REVIEW','Review / Knowledge / Next Version',15,'AG-M9','G-AIGC-REVIEW','AIGC_REVIEW_KNOWLEDGE',['ALL_STAGES'],{
+    s('AIGC_14_REVIEW','复盘 / 知识 / 下一版本',15,'AG-M9','G-AIGC-REVIEW','AIGC_REVIEW_KNOWLEDGE',['ALL_STAGES'],{
       executionMode:'HUMAN_GATE',capabilityRequirements:[modelReq('AIGC_REVIEW')],
       knowledgePolicies:[
         k('PROJECT_CURRENT','PROJECT_CURRENT','Load planned vs actual production, cost, failure, QA and delivery evidence.','PROJECT_CONTEXT'),
