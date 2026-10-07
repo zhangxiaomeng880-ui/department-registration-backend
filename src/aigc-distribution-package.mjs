@@ -145,7 +145,7 @@ export const createAigcDistributionVersion=async(projectId,input={},actorId=null
   let parent=null;
   if(input.parentDistributionVersionId){
     const [rows]=await db.execute(
-      'SELECT * FROM aigc_distribution_versions WHERE id=? AND project_id=?',
+      'SELECT * FROM aigc_content_derivation_versions WHERE id=? AND project_id=?',
       [input.parentDistributionVersionId,projectId]
     );
     parent=rows[0];
@@ -160,7 +160,7 @@ export const createAigcDistributionVersion=async(projectId,input={},actorId=null
   const status=qaPass(input.qa)?'READY':'BLOCKED';
   const id=randomUUID();
   await db.execute(
-    `INSERT INTO aigc_distribution_versions
+    `INSERT INTO aigc_content_derivation_versions
       (id,project_id,master_version_id,parent_distribution_version_id,distribution_key,version_no,
        derivation_type,mother_asset_json,spoiler_risk,target_json,platform_json,format_json,
        localization_level,localization_json,cta_json,qa_json,rights_json,content_locator_json,
@@ -201,7 +201,7 @@ export const createAigcDistributionPackage=async(projectId,input={},actorId=null
 
   const ids=[...new Set(input.distributionVersionIds)];
   const [versions]=await db.query(
-    `SELECT * FROM aigc_distribution_versions
+    `SELECT * FROM aigc_content_derivation_versions
       WHERE project_id=? AND id IN (${ids.map(()=>'?').join(',')})`,
     [projectId,...ids]
   );
@@ -289,7 +289,7 @@ export const evaluateAigcDistributionPackageGate=async(projectId,input={},actorI
   const items=await listRows(db,
     `SELECT i.id item_id,i.sequence_no,i.required,v.*
        FROM aigc_distribution_package_items i
-       JOIN aigc_distribution_versions v ON v.id=i.distribution_version_id
+       JOIN aigc_content_derivation_versions v ON v.id=i.distribution_version_id
       WHERE i.package_id=? ORDER BY i.sequence_no`,[pkg.id]
   );
   if(!items.length)reasons.push('AIGC_DISTRIBUTION_PACKAGE_EMPTY');
@@ -397,7 +397,7 @@ export const getAigcDistributionPackageState=async projectId=>{
   const project=await loadProject(projectId);
   const db=getRuntimePool();
   const [versions,packages,items,gates]=await Promise.all([
-    listRows(db,'SELECT * FROM aigc_distribution_versions WHERE project_id=? ORDER BY created_at,id',[projectId]),
+    listRows(db,'SELECT * FROM aigc_content_derivation_versions WHERE project_id=? ORDER BY created_at,id',[projectId]),
     listRows(db,'SELECT * FROM aigc_distribution_packages WHERE project_id=? ORDER BY version_no,id',[projectId]),
     listRows(db,
       `SELECT i.*,p.project_id FROM aigc_distribution_package_items i
