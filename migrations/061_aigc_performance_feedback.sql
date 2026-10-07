@@ -30,7 +30,9 @@ VALUES
   ('FEEDBACK_SEVERITY','LOW','低','ACTIVE'),
   ('FEEDBACK_SEVERITY','MEDIUM','中','ACTIVE'),
   ('FEEDBACK_SEVERITY','HIGH','高','ACTIVE'),
-  ('FEEDBACK_SEVERITY','CRITICAL','严重','ACTIVE')
+  ('FEEDBACK_SEVERITY','CRITICAL','严重','ACTIVE'),
+  ('FEEDBACK_STATUS','COLLECTED','已收集','ACTIVE'),
+  ('FEEDBACK_STATUS','REVIEW_REQUIRED','待复盘 / 人工评审','ACTIVE')
 ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),status='ACTIVE';
 
 CREATE TABLE IF NOT EXISTS aigc_performance_snapshots (
@@ -59,7 +61,7 @@ CREATE TABLE IF NOT EXISTS aigc_performance_snapshots (
   CONSTRAINT fk_m2815_perf_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m2815_perf_key (project_id,snapshot_key),
   INDEX idx_m2815_perf_window (project_id,platform_key,window_end,observed_at),
-  INDEX idx_m2815_perf_quality (project_id,data_quality_status,window_end),
+  INDEX idx_m2815_perf_quality (project_id,data_quality_status,window_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS aigc_production_metric_snapshots (
@@ -92,7 +94,9 @@ CREATE TABLE IF NOT EXISTS aigc_feedback_signals (
   limitation_json JSON NOT NULL,
   recommended_scope VARCHAR(24) NULL,
   story_rule_change_requested BOOLEAN NOT NULL DEFAULT FALSE,
+  status VARCHAR(24) NOT NULL DEFAULT 'COLLECTED',
   evidence_json JSON NOT NULL,
+  collected_at TIMESTAMP(6) NOT NULL,
   created_by_identity_id CHAR(36) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_m2815_feedback_project FOREIGN KEY (project_id) REFERENCES projects(id),
