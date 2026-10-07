@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS m29_real_loop_attestations (
 
 CREATE TABLE IF NOT EXISTS m29_final_gate_evaluations (
   id CHAR(36) PRIMARY KEY,
-  workspace_id CHAR(36) NOT NULL,
+  scope_key VARCHAR(64) NOT NULL DEFAULT 'PLATFORM',
   gate_key VARCHAR(64) NOT NULL,
   implementation_status VARCHAR(16) NOT NULL,
   blueprint_exit_status VARCHAR(16) NOT NULL,
@@ -64,7 +64,6 @@ CREATE TABLE IF NOT EXISTS m29_final_gate_evaluations (
   as_of TIMESTAMP(6) NOT NULL,
   evaluated_by_identity_id CHAR(36) NULL,
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  CONSTRAINT fk_m295_final_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
   CONSTRAINT fk_m295_final_identity FOREIGN KEY (evaluated_by_identity_id) REFERENCES identities(id),
-  INDEX idx_m295_final_latest (workspace_id,gate_key,as_of,created_at)
+  INDEX idx_m295_final_latest (scope_key,gate_key,as_of,created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
