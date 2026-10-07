@@ -85,7 +85,8 @@
     "validate:m30-ops-foundation": "node test/m30-ops-foundation.test.mjs",
     "validate:m30-release-rollback": "node test/m30-release-promotion-rollback.test.mjs",
     "validate:m30-alert-incident": "node test/m30-alert-incident.test.mjs",
-    "validate:m30-retention-backup": "node test/m30-retention-backup-restore.test.mjs"
+    "validate:m30-retention-backup": "node test/m30-retention-backup-restore.test.mjs",
+    "validate:m30-search-audit": "node test/m30-global-search-audit-evidence.test.mjs"
   },
   "dependencies": {
     "mysql2": "3.24.5"
