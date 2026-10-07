@@ -6,6 +6,7 @@ SET time_zone = '+00:00';
 
 INSERT INTO aigc_module_registry(module_key,display_name,stage_key,sort_order,description)
 VALUES
+  ('AIGC_DERIVATION_SCAN','衍生扫描','AIGC_11_DERIVATION',395,'对当前锁定母版逐类判断 REQUIRED / OPTIONAL / N_A，形成可追溯衍生范围'),
   ('AIGC_DERIVATION_VERSION','内容衍生版本','AIGC_11_DERIVATION',400,'从当前锁定母版派生的独立内容版本；绑定母内容、目标、平台、格式、剧透风险、本地化、CTA 与 QA'),
   ('AIGC_LOCALIZATION_VARIANT','本地化版本','AIGC_11_DERIVATION',410,'Subtitle / Copy Localization / Dub / Re-edit / Re-compose 等本地化派生，不反向修改母版'),
   ('AIGC_DISTRIBUTION_PACKAGE','发行素材包','AIGC_11_DERIVATION',420,'把已通过 QA 的衍生版本冻结为可交接 Stage 12 的发行素材包')
@@ -25,22 +26,49 @@ VALUES
   ('DERIVATION_TYPE','OST_MV','OST / MV','ACTIVE'),
   ('DERIVATION_TYPE','STILL','静帧','ACTIVE'),
   ('DERIVATION_TYPE','GRAPHIC','图文','ACTIVE'),
-  ('DERIVATION_TYPE','BTS_AI_PROCESS','幕后 / AI 制作过程','ACTIVE'),
+  ('DERIVATION_TYPE','BTS_MAKING_OF','幕后 / 制作花絮','ACTIVE'),
+  ('DERIVATION_TYPE','AI_PROCESS','AI 制作过程','ACTIVE'),
+  ('DERIVATION_APPLICABILITY','REQUIRED','必需','ACTIVE'),
+  ('DERIVATION_APPLICABILITY','OPTIONAL','可选','ACTIVE'),
+  ('DERIVATION_APPLICABILITY','N_A','不适用','ACTIVE'),
   ('LOCALIZATION_LEVEL','NONE','不本地化','ACTIVE'),
   ('LOCALIZATION_LEVEL','SUBTITLE','字幕本地化','ACTIVE'),
   ('LOCALIZATION_LEVEL','COPY_LOCALIZATION','文案本地化','ACTIVE'),
   ('LOCALIZATION_LEVEL','DUB','配音本地化','ACTIVE'),
   ('LOCALIZATION_LEVEL','RE_EDIT','重新剪辑','ACTIVE'),
   ('LOCALIZATION_LEVEL','RE_COMPOSE','重新编曲 / 重构','ACTIVE'),
+  ('DISTRIBUTION_VERSION_STATUS','READY','已就绪','ACTIVE'),
+  ('DISTRIBUTION_VERSION_STATUS','BLOCKED','阻塞','ACTIVE'),
   ('DISTRIBUTION_PACKAGE_STATUS','CANDIDATE','候选素材包','ACTIVE'),
   ('DISTRIBUTION_PACKAGE_STATUS','FROZEN','已冻结素材包','ACTIVE'),
   ('DISTRIBUTION_PACKAGE_STATUS','HISTORICAL','历史素材包','ACTIVE')
 ON DUPLICATE KEY UPDATE display_name=VALUES(display_name),status='ACTIVE';
 
+CREATE TABLE IF NOT EXISTS aigc_derivation_scan_items (
+  id CHAR(36) PRIMARY KEY,
+  project_id CHAR(36) NOT NULL,
+  master_version_id CHAR(36) NOT NULL,
+  scan_key VARCHAR(200) NOT NULL,
+  derivation_type VARCHAR(32) NOT NULL,
+  applicability VARCHAR(16) NOT NULL,
+  rationale TEXT NOT NULL,
+  target_hint_json JSON NOT NULL,
+  evidence_json JSON NOT NULL,
+  created_by_identity_id CHAR(36) NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  CONSTRAINT fk_m2813_scan_project FOREIGN KEY (project_id) REFERENCES projects(id),
+  CONSTRAINT fk_m2813_scan_master FOREIGN KEY (master_version_id) REFERENCES aigc_master_versions(id),
+  CONSTRAINT fk_m2813_scan_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
+  UNIQUE KEY uq_m2813_scan_type (master_version_id,derivation_type),
+  UNIQUE KEY uq_m2813_scan_key (project_id,scan_key),
+  INDEX idx_m2813_scan_scope (project_id,master_version_id,applicability)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS aigc_distribution_versions (
   id CHAR(36) PRIMARY KEY,
   project_id CHAR(36) NOT NULL,
   master_version_id CHAR(36) NOT NULL,
+  scan_item_id CHAR(36) NOT NULL,
   parent_distribution_version_id CHAR(36) NULL,
   distribution_key VARCHAR(200) NOT NULL,
   version_no INT NOT NULL,
@@ -63,10 +91,12 @@ CREATE TABLE IF NOT EXISTS aigc_distribution_versions (
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   CONSTRAINT fk_m2813_distribution_project FOREIGN KEY (project_id) REFERENCES projects(id),
   CONSTRAINT fk_m2813_distribution_master FOREIGN KEY (master_version_id) REFERENCES aigc_master_versions(id),
+  CONSTRAINT fk_m2813_distribution_scan FOREIGN KEY (scan_item_id) REFERENCES aigc_derivation_scan_items(id),
   CONSTRAINT fk_m2813_distribution_parent FOREIGN KEY (parent_distribution_version_id) REFERENCES aigc_distribution_versions(id),
   CONSTRAINT fk_m2813_distribution_identity FOREIGN KEY (created_by_identity_id) REFERENCES identities(id),
   UNIQUE KEY uq_m2813_distribution_key_version (project_id,distribution_key,version_no),
   INDEX idx_m2813_distribution_master (master_version_id,status,derivation_type),
+  INDEX idx_m2813_distribution_scan (scan_item_id,status),
   INDEX idx_m2813_distribution_platform (project_id,localization_level,status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -79,6 +109,7 @@ CREATE TABLE IF NOT EXISTS aigc_distribution_packages (
   version_no INT NOT NULL,
   title VARCHAR(512) NOT NULL,
   package_intent_json JSON NOT NULL,
+  change_ref_json JSON NULL,
   status VARCHAR(24) NOT NULL DEFAULT 'CANDIDATE',
   is_current BOOLEAN NOT NULL DEFAULT FALSE,
   approval_json JSON NULL,
