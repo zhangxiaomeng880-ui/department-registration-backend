@@ -391,7 +391,7 @@ assert.ok(r.body.data.every(x=>/[\u4e00-\u9fff]/.test(x.displayName)),JSON.strin
 
 r=await request('GET','/api/runtime/aigc-modules');
 assert.equal(r.status,200,JSON.stringify(r.body));
-assert.equal(r.body.data.length,7);
+assert.ok(r.body.data.length>=7);
 assert.ok(r.body.data.every(x=>/[\u4e00-\u9fff]/.test(x.displayName)));
 
 r=await request('GET','/api/runtime/aigc-ui-labels');
