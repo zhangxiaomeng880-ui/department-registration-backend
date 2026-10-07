@@ -299,6 +299,9 @@ import {
   evaluateM30RetentionBackupGate,getM30RetentionBackupState,
   resolveM30RetentionPolicyScope,resolveM30BackupScope
 } from './m30-retention-backup-restore.mjs';
+import {
+  globalWorkspaceSearch,getWorkspaceAuditEvidence,evaluateM30SearchAuditGate,getM30SearchAuditState
+} from './m30-search-audit-evidence.mjs';
 
 const match = (pathname, expression) => pathname.match(expression);
 
@@ -2032,6 +2035,51 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
       principal,permission:'project:write',...scope,method:req.method,path:url.pathname
     });
     json(res,200,{data:await evaluateM29AutomationGate(projectId,await readBody(req))});
+    return true;
+  }
+
+  const m305GlobalSearchMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/global-search$/);
+  if (req.method === 'GET' && m305GlobalSearchMatch) {
+    const workspaceId=m305GlobalSearchMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await globalWorkspaceSearch(workspaceId,{
+      q:url.searchParams.get('q')||'',
+      types:url.searchParams.getAll('type'),
+      limit:url.searchParams.get('limit')||30
+    })});
+    return true;
+  }
+
+  const m305AuditMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/audit-evidence$/);
+  if (req.method === 'GET' && m305AuditMatch) {
+    const workspaceId=m305AuditMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getWorkspaceAuditEvidence(workspaceId,{
+      limit:url.searchParams.get('limit')||100,
+      since:url.searchParams.get('since')||null
+    })});
+    return true;
+  }
+
+  const m305GateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-gates\/G-M30-SEARCH-AUDIT\/evaluate$/);
+  if (req.method === 'POST' && m305GateMatch) {
+    const workspaceId=m305GateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:write',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await evaluateM30SearchAuditGate(workspaceId,await readBody(req))});
+    return true;
+  }
+
+  const m305StateMatch=match(url.pathname,/^\/api\/runtime\/workspaces\/([^/]+)\/m30-search-audit$/);
+  if (req.method === 'GET' && m305StateMatch) {
+    const workspaceId=m305StateMatch[1],scope=await resolveM30WorkspaceScope(workspaceId);
+    if(!principal?.platformAdmin) await assertAccess({principal,permission:'workspace:read',...scope,method:req.method,path:url.pathname});
+    json(res,200,{data:await getM30SearchAuditState(workspaceId,{
+      q:url.searchParams.get('q')||null,
+      types:url.searchParams.getAll('type'),
+      limit:url.searchParams.get('limit')||30,
+      auditLimit:url.searchParams.get('auditLimit')||100,
+      since:url.searchParams.get('since')||null
+    })});
     return true;
   }
 
