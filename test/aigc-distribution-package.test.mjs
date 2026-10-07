@@ -178,8 +178,8 @@ assert.equal(r.body.data.packages[0].items.length,4);
 
 const [[truth]]=await db.execute(
   `SELECT
-    (SELECT COUNT(*) FROM aigc_distribution_versions WHERE project_id=? AND status='READY') ready_versions,
-    (SELECT COUNT(*) FROM aigc_distribution_versions WHERE project_id=? AND status='BLOCKED') blocked_versions,
+    (SELECT COUNT(*) FROM aigc_content_derivation_versions WHERE project_id=? AND status='READY') ready_versions,
+    (SELECT COUNT(*) FROM aigc_content_derivation_versions WHERE project_id=? AND status='BLOCKED') blocked_versions,
     (SELECT COUNT(*) FROM aigc_distribution_packages WHERE project_id=? AND status='FROZEN' AND is_current=TRUE) current_package,
     (SELECT COUNT(*) FROM aigc_m2813_gate_evaluations WHERE project_id=? AND package_id=? AND gate_key='G-AIGC-DISTRIBUTION-PACKAGE' AND status='PASS') gate_pass`,
   [projectId,projectId,projectId,projectId,packageId]
