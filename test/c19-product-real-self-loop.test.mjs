@@ -110,12 +110,35 @@ const [[gates]]=await db.execute(
     (SELECT COUNT(*) FROM m29_self_loop_gate_evaluations
       WHERE project_id=? AND gate_key='G-M29-SELF-LOOP' AND status='PASS') loop_gate_pass,
     (SELECT COUNT(*) FROM m29_real_loop_attestations
-      WHERE project_id=? AND decision='APPROVED') real_attestations`,
+      WHERE project_id=? AND decision='APPROVED' AND attestation_mode='HUMAN'
+        AND is_synthetic=FALSE AND status='ACTIVE') real_attestations`,
   [project.id,project.id,project.id]
 );
 assert.ok(Number(gates.data_gate_pass)>=1);
 assert.ok(Number(gates.loop_gate_pass)>=1);
-assert.equal(Number(gates.real_attestations),0,'migration must never auto-create HUMAN attestation');
+assert.equal(Number(gates.real_attestations),1,'explicit HUMAN approval must create exactly one Product attestation');
+
+const [[attestation]]=await db.execute(
+  `SELECT a.*,p.project_key
+     FROM m29_real_loop_attestations a
+     JOIN projects p ON p.id=a.project_id
+    WHERE a.project_id=? AND a.loop_closure_id=?
+      AND a.decision='APPROVED' AND a.attestation_mode='HUMAN'
+      AND a.is_synthetic=FALSE AND a.status='ACTIVE'`,
+  [project.id,chain.closure_id]
+);
+assert.ok(attestation);
+assert.equal(attestation.project_type,'PRODUCT_DEVELOPMENT');
+assert.equal(attestation.attested_by_ref,'USER_EXPLICIT_APPROVAL_CHATGPT_2026-10-08T09:20:00+08:00');
+const sourceResultRef=typeof attestation.source_result_ref_json==='string'
+  ?JSON.parse(attestation.source_result_ref_json):attestation.source_result_ref_json;
+assert.equal(sourceResultRef.sourceObjectType,'HISTORICAL_PRODUCT_REVIEW');
+assert.equal(sourceResultRef.sourceObjectId,'c1900000-0000-4000-8000-000000000013');
+const provenance=typeof attestation.provenance_json==='string'
+  ?JSON.parse(attestation.provenance_json):attestation.provenance_json;
+assert.equal(provenance.realExternalOutcome,true);
+assert.equal(provenance.humanApproval,true);
+assert.equal(provenance.isSynthetic,false);
 
 await db.end();
-console.log('C19_P2_REAL_PRODUCT_SELF_LOOP_CHAIN_MATERIALIZED_HUMAN_ATTESTATION_PENDING');
+console.log('C19_P2_HUMAN_REAL_LOOP_ATTESTATION_APPROVED_PRODUCT_REAL_LOOP_PASS');
