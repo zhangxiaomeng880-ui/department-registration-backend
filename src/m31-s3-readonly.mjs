@@ -72,11 +72,16 @@ export const getS3Object=async({config,key,method='GET',fetchImpl=fetch,maxBytes
   const contentType=(response.headers.get('content-type')||'application/octet-stream').split(';')[0].trim().toLowerCase();
   if(!permittedMimes.has(contentType))throw fail('FILE_OBJECT_MIME_UNSUPPORTED',415);
   if(method==='HEAD')return {sizeBytes:size,contentType};
-  // Bounded read. Response bodies larger than the head declaration are refused
-  // after read; request cancellation and the 12s deadline limit resource use.
-  const bytes=Buffer.from(await response.arrayBuffer());
-  if(bytes.length>maxBytes)throw fail('FILE_OBJECT_SIZE_UNSUPPORTED',413);
-  return {sizeBytes:bytes.length,contentType,bytes,sha256:hex(bytes)};
+  // Bound the body *during* streaming; never allocate an arbitrarily large object.
+  let length=0;const chunks=[];
+  for await (const chunk of response.body){
+    length+=chunk.byteLength;
+    if(length>maxBytes){controller.abort();throw fail('FILE_OBJECT_SIZE_UNSUPPORTED',413);}
+    chunks.push(Buffer.from(chunk));
+  }
+  if(size!==null&&size!==length)throw fail('FILE_OBJECT_LENGTH_MISMATCH',409);
+  const bytes=Buffer.concat(chunks,length);
+  return {sizeBytes:length,contentType,bytes,sha256:hex(bytes)};
  }catch(e){
   if(e.name==='AbortError')throw fail('FILE_PROVIDER_TIMEOUT',503);
   if(e.code)throw e;
