@@ -148,3 +148,16 @@ test('adapter blocks unsupported MIME and oversized HEAD',async()=>{
  await assert.rejects(getS3Object({config,key,fetchImpl:async()=>http(200,file,'text/html')}),{code:'FILE_OBJECT_MIME_UNSUPPORTED'});
  await assert.rejects(getS3Object({config,key,method:'HEAD',fetchImpl:async()=>new Response(null,{status:200,headers:{'content-length':'20971521','content-type':'application/pdf'}})}),{code:'FILE_OBJECT_SIZE_UNSUPPORTED'});
 });
+
+test('Railway virtual-host-style S3 SigV4 targets the bucket host, not a path-style URL',()=>{
+ const configured=resolveS3Config({
+  ...env,M31_S3_ENDPOINT:'https://t3.storageapi.dev',
+  M31_S3_BUCKET:'m31-asset-read-staging-eglbiw',
+  M31_S3_REGION:'auto',M31_S3_URL_STYLE:'virtual-host'
+ });
+ const signed=signS3Request({config:configured,key,now:new Date('2026-10-08T01:00:00Z')});
+ assert.equal(new URL(signed.url).hostname,'m31-asset-read-staging-eglbiw.t3.storageapi.dev');
+ assert.equal(new URL(signed.url).pathname,'/'+key);
+ assert.equal(signed.headers.host,'m31-asset-read-staging-eglbiw.t3.storageapi.dev');
+ assert.match(signed.headers.authorization,/\/auto\/s3\/aws4_request/);
+});
