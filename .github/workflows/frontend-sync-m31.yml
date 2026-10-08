@@ -1,0 +1,21 @@
+name: Frontend Sync M31 API
+on:
+  push:
+    branches: [feat/frontend-sync-project-list-m31]
+    paths: [".github/workflows/frontend-sync-m31.yml", "src/frontend-sync-api.mjs", "src/server.mjs", "test/frontend-sync-api.test.mjs"]
+  pull_request:
+    paths: [".github/workflows/frontend-sync-m31.yml", "src/frontend-sync-api.mjs", "src/server.mjs", "test/frontend-sync-api.test.mjs"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  api-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22', cache: 'npm'}
+      - run: npm ci
+      - run: node --check src/server.mjs && node --check src/frontend-sync-api.mjs
+      - run: node --test test/frontend-sync-api.test.mjs
