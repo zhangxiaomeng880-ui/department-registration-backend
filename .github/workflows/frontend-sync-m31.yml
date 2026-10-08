@@ -2,9 +2,21 @@ name: Frontend Sync M31 API
 on:
   push:
     branches: [feat/frontend-sync-project-list-m31]
-    paths: [".github/workflows/frontend-sync-m31.yml", "src/frontend-sync-api.mjs", "src/server.mjs", "test/frontend-sync-api.test.mjs"]
+    paths:
+      - ".github/workflows/frontend-sync-m31.yml"
+      - "src/frontend-sync-api.mjs"
+      - "src/server.mjs"
+      - "src/runtime-api.mjs"
+      - "src/runtime-db.mjs"
+      - "test/frontend-sync*.test.mjs"
   pull_request:
-    paths: [".github/workflows/frontend-sync-m31.yml", "src/frontend-sync-api.mjs", "src/server.mjs", "test/frontend-sync-api.test.mjs"]
+    paths:
+      - ".github/workflows/frontend-sync-m31.yml"
+      - "src/frontend-sync-api.mjs"
+      - "src/server.mjs"
+      - "src/runtime-api.mjs"
+      - "src/runtime-db.mjs"
+      - "test/frontend-sync*.test.mjs"
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,10 +24,31 @@ jobs:
   api-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: testonly
+          MYSQL_DATABASE: m31_integration
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptestonly"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: m31_integration
+      DB_USER: root
+      DB_PASSWORD: testonly
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: npm install --no-audit --no-fund
-      - run: node --check src/server.mjs && node --check src/frontend-sync-api.mjs
+      - run: node --check src/server.mjs && node --check src/frontend-sync-api.mjs && node --check src/runtime-db.mjs && node --check src/runtime-api.mjs
       - run: node --test test/frontend-sync-api.test.mjs
+      - name: Real MySQL isolation and audit integration
+        run: node --test test/frontend-sync-mysql.integration.test.mjs
