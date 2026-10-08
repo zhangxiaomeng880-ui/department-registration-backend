@@ -51,5 +51,14 @@ test('real MySQL: creating a project produces an atomic audit event and survives
     assert.equal(liveAudit.items.length,1);
     assert.equal(liveAudit.items[0].eventType,'PROJECT_CREATED');
     assert.equal(liveAudit.items[0].projectId,saved.id);
+    // If audit persistence fails, the project insert must roll back too.
+    await db.query('DROP TABLE audit_logs');
+    await assert.rejects(createProject({
+      workspaceId:W1,projectKey:'M31_MUST_ROLLBACK',name:'should not survive',
+      projectType:'PRODUCT_DEVELOPMENT',
+      auditActor:{type:'SCOPED',actorKey:'test-user-m31'}
+    }));
+    const [ghost]=await db.execute('SELECT id FROM projects WHERE project_key=?',['M31_MUST_ROLLBACK']);
+    assert.equal(ghost.length,0,'No project can survive failed audit transaction');
   }finally{await db.end();}
 });
