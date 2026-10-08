@@ -47,7 +47,31 @@ export const listWorkbenchProjectAudit=async ({projectId,limit=50}={})=>{
 };
 
 export const handleFrontendSyncRoute=async(req,res,url,{json,principal})=>{
-  const projectAuditMatch=url.pathname.match(/^\\/api\\/runtime\\/projects\\/([a-zA-Z0-9-]{1,64})\\/audit-events$/);
+  const projectAuditMatch=url.pathname.match(new RegExp('^/api/runtime/projects/([a-zA-Z0-9-]{1,64})/audit-events
+  if(req.method==='GET'&&projectAuditMatch){
+    const projectId=projectAuditMatch[1],scope=await resolveProjectScope(projectId);
+    if(!principal?.platformAdmin)await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listWorkbenchProjectAudit({
+      projectId,limit:url.searchParams.get('limit')||50
+    })});
+    return true;
+  }
+  if(url.pathname!=='/api/runtime/projects' || req.method!=='GET')return false;
+  const workspaceId=url.searchParams.get('workspaceId');
+  if(!workspaceId)throw fail('WORKSPACE_ID_REQUIRED');
+  const scope=await resolveWorkspaceScope(workspaceId);
+  if(!principal?.platformAdmin)await assertAccess({
+    principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+  });
+  json(res,200,{data:await listWorkbenchProjects({
+    workspaceId,projectType:url.searchParams.get('projectType')||null,
+    limit:url.searchParams.get('limit')||50,offset:url.searchParams.get('offset')||0
+  })});
+  return true;
+};
+));
   if(req.method==='GET'&&projectAuditMatch){
     const projectId=projectAuditMatch[1],scope=await resolveProjectScope(projectId);
     if(!principal?.platformAdmin)await assertAccess({
