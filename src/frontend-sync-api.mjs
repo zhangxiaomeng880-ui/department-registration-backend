@@ -46,7 +46,26 @@ export const listWorkbenchProjectAudit=async ({projectId,limit=50}={})=>{
   }))};
 };
 
+export const scopedPrincipalView=principal=>{
+  if(!principal)throw fail('RUNTIME_UNAUTHORIZED',401);
+  if(principal.platformAdmin)return {
+    principalType:'PLATFORM',platformAdmin:true,identityId:null,tenantId:null,
+    workspaceId:null,permissions:[]
+  };
+  if(principal.type!=='SCOPED'||!principal.identityId||!principal.tenantId||
+     !(principal.permissions instanceof Set))throw fail('INVALID_SCOPED_PRINCIPAL',401);
+  return {
+    principalType:'SCOPED',platformAdmin:false,identityId:principal.identityId,
+    tenantId:principal.tenantId,workspaceId:principal.workspaceId||null,
+    permissions:[...principal.permissions].sort()
+  };
+};
+
 export const handleFrontendSyncRoute=async(req,res,url,{json,principal})=>{
+  if(url.pathname==='/api/runtime/me'&&req.method==='GET'){
+    json(res,200,{data:scopedPrincipalView(principal)});
+    return true;
+  }
   const projectAuditMatch=url.pathname.match(new RegExp('^/api/runtime/projects/([a-zA-Z0-9-]{1,64})/audit-events'+String.fromCharCode(36)));
   if(req.method==='GET'&&projectAuditMatch){
     const projectId=projectAuditMatch[1],scope=await resolveProjectScope(projectId);
