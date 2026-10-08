@@ -1,6 +1,6 @@
 // M31 Frontend Sync — database-backed project list; no client-side catalogue.
 import { getRuntimePool } from './runtime-db.mjs';
-import { assertAccess, resolveWorkspaceScope } from './runtime-rbac.mjs';
+import { assertAccess, resolveWorkspaceScope, resolveProjectScope } from './runtime-rbac.mjs';
 
 const fail = (code, statusCode=400) => Object.assign(new Error(code),{code,statusCode});
 
@@ -29,7 +29,35 @@ export const listWorkbenchProjects = async ({workspaceId,projectType=null,limit=
   }))};
 };
 
+export const listWorkbenchProjectAudit=async ({projectId,limit=50}={})=>{
+  if(!projectId || !/^[a-zA-Z0-9-]{1,64}$/.test(projectId)) throw fail('PROJECT_ID_REQUIRED');
+  const max=Number(limit);
+  if(!Number.isInteger(max)||max<1||max>100)throw fail('INVALID_AUDIT_PAGE');
+  const db=getRuntimePool();
+  const [rows]=await db.query(
+    'SELECT id,project_id,event_type,actor_type,actor_key,object_type,object_id,event_json,created_at FROM audit_logs WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ?',
+    [projectId,max]
+  );
+  return {projectId,source:'AUDIT_LOGS_PRIMARY',items:rows.map(r=>({
+    id:String(r.id),projectId:r.project_id,eventType:r.event_type,
+    actorType:r.actor_type,actorKey:r.actor_key,objectType:r.object_type,
+    objectId:r.object_id,event:r.event_json==null?null:(typeof r.event_json==='string'?JSON.parse(r.event_json):r.event_json),
+    createdAt:r.created_at
+  }))};
+};
+
 export const handleFrontendSyncRoute=async(req,res,url,{json,principal})=>{
+  const projectAuditMatch=url.pathname.match(/^\\/api\\/runtime\\/projects\\/([a-zA-Z0-9-]{1,64})\\/audit-events$/);
+  if(req.method==='GET'&&projectAuditMatch){
+    const projectId=projectAuditMatch[1],scope=await resolveProjectScope(projectId);
+    if(!principal?.platformAdmin)await assertAccess({
+      principal,permission:'project:read',...scope,method:req.method,path:url.pathname
+    });
+    json(res,200,{data:await listWorkbenchProjectAudit({
+      projectId,limit:url.searchParams.get('limit')||50
+    })});
+    return true;
+  }
   if(url.pathname!=='/api/runtime/projects' || req.method!=='GET')return false;
   const workspaceId=url.searchParams.get('workspaceId');
   if(!workspaceId)throw fail('WORKSPACE_ID_REQUIRED');
