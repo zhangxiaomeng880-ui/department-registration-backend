@@ -23,8 +23,10 @@ export const resolveS3Config=(env=process.env)=>{
  if(!/^[a-z0-9][a-z0-9.-]{2,62}$/.test(env.M31_S3_BUCKET)||
     !/^[a-z0-9-]{2,24}$/.test(env.M31_S3_REGION))
    throw fail('FILE_PROVIDER_INVALID_CONFIG',503);
+ const urlStyle=env.M31_S3_URL_STYLE||'path';
+ if(!['path','virtual-host'].includes(urlStyle))throw fail('FILE_PROVIDER_INVALID_CONFIG',503);
  return {
-  endpoint,region:env.M31_S3_REGION,bucket:env.M31_S3_BUCKET,
+  endpoint,region:env.M31_S3_REGION,bucket:env.M31_S3_BUCKET,urlStyle,
   accessKey:env.M31_S3_ACCESS_KEY_ID,secretKey:env.M31_S3_SECRET_ACCESS_KEY
  };
 };
@@ -36,8 +38,9 @@ export const signS3Request=({config,key,method='GET',now=new Date()})=>{
    throw fail('FILE_INVALID_OBJECT_KEY',409);
  const stamp=now.toISOString().replace(/[:-]|\.\d{3}/g,'');
  const date=stamp.slice(0,8);
- const path='/'+keySegment(config.bucket)+'/'+pathEncoded(key);
- const host=config.endpoint.host;
+ const virtual=config.urlStyle==='virtual-host';
+ const path=virtual?'/'+pathEncoded(key):'/'+keySegment(config.bucket)+'/'+pathEncoded(key);
+ const host=virtual?config.bucket+'.'+config.endpoint.host:config.endpoint.host;
  const bodyHash=hex('');
  const canonicalHeaders='host:'+host+'\n'+'x-amz-content-sha256:'+bodyHash+'\n'+'x-amz-date:'+stamp+'\n';
  const signedHeaders='host;x-amz-content-sha256;x-amz-date';
@@ -47,7 +50,7 @@ export const signS3Request=({config,key,method='GET',now=new Date()})=>{
  const signingKey=hmac(hmac(hmac(hmac('AWS4'+config.secretKey,date),config.region),'s3'),'aws4_request');
  const signature=hmac(signingKey,toSign,'hex');
  return {
-  url:config.endpoint.origin+path,
+  url:config.endpoint.protocol+'//'+host+path,
   headers:{
    'host':host,'x-amz-content-sha256':bodyHash,'x-amz-date':stamp,
    authorization:'AWS4-HMAC-SHA256 Credential='+config.accessKey+'/'+scope+
