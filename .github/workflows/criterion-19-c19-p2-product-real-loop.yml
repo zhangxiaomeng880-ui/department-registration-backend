@@ -1,0 +1,60 @@
+name: Criterion 19 C19-P2 Real Product Self-loop Gate
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - feat/c19-p2-product-real-loop-materialization
+  pull_request:
+    branches:
+      - feat/ai-native-runtime-v3.0-m30.6-ai-native-v2-final
+  workflow_dispatch:
+
+jobs:
+  c19-p2-real-product-self-loop:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: ai_native_runtime
+          MYSQL_USER: ai_native_runtime
+          MYSQL_PASSWORD: ci
+          MYSQL_ROOT_PASSWORD: ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Apply Runtime migrations twice
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ai_native_runtime
+          DB_USER: ai_native_runtime
+          DB_PASSWORD: ci
+        run: |
+          npm run migrate:runtime
+          npm run migrate:runtime
+
+      - name: Validate C19-P2 real Product self-loop evidence chain
+        env:
+          MYSQL_URL: mysql://ai_native_runtime:ci@127.0.0.1:3306/ai_native_runtime
+        run: npm run validate:c19-p2-real-loop
