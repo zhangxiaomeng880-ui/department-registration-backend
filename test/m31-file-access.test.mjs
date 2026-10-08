@@ -32,7 +32,7 @@ const row={
  fingerprint_sha256:sha(file),asset_key:'SCENE_QA'
 };
 const http=(status,bytes=file,contentType='application/pdf')=>new Response(bytes,{
- status,headers:{'content-type':contentType,'content-length':String(bytes.byteLength)}
+ status,headers:{'content-type':contentType,'content-length':String(bytes?.byteLength??0)}
 });
 const s3=async(url,options)=>{
  assert.equal(new URL(url).origin,'https://s3.test.invalid');
