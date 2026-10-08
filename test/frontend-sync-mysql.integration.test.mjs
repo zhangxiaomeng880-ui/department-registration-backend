@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getRuntimePool, createProject } from '../src/runtime-db.mjs';
-import { listWorkbenchProjects } from '../src/frontend-sync-api.mjs';
+import { listWorkbenchProjects, listWorkbenchProjectAudit } from '../src/frontend-sync-api.mjs';
 
 const W1='00000000-0000-4000-8000-000000000901';
 const W2='00000000-0000-4000-8000-000000000902';
@@ -46,5 +46,10 @@ test('real MySQL: creating a project produces an atomic audit event and survives
     assert.equal(audit[0].event_type,'PROJECT_CREATED');
     assert.equal(audit[0].actor_key,'test-user-m31');
     assert.equal(audit[0].event_json.source,'RUNTIME_PROJECTS_API');
+    const liveAudit=await listWorkbenchProjectAudit({projectId:saved.id,limit:10});
+    assert.equal(liveAudit.source,'AUDIT_LOGS_PRIMARY');
+    assert.equal(liveAudit.items.length,1);
+    assert.equal(liveAudit.items[0].eventType,'PROJECT_CREATED');
+    assert.equal(liveAudit.items[0].projectId,saved.id);
   }finally{await db.end();}
 });
