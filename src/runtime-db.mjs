@@ -119,16 +119,44 @@ export const createProject = async input => {
       error.code='PROJECT_SUBTYPE_NOT_ACTIVE';error.statusCode=409;throw error;
     }
   }
-  await db.execute(
-    `INSERT INTO projects (
+  const insertSql=`INSERT INTO projects (
       id, tenant_id, workspace_id, project_key, name, project_type, project_subtype_key, status,
       current_workflow_version, current_knowledge_commit_sha
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.projectSubtypeKey||null,
-      input.status || 'ACTIVE',input.currentWorkflowVersion || null,input.currentKnowledgeCommitSha || null,
-    ]
-  );
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const insertArgs=[
+    id,tenantId,workspaceId,input.projectKey,input.name,input.projectType,input.projectSubtypeKey||null,
+    input.status || 'ACTIVE',input.currentWorkflowVersion || null,input.currentKnowledgeCommitSha || null,
+  ];
+  // Audit-backed creation is atomic. Legacy internal seeding without auditActor
+  // retains its existing behavior until each caller is migrated.
+  if (input.auditActor) {
+    const actor=input.auditActor;
+    if(!['PLATFORM','SCOPED'].includes(actor.type)||!actor.actorKey||
+      String(actor.actorKey).length>128) {
+      const error=new Error('Valid authenticated audit actor is required');
+      error.code='INVALID_PROJECT_AUDIT_ACTOR';error.statusCode=400;throw error;
+    }
+    const conn=await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.execute(insertSql,insertArgs);
+      await conn.execute(
+        `INSERT INTO audit_logs
+          (project_id,event_type,actor_type,actor_key,object_type,object_id,event_json)
+         VALUES (?,'PROJECT_CREATED',?,?,'PROJECT',?,?)`,
+        [id,actor.type,actor.actorKey,id,JSON.stringify({
+          projectKey:input.projectKey,projectType:input.projectType,
+          workspaceId,source:'RUNTIME_PROJECTS_API'
+        })]
+      );
+      await conn.commit();
+    } catch(error) {
+      await conn.rollback();
+      throw error;
+    } finally { conn.release(); }
+  } else {
+    await db.execute(insertSql,insertArgs);
+  }
   return {
     id,tenantId,workspaceId,projectKey:input.projectKey,name:input.name,
     projectType:input.projectType,projectSubtypeKey:input.projectSubtypeKey||null,
