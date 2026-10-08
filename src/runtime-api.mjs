@@ -3699,7 +3699,11 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
         presetKey:body.domainPresetKey,projectTypeKey:body.projectType
       });
     }
-    const result=await createProject(body);
+    const auditActor={
+      type:principal?.platformAdmin?'PLATFORM':'SCOPED',
+      actorKey:principal?.identityId||principal?.credentialId||'PLATFORM_ADMIN'
+    };
+    const result=await createProject({...body,auditActor});
     const data=workflowTemplateId
       ? {...result,lifecycle:await bindProjectWorkflow(result.id,workflowTemplateId)}
       : result;
