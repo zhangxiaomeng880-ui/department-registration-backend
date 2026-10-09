@@ -8,6 +8,30 @@ const db=await mysql.createConnection({
   multipleStatements:true
 });
 
+await db.query(`
+  CREATE TABLE IF NOT EXISTS roles (
+    role_key VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    scope_type VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    system_role TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  CREATE TABLE IF NOT EXISTS role_permissions (
+    role_key VARCHAR(64) NOT NULL,
+    permission_key VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (role_key,permission_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+`);
+await db.execute(
+  "INSERT IGNORE INTO roles(role_key,name,scope_type,status,system_role) VALUES ('TENANT_OPERATOR','Tenant Operator','TENANT','ACTIVE',1),('WORKSPACE_OPERATOR','Workspace Operator','WORKSPACE','ACTIVE',1)"
+);
+await db.execute(
+  "INSERT IGNORE INTO role_permissions(role_key,permission_key) VALUES ('TENANT_OPERATOR','tenant.read'),('WORKSPACE_OPERATOR','project.read')"
+);
+
 const migration=await fs.readFile(
   new URL('../migrations/20261009_staging_credential_rbac_compatibility.sql',import.meta.url),
   'utf8'
