@@ -70,10 +70,24 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- The credential-admin Runtime reads rbac_* tables while the requirement-completion
 -- migration seeds roles/role_permissions. Mirror only missing rows; do not overwrite.
-INSERT IGNORE INTO rbac_roles (role_key,scope_type,name,system_role,created_at)
-SELECT role_key,scope_type,name,system_role,created_at
-FROM roles;
+SET @has_roles := (
+  SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema=DATABASE() AND table_name='roles'
+);
+SET @sql := IF(
+  @has_roles=1,
+  'INSERT IGNORE INTO rbac_roles (role_key,scope_type,name,system_role,created_at) SELECT role_key,scope_type,name,system_role,created_at FROM roles',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-INSERT IGNORE INTO rbac_role_permissions (role_key,permission_key,created_at)
-SELECT role_key,permission_key,created_at
-FROM role_permissions;
+SET @has_role_permissions := (
+  SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema=DATABASE() AND table_name='role_permissions'
+);
+SET @sql := IF(
+  @has_roles=1 AND @has_role_permissions=1,
+  'INSERT IGNORE INTO rbac_role_permissions (role_key,permission_key,created_at) SELECT role_key,permission_key,created_at FROM role_permissions',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
