@@ -89,7 +89,9 @@ export const validateAgentOutput = output => {
 };
 
 export const buildRequirementPrompt = ({ statement, applicationType, project, priorSessions }) => JSON.stringify({
-  task: '将一句话需求主动补全为可进入 Product Agent/PRD 的结构化需求。不要重复询问项目上下文中已有答案。',
+  ownerAgent: 'PRODUCT_AGENT',
+  executionMode: 'INTEGRATED',
+  task: '由需求 Agent 在同一需求任务内分析并主动补齐一句话需求，形成可继续整理 PRD 的结构化结果。不要重复询问项目上下文中已有答案。',
   userStatement: statement,
   applicationType: applicationType || 'UNSPECIFIED',
   project,
@@ -144,9 +146,9 @@ export const executeRequirementCompletion = async ({ projectId, statement, appli
     provider = await invoke({
       schema: requirementCompletionSchema,
       schemaName: 'requirement_completion_result',
-      instructions: '你是 Requirement Completion Agent。输出必须完整覆盖四级拆解和十二维度；先主动补全，只把真正需要产品负责人决定的事项集中为 decisions。使用简体中文。',
+      instructions: '你是 Product Agent（需求 Agent），当前执行内置需求分析与主动补齐步骤，不存在独立的需求补齐 Agent。输出必须完整覆盖四级拆解和十二维度；先主动补全，只把真正需要产品负责人决定的事项集中为 decisions。使用简体中文。',
       input: buildRequirementPrompt({ statement: source, applicationType, ...context }),
-      metadata: { capability: 'CAP-REQ-COMPLETION-V1', project_id: projectId, run_id: runId }
+      metadata: { owner_agent: 'PRODUCT_AGENT', execution_mode: 'INTEGRATED', capability: 'CAP-REQ-COMPLETION-V1', project_id: projectId, run_id: runId }
     });
   } catch (error) {
     await db.execute(
@@ -164,14 +166,14 @@ export const executeRequirementCompletion = async ({ projectId, statement, appli
     'INSERT INTO requirement_completion_sessions (id,project_id,workspace_id,actor_key,source_statement,application_type,status,context_fingerprint,run_id,task_id,step_id,model_provider,model_key,provider_response_id,input_tokens,output_tokens,total_tokens,result_json,decisions_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
     [id, projectId, context.project.workspace_id, actorKey, source, applicationType, status, contextFingerprint, runId, taskId, stepId, provider.provider, provider.model, provider.providerResponseId, usage.input_tokens ?? null, usage.output_tokens ?? null, usage.total_tokens ?? null, JSON.stringify(result), JSON.stringify(decisions)]
   );
-  await writeAudit(db, { projectId, actorKey, eventType: 'REQUIREMENT_COMPLETION_EXECUTED', objectId: id, event: { capabilityId: 'CAP-REQ-COMPLETION-V1', runId, taskId, stepId, status, contextFingerprint, model: provider.model, usage } });
-  return { id, projectId, status, sourceStatement: source, applicationType, contextFingerprint, trace: { phase: 'PRODUCT', taskId, stepId, runId }, provider: { name: provider.provider, model: provider.model, responseId: provider.providerResponseId, usage, estimatedCost: null, costStatus: 'PRICING_RESOLUTION_PENDING' }, result, decisions };
+  await writeAudit(db, { projectId, actorKey, eventType: 'REQUIREMENT_COMPLETION_EXECUTED', objectId: id, event: { ownerAgent: 'PRODUCT_AGENT', executionMode: 'INTEGRATED', capabilityId: 'CAP-REQ-COMPLETION-V1', runId, taskId, stepId, status, contextFingerprint, model: provider.model, usage } });
+  return { id, projectId, status, sourceStatement: source, applicationType, contextFingerprint, trace: { ownerAgent: 'PRODUCT_AGENT', executionMode: 'INTEGRATED', capabilityId: 'CAP-REQ-COMPLETION-V1', phase: 'PRODUCT', taskId, stepId, runId }, provider: { name: provider.provider, model: provider.model, responseId: provider.providerResponseId, usage, estimatedCost: null, costStatus: 'PRICING_RESOLUTION_PENDING' }, result, decisions };
 };
 
 const rowView = row => ({
   id: row.id, projectId: row.project_id, status: row.status, sourceStatement: row.source_statement,
   applicationType: row.application_type, contextFingerprint: row.context_fingerprint,
-  trace: { phase: 'PRODUCT', runId: row.run_id, taskId: row.task_id, stepId: row.step_id },
+  trace: { ownerAgent: 'PRODUCT_AGENT', executionMode: 'INTEGRATED', capabilityId: 'CAP-REQ-COMPLETION-V1', phase: 'PRODUCT', runId: row.run_id, taskId: row.task_id, stepId: row.step_id },
   provider: { name: row.model_provider, model: row.model_key, responseId: row.provider_response_id, usage: { input_tokens: row.input_tokens, output_tokens: row.output_tokens, total_tokens: row.total_tokens } },
   result: parseJson(row.result_json), decisions: parseJson(row.decisions_json) || [], prdHandoff: parseJson(row.prd_handoff_json),
   errorCode: row.error_code, createdAt: row.created_at, updatedAt: row.updated_at
@@ -214,7 +216,7 @@ export const answerRequirementDecisions = async ({ projectId, sessionId, answers
 export const createPrdHandoff = async ({ projectId, sessionId, actorKey, db = getRuntimePool() }) => {
   const current = await getRequirementCompletion({ projectId, sessionId, db });
   if (current.status !== 'READY_FOR_PRD') throw fail('REQUIREMENT_DECISIONS_PENDING', 409);
-  const handoff = { handoffId: randomUUID(), targetAgent: 'PRODUCT_AGENT', targetPhase: 'PRODUCT', sourceSessionId: sessionId, contextFingerprint: current.contextFingerprint, createdBy: actorKey, createdAt: new Date().toISOString(), status: 'READY' };
+  const handoff = { handoffId: randomUUID(), ownerAgent: 'PRODUCT_AGENT', executionMode: 'INTEGRATED', continuationStep: 'PRD_PREPARATION', targetAgent: 'PRODUCT_AGENT', targetPhase: 'PRODUCT', sourceSessionId: sessionId, contextFingerprint: current.contextFingerprint, createdBy: actorKey, createdAt: new Date().toISOString(), status: 'READY' };
   await db.execute('UPDATE requirement_completion_sessions SET status=?,prd_handoff_json=?,updated_at=CURRENT_TIMESTAMP(6) WHERE id=? AND project_id=?', ['HANDOFF_READY', JSON.stringify(handoff), sessionId, projectId]);
   await writeAudit(db, { projectId, actorKey, eventType: 'REQUIREMENT_PRD_HANDOFF_READY', objectId: sessionId, event: handoff });
   return { ...current, status: 'HANDOFF_READY', prdHandoff: handoff };
