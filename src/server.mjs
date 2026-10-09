@@ -3,6 +3,7 @@ import { URL } from 'node:url';
 import { handleRuntimeRoute } from './runtime-api.mjs';
 import { handleFrontendSyncRoute } from './frontend-sync-api.mjs';
 import { handleM31FileAccessRoute } from './m31-file-access-api.mjs';
+import { handleRequirementCompletionRoute } from './requirement-completion-runtime.mjs';
 import { handleKnowledgeRoute } from './knowledge-api.mjs';
 import { checkRuntimeDbReady } from './runtime-db.mjs';
 import { modelProviderConfigured } from './openai-responses-provider.mjs';
@@ -55,6 +56,7 @@ const route = async (req, res) => {
   let runtimePrincipal=null;
   if (url.pathname.startsWith('/api/runtime/')) runtimePrincipal=await authorizeRuntimeRequest(req);
   if (await handleKnowledgeRoute(req, res, url, { json, readBody })) return;
+  if (await handleRequirementCompletionRoute(req, res, url, { json, readBody, principal:runtimePrincipal })) return;
   if (await handleM31FileAccessRoute(req, res, url, { json, principal:runtimePrincipal })) return;
   if (await handleFrontendSyncRoute(req, res, url, { json, principal:runtimePrincipal })) return;
   if (await handleRuntimeRoute(req, res, url, { json, readBody, principal:runtimePrincipal })) return;
