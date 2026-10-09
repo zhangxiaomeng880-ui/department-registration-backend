@@ -31,6 +31,6 @@ test('credential list never exposes token hash or full token',async()=>{
 });
 
 test('admin lists reject unsafe filters',async()=>{
-  await assert.rejects(()=>listIdentities({status:'DROP TABLE'},db),/INVALID_IDENTITY_STATUS/);
-  await assert.rejects(()=>listWorkspaceMemberships({},db),/WORKSPACE_ID_REQUIRED/);
+  await assert.rejects(()=>listIdentities({status:'DROP TABLE'},db),error=>error.code==='INVALID_IDENTITY_STATUS');
+  await assert.rejects(()=>listWorkspaceMemberships({},db),error=>error.code==='WORKSPACE_ID_REQUIRED');
 });
