@@ -68,5 +68,19 @@ const [permissionCounts]=await db.execute(`
 assert.ok(Number(permissionCounts[0].source_count)>0);
 assert.equal(Number(permissionCounts[0].mirrored_count),Number(permissionCounts[0].source_count));
 
+// Reproduce the legacy role FK used by the live membership table.
+await db.query(`CREATE TABLE credential_role_fk_probe (
+  id INT PRIMARY KEY, role_key VARCHAR(64) NOT NULL,
+  FOREIGN KEY (role_key) REFERENCES roles(role_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`);
+await assert.rejects(db.execute("INSERT INTO credential_role_fk_probe VALUES (1,'OPERATOR')"),
+  error=>error.code==='ER_NO_REFERENCED_ROW_2');
+const roleMigration=await fs.readFile(new URL('../migrations/20261010_credential_role_fk_compatibility.sql',import.meta.url),'utf8');
+await db.query(roleMigration);
+await db.query(roleMigration);
+await db.execute("INSERT INTO credential_role_fk_probe VALUES (1,'OPERATOR')");
+const [probe]=await db.execute('SELECT role_key FROM credential_role_fk_probe WHERE id=1');
+assert.equal(probe[0].role_key,'OPERATOR');
+await db.query('DROP TABLE credential_role_fk_probe');
 await db.end();
 console.log('STAGING_CREDENTIAL_RBAC_COMPATIBILITY_PASS');
