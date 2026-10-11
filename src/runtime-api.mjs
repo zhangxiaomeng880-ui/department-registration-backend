@@ -36,8 +36,8 @@ import {
 } from './cost-ledger.mjs';
 import { createTenant, listTenants, createWorkspace, listWorkspaces } from './tenant-workspace.mjs';
 import {
-  createIdentity,upsertTenantMembership,upsertWorkspaceMembership,createApiCredential,
-  revokeApiCredential,listRbacRoles,assertAccess,resolveWorkspaceScope,resolveProjectScope,
+  createIdentity,listIdentities,upsertTenantMembership,upsertWorkspaceMembership,listWorkspaceMemberships,createApiCredential,
+  listApiCredentials,revokeApiCredential,listRbacRoles,assertAccess,resolveWorkspaceScope,resolveProjectScope,
   resolveRunScope,resolveTaskScope,resolveReservationScope,resolveCredentialScope,requirePlatformAdmin
 } from './runtime-rbac.mjs';
 import { upsertQuotaPolicy, listQuotaPolicies, getUsageMeter, evaluateRunQuota } from './quota-meter.mjs';
@@ -802,6 +802,14 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/runtime/identities') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listIdentities({
+      status:url.searchParams.get('status')||'ACTIVE',limit:url.searchParams.get('limit')||100
+    })});
+    return true;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/runtime/identities') {
     requirePlatformAdmin(principal);
     json(res,201,{data:await createIdentity(await readBody(req))});
@@ -821,11 +829,29 @@ export const handleRuntimeRoute = async (req, res, url, helpers) => {
     return true;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/runtime/workspace-memberships') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listWorkspaceMemberships({
+      workspaceId:url.searchParams.get('workspaceId'),status:url.searchParams.get('status')||'ACTIVE',
+      limit:url.searchParams.get('limit')||200
+    })});
+    return true;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/runtime/workspace-memberships') {
     const body=await readBody(req);
     const scope=await resolveWorkspaceScope(body.workspaceId);
     if(!principal?.platformAdmin) await assertAccess({principal,permission:'membership:write',...scope,method:req.method,path:url.pathname});
     json(res,201,{data:await upsertWorkspaceMembership(body)});
+    return true;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/runtime/api-credentials') {
+    requirePlatformAdmin(principal);
+    json(res,200,{data:await listApiCredentials({
+      workspaceId:url.searchParams.get('workspaceId'),identityId:url.searchParams.get('identityId')||null,
+      status:url.searchParams.get('status')||'ALL',limit:url.searchParams.get('limit')||100
+    })});
     return true;
   }
 

@@ -161,6 +161,74 @@ export const listRbacRoles=async()=>{
   return rows.map(r=>({roleKey:r.role_key,scopeType:r.scope_type,name:r.name,permissions:r.permissions?String(r.permissions).split(','):[]}));
 };
 
+
+const adminListStatus=(value,code)=>{
+  const status=value||'ACTIVE';
+  if(!['ACTIVE','INACTIVE','REVOKED','ALL'].includes(status)) throw errorOf('Invalid status filter',code);
+  return status;
+};
+const pageLimit=value=>{
+  const limit=Number(value||100);
+  if(!Number.isInteger(limit)||limit<1||limit>200) throw errorOf('Invalid list limit','INVALID_ADMIN_LIST_LIMIT');
+  return limit;
+};
+const parsedJson=value=>{
+  if(value==null)return null;
+  if(typeof value==='object')return value;
+  try{return JSON.parse(value);}catch{return null;}
+};
+
+export const listIdentities=async({status='ACTIVE',limit=100}={},db=getRuntimePool())=>{
+  const state=adminListStatus(status,'INVALID_IDENTITY_STATUS'),size=pageLimit(limit);
+  const where=state==='ALL'?'':' WHERE status=?';
+  const args=state==='ALL'?[]:[state];
+  const [rows]=await db.query(
+    'SELECT id,identity_key,display_name,status,created_at FROM identities'+where+' ORDER BY display_name,identity_key LIMIT ?',
+    [...args,size]
+  );
+  return rows.map(row=>({id:row.id,identityKey:row.identity_key,displayName:row.display_name,status:row.status,createdAt:row.created_at}));
+};
+
+export const listWorkspaceMemberships=async({workspaceId,status='ACTIVE',limit=200}={},db=getRuntimePool())=>{
+  if(!workspaceId)throw errorOf('workspaceId is required','WORKSPACE_ID_REQUIRED');
+  const state=adminListStatus(status,'INVALID_MEMBERSHIP_STATUS'),size=pageLimit(limit);
+  const where=state==='ALL'?'':' AND wm.status=?';
+  const args=state==='ALL'?[workspaceId,size]:[workspaceId,state,size];
+  const [rows]=await db.query(
+    `SELECT wm.id,wm.workspace_id,wm.identity_id,i.identity_key,i.display_name,
+            wm.role_key,r.name AS role_name,wm.status,wm.created_at
+       FROM workspace_memberships wm
+       JOIN identities i ON i.id=wm.identity_id
+       JOIN rbac_roles r ON r.role_key=wm.role_key
+      WHERE wm.workspace_id=?${where}
+      ORDER BY i.display_name,i.identity_key LIMIT ?`,args
+  );
+  return rows.map(row=>({id:row.id,workspaceId:row.workspace_id,identityId:row.identity_id,identityKey:row.identity_key,displayName:row.display_name,roleKey:row.role_key,roleName:row.role_name,status:row.status,createdAt:row.created_at}));
+};
+
+export const listApiCredentials=async({workspaceId,identityId=null,status='ALL',limit=100}={},db=getRuntimePool())=>{
+  if(!workspaceId)throw errorOf('workspaceId is required','WORKSPACE_ID_REQUIRED');
+  const state=adminListStatus(status,'INVALID_CREDENTIAL_STATUS'),size=pageLimit(limit);
+  const clauses=['c.workspace_id=?'],args=[workspaceId];
+  if(identityId){clauses.push('c.identity_id=?');args.push(identityId);}
+  if(state!=='ALL'){clauses.push('c.status=?');args.push(state);}
+  const [rows]=await db.query(
+    `SELECT c.id,c.credential_prefix,c.identity_id,i.identity_key,i.display_name,
+            c.tenant_id,c.workspace_id,c.name,c.status,c.allowed_permissions_json,
+            c.expires_at,c.last_used_at,c.revoked_at,c.created_at
+       FROM api_credentials c JOIN identities i ON i.id=c.identity_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY c.created_at DESC LIMIT ?`,[...args,size]
+  );
+  return rows.map(row=>({
+    id:row.id,credentialPrefix:'rtk_'+row.credential_prefix+'_…',identityId:row.identity_id,
+    identityKey:row.identity_key,displayName:row.display_name,tenantId:row.tenant_id,
+    workspaceId:row.workspace_id,name:row.name,status:row.status,
+    allowedPermissions:parsedJson(row.allowed_permissions_json)||[],
+    expiresAt:row.expires_at,lastUsedAt:row.last_used_at,revokedAt:row.revoked_at,createdAt:row.created_at
+  }));
+};
+
 export const authenticateScopedCredential=async token=>{
   const match=String(token||'').match(/^rtk_([a-f0-9]{12})_[A-Za-z0-9_-]+$/);
   if(!match) return null;

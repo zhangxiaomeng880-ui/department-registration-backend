@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateRequirementStatement, validateAgentOutput, buildRequirementPrompt, requirementCompletionConstants } from '../src/requirement-completion-runtime.mjs';
+import { validateRequirementStatement, validateAgentOutput, buildRequirementPrompt, requirementCompletionConstants, executeRequirementCompletion, createPrdHandoff } from '../src/requirement-completion-runtime.mjs';
 
 test('one-line requirement validation is bounded and normalized', () => {
   assert.equal(validateRequirementStatement('  建立网站异常监控工作台  '), '建立网站异常监控工作台');
@@ -26,4 +26,33 @@ test('agent result contract rejects duplicate ids and decorates pending decision
   assert.equal(checked.decisions[0].status, 'PENDING');
   const invalid = structuredClone(base); invalid.decisions[0].id = 'r0';
   assert.throws(() => validateAgentOutput(invalid), /REQUIREMENT_AGENT_OUTPUT_CONTRACT_VIOLATION/);
+});
+
+
+test('completion model run and PRD continuation retain one Product Agent owner', async () => {
+  const writes = [];
+  const db = { execute: async (sql, values) => {
+    if (sql.startsWith('SELECT id,tenant_id')) return [[{ id: 'p1', workspace_id: 'w1' }]];
+    if (sql.startsWith('SELECT id,source_statement')) return [[]];
+    writes.push({ sql, values }); return [{}];
+  } };
+  let request;
+  const completed = await executeRequirementCompletion({ projectId: 'p1', statement: '建立网站异常监控工作台', actorKey: 'u1', db, invoke: async args => {
+    request = args;
+    return { provider: 'openai', model: 'test', output: { summary: '需求', assumptions: [], decisions: [], risks: [], completionScore: 100,
+      requirements: ['PAGE','MODULE','METRIC','FUNCTION'].map((level, i) => ({ id: 'r'+i, level, dimension: requirementCompletionConstants.DIMENSIONS[i] })) } };
+  } });
+  assert.equal(request.metadata.owner_agent, 'PRODUCT_AGENT');
+  assert.equal(request.metadata.execution_mode, 'INTEGRATED');
+  assert.equal(completed.trace.ownerAgent, 'PRODUCT_AGENT');
+  assert.equal(completed.status, 'READY_FOR_PRD');
+  const persisted = writes.find(item => item.sql.startsWith('INSERT INTO requirement_completion_sessions')).values;
+  const continuationDb = { execute: async sql => sql.startsWith('SELECT *') ? [[{
+    id: completed.id, project_id: 'p1', status: 'READY_FOR_PRD', context_fingerprint: completed.contextFingerprint,
+    result_json: persisted[17], decisions_json: persisted[18]
+  }]] : [{}] };
+  const prepared = await createPrdHandoff({ projectId: 'p1', sessionId: completed.id, actorKey: 'u1', db: continuationDb });
+  assert.equal(prepared.prdHandoff.ownerAgent, completed.trace.ownerAgent);
+  assert.equal(prepared.prdHandoff.executionMode, 'INTEGRATED');
+  assert.equal(prepared.prdHandoff.continuationStep, 'PRD_PREPARATION');
 });
