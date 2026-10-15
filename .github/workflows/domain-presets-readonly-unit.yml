@@ -1,0 +1,23 @@
+name: Domain Presets Read-only Unit
+on:
+  pull_request:
+    branches: [feat/credential-admin-mvp]
+    paths:
+      - .github/workflows/domain-presets-readonly-unit.yml
+      - src/domain-workflow-presets.mjs
+      - src/runtime-api.mjs
+      - test/domain-presets-readonly.unit.test.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  domain-presets-readonly-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Isolated read-only unit contracts (no database or provider)
+        run: node --experimental-vm-modules --test test/domain-presets-readonly.unit.test.mjs

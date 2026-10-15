@@ -359,7 +359,8 @@ export const listProjectSubtypes=async({projectTypeKey,status='ACTIVE'}={})=>{
 };
 
 export const listDomainWorkflowPresets=async({projectTypeKey=null}={})=>{
-  await syncStandardDomainPresets();
+  // Browsing only reads registered presets. Initialization belongs to the
+  // existing, explicitly authorized POST /domain-presets/sync operation.
   const db=getRuntimePool();
   const [rows]=projectTypeKey
     ? await db.execute(
@@ -373,7 +374,7 @@ export const listDomainWorkflowPresets=async({projectTypeKey=null}={})=>{
 };
 
 export const getDomainWorkflowPreset=async presetKey=>{
-  await syncStandardDomainPresets();
+  // Never seed or refresh a preset through a read (including readiness).
   const db=getRuntimePool();
   const [rows]=await db.execute(
     'SELECT * FROM domain_workflow_presets WHERE preset_key=?',[presetKey]
@@ -503,6 +504,9 @@ export const getDomainPresetReadiness=async presetKey=>{
 };
 
 export const compileDomainWorkflowPreset=async presetKey=>{
+  // Compilation is an explicit mutation. Preserve its existing initialization
+  // and standard-spec refresh behavior here, never inside shared read helpers.
+  await syncStandardDomainPresets();
   const preset=await getDomainWorkflowPreset(presetKey);
   const spec=preset.spec;
   const readiness=await getDomainPresetReadiness(presetKey);
