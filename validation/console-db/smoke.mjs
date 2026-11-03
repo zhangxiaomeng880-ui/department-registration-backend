@@ -10,7 +10,7 @@ const {getRuntimePool}=await import('../../src/runtime-db.mjs');
 const {createConsoleServer}=await import('./console/server.mjs');
 const report=[];
 async function request(base,path,status,options={}) {
- const r=await fetch(base+path,options);const body=await r.json();
+ const r=await fetch(base+path,{...options,headers:{...options.headers,connection:'close'}});const body=await r.json();
  assert.equal(r.status,status,JSON.stringify({path,status:r.status,body}));
  report.push({path,status:r.status});return {r,body};
 }
