@@ -32,7 +32,7 @@ try {
  const login=await request(origin,'/auth/login',200,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({password:env.CONSOLE_ADMIN_PASSWORD})});
  const cookie=login.r.headers.get('set-cookie').split(';')[0];
  await request(origin,'/api/runtime/workspaces',200,{headers:{cookie}});
- await request(origin,'/api/runtime/projects',200,{headers:{cookie}});
+ await request(origin,'/api/runtime/projects?workspaceId=00000000-0000-4000-8000-000000000102&offset=0&limit=100',200,{headers:{cookie}});
  const next=randomBytes(24).toString('hex');
  await request(origin,'/auth/change-password',200,{method:'POST',headers:{cookie,origin,'content-type':'application/json'},body:JSON.stringify({currentPassword:env.CONSOLE_ADMIN_PASSWORD,newPassword:next})});
  await new Promise(r=>bff.close(r));await start();
