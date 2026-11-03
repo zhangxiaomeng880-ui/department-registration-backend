@@ -1,0 +1,43 @@
+name: Isolated Console MySQL integration
+on:
+  push:
+    branches: [validation/console-db-20261103]
+    paths: ['.github/workflows/isolated-console-db.yml', 'validation/console-db/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-ci-only
+          MYSQL_DATABASE: runtime
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pisolated-ci-only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: root
+      DB_PASSWORD: isolated-ci-only
+      DB_NAME: runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Migrate clean database
+        run: node scripts/migrate-runtime.mjs
+      - name: Verify migration idempotence
+        run: node scripts/migrate-runtime.mjs
+      - name: Run backend contracts
+        run: node --experimental-vm-modules --test test/domain-presets-readonly.unit.test.mjs test/frontend-sync-api.test.mjs test/m31-file-access.test.mjs
+      - name: Verify Runtime and Console with real MySQL
+        run: node validation/console-db/smoke.mjs
